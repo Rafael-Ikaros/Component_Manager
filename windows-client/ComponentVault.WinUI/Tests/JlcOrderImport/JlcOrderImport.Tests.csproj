@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.10" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../Services/BatchInbound/*.cs" Link="Production/BatchInbound/%(Filename)%(Extension)" />
+    <Compile Include="../../Services/InventoryDatabase.cs" Link="Production/InventoryDatabase.cs" />
+    <Compile Include="../../Services/InventoryWrites/InventoryBatchWriter.cs" Link="Production/InventoryBatchWriter.cs" />
+    <Compile Include="../../Services/InventoryWrites/InventoryLocationWriter.cs" Link="Production/InventoryLocationWriter.cs" />
+    <Compile Include="../../Services/InventoryWrites/InventoryWriteSql.cs" Link="Production/InventoryWriteSql.cs" />
+    <Compile Include="../../Services/Catalog/*.cs" Link="Production/Catalog/%(Filename)%(Extension)" />
+    <Compile Include="../../Services/AppDiagnostics.cs" Link="Production/AppDiagnostics.cs" />
+    <Compile Include="../../Models/OperationResult.cs" Link="Production/OperationResult.cs" />
+  </ItemGroup>
+</Project>
