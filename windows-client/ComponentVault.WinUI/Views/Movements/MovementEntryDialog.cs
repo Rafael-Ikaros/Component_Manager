@@ -1,8 +1,12 @@
 using ComponentVault.WinUI.Localization;
 using ComponentVault.WinUI.Models;
+using ComponentVault.WinUI.Services;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.System;
 using Windows.UI;
 
 namespace ComponentVault.WinUI.Views.Movements;
@@ -14,14 +18,22 @@ public sealed class MovementEntryDialog(
     IReadOnlyList<StorageLocationRecord> locations)
 {
     private sealed record MovementTypeOption(string Value, string Label);
+    private sealed record ComponentOption(ComponentRecord Component)
+    {
+        public string Label => $"{Component.Name} · {Component.Sku} · {Component.PackageName}";
+        public override string ToString() => Label;
+    }
 
     public async Task<MovementEntryDraft?> ShowAsync()
     {
-        var componentCombo = new ComboBox
+        var componentOptions = components.Select(component => new ComponentOption(component)).ToArray();
+        var selectedComponent = componentOptions.FirstOrDefault();
+        var componentSearch = new AutoSuggestBox
         {
-            ItemsSource = components,
-            DisplayMemberPath = nameof(ComponentRecord.Name),
-            SelectedIndex = 0,
+            PlaceholderText = "搜索 SKU、名称、封装或库位",
+            TextMemberPath = nameof(ComponentOption.Label),
+            Text = selectedComponent?.Label ?? "",
+            ItemsSource = componentOptions.Take(20).ToArray(),
         };
         var movementTypeCombo = new ComboBox
         {
@@ -49,11 +61,39 @@ public sealed class MovementEntryDialog(
         };
         void RefreshSourceLocations()
         {
-            var component = componentCombo.SelectedItem as ComponentRecord;
-            sourceLocationCombo.SelectedItem = locations.FirstOrDefault(item => item.Id == component?.Location)
-                ?? locations.FirstOrDefault();
+            sourceLocationCombo.SelectedItem = selectedComponent is null
+                ? null
+                : locations.FirstOrDefault(item => item.Id == selectedComponent.Component.Location)
+                    ?? locations.FirstOrDefault();
         }
-        componentCombo.SelectionChanged += (_, _) => RefreshSourceLocations();
+        void SelectComponent(ComponentOption option)
+        {
+            selectedComponent = option;
+            componentSearch.Text = option.Label;
+            RefreshSourceLocations();
+        }
+        componentSearch.TextChanged += (sender, args) =>
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            selectedComponent = null;
+            RefreshSourceLocations();
+            sender.ItemsSource = componentOptions
+                .Where(option => InventorySearch.Matches(option.Component, sender.Text))
+                .Take(20).ToArray();
+        };
+        componentSearch.SuggestionChosen += (_, args) =>
+        {
+            if (args.SelectedItem is ComponentOption option) SelectComponent(option);
+        };
+        componentSearch.QuerySubmitted += (_, args) =>
+        {
+            if (args.ChosenSuggestion is ComponentOption option) SelectComponent(option);
+        };
+        // Enter confirms a suggestion without invoking the dialog's default Save button.
+        componentSearch.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler((_, args) =>
+        {
+            if (args.Key == VirtualKey.Enter) args.Handled = true;
+        }), true);
         RefreshSourceLocations();
         var quantityBox = new NumberBox
         {
@@ -88,13 +128,12 @@ public sealed class MovementEntryDialog(
         var panel = new StackPanel
         {
             Spacing = 16,
-            Width = 500,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        panel.Children.Add(CreateSectionHeader("记录对象", "先选择元器件，再填写变动类型。"));
-        panel.Children.Add(CreateField("元器件", componentCombo));
-        panel.Children.Add(CreateField("变动类型", movementTypeCombo));
-        panel.Children.Add(CreateField("作业 / 来源库位", sourceLocationCombo));
-        panel.Children.Add(CreateField("调拨目标库位", destinationLocationCombo));
+        panel.Children.Add(CreateInlineField("元器件", componentSearch));
+        panel.Children.Add(CreateInlineField("变动类型", movementTypeCombo));
+        panel.Children.Add(CreateInlineField("作业 / 来源库位", sourceLocationCombo));
+        panel.Children.Add(CreateInlineField("调拨目标库位", destinationLocationCombo));
 
         panel.Children.Add(CreateSectionHeader("数量与原因", "数量将直接影响本地库存。"));
         panel.Children.Add(CreateField("数量", quantityBox));
@@ -105,25 +144,62 @@ public sealed class MovementEntryDialog(
         panel.Children.Add(CreateField("备注", noteBox));
         panel.Children.Add(errorText);
 
+        var overlayLayout = new Grid
+        {
+            MaxHeight = 600,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        overlayLayout.Children.Add(new ScrollViewer
+        {
+            Content = panel,
+            Padding = new Thickness(0, 0, 24, 0),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollMode = ScrollMode.Enabled,
+        });
+
         MovementEntryDraft? draft = null;
         var dialog = new ContentDialog
         {
             Title = AppStrings.Get("Movements_Dialog_Title"),
-            Content = new ScrollViewer
-            {
-                Content = panel,
-                MaxHeight = 600,
-            },
+            Content = overlayLayout,
             PrimaryButtonText = AppStrings.Get("Common_Save"),
             CloseButtonText = AppStrings.Get("Common_Cancel"),
             DefaultButton = ContentDialogButton.Primary,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             XamlRoot = xamlRoot,
+        };
+        const double maximumDialogWidth = 720;
+        const double maximumContentHeight = 600;
+        const double verticalChromeAndMargins = 224;
+        const double windowMargin = 24;
+        var dialogPadding = new Thickness(24);
+        dialog.Resources["ContentDialogMinWidth"] = 0d;
+        dialog.Resources["ContentDialogMaxWidth"] = maximumDialogWidth;
+        dialog.Resources["ContentDialogPadding"] = dialogPadding;
+        void UpdateLayoutSize()
+        {
+            var dialogWidth = Math.Min(maximumDialogWidth, Math.Max(0, xamlRoot.Size.Width - 2 * windowMargin));
+            var contentWidth = Math.Max(0, dialogWidth - dialogPadding.Left - dialogPadding.Right
+                - dialog.BorderThickness.Left - dialog.BorderThickness.Right);
+            if (overlayLayout.Width != contentWidth) overlayLayout.Width = contentWidth;
+            var contentHeight = Math.Min(maximumContentHeight, Math.Max(0, xamlRoot.Size.Height - verticalChromeAndMargins));
+            if (overlayLayout.MaxHeight != contentHeight) overlayLayout.MaxHeight = contentHeight;
+        }
+        void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateLayoutSize();
+        dialog.Opened += (_, _) =>
+        {
+            UpdateLayoutSize();
+            movementTypeCombo.Focus(FocusState.Programmatic);
+            componentSearch.IsSuggestionListOpen = false;
         };
         dialog.PrimaryButtonClick += (_, args) =>
         {
-            if (componentCombo.SelectedItem is not ComponentRecord component)
+            if (selectedComponent is null || componentSearch.Text != selectedComponent.Label)
             {
-                errorText.Text = "请选择一个元器件。";
+                errorText.Text = "请从搜索建议中选择一个元器件。";
                 args.Cancel = true;
                 return;
             }
@@ -157,7 +233,7 @@ public sealed class MovementEntryDialog(
 
             draft = new MovementEntryDraft
             {
-                ComponentId = component.Id,
+                ComponentId = selectedComponent.Component.Id,
                 MovementType = movementType.Value,
                 Quantity = (int)Math.Round(quantityBox.Value),
                 Reason = reasonBox.Text,
@@ -167,8 +243,38 @@ public sealed class MovementEntryDialog(
             };
         };
 
-        var result = await dialog.ShowAsync();
-        return result == ContentDialogResult.Primary ? draft : null;
+        UpdateLayoutSize();
+        xamlRoot.Changed += OnRootChanged;
+        try
+        {
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary ? draft : null;
+        }
+        finally
+        {
+            xamlRoot.Changed -= OnRootChanged;
+        }
+    }
+
+    private static FrameworkElement CreateInlineField(string label, FrameworkElement control)
+    {
+        var grid = new Grid { ColumnSpacing = 12 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star), MaxWidth = 126 });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(7, GridUnitType.Star) });
+        var labelText = new TextBlock
+        {
+            Text = label,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        control.HorizontalAlignment = HorizontalAlignment.Stretch;
+        control.VerticalAlignment = VerticalAlignment.Center;
+        AutomationProperties.SetLabeledBy(control, labelText);
+        Grid.SetColumn(control, 1);
+        grid.Children.Add(labelText);
+        grid.Children.Add(control);
+        return grid;
     }
 
     private static FrameworkElement CreateField(string label, FrameworkElement control)

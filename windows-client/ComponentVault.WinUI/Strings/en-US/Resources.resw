@@ -24,10 +24,10 @@
   <data name="ComponentsViewPageSubtitle.Text" xml:space="preserve"><value>Find components, inspect stock, and edit or delete from the detail pane.</value></data>
   <data name="ComponentsViewAddButton.Label" xml:space="preserve"><value>Add component</value></data>
   <data name="ComponentsViewSearchBox.PlaceholderText" xml:space="preserve"><value>Search SKU, name, category, or location</value></data>
-  <data name="ComponentsViewLowStockToggle.Header" xml:space="preserve"><value>Low stock</value></data>
-  <data name="ComponentsViewCategoryCombo.Header" xml:space="preserve"><value>Category</value></data>
-  <data name="ComponentsViewLocationCombo.Header" xml:space="preserve"><value>Location</value></data>
-  <data name="ComponentsViewSortCombo.Header" xml:space="preserve"><value>Sort</value></data>
+  <data name="ComponentsViewLowStockLabel.Text" xml:space="preserve"><value>Low stock</value></data>
+  <data name="ComponentsViewCategoryLabel.Text" xml:space="preserve"><value>Category</value></data>
+  <data name="ComponentsViewLocationLabel.Text" xml:space="preserve"><value>Location</value></data>
+  <data name="ComponentsViewSortLabel.Text" xml:space="preserve"><value>Sort</value></data>
   <data name="ComponentsViewSkuCaption.Text" xml:space="preserve"><value>SKU</value></data>
   <data name="DashboardViewPageTitle.Text" xml:space="preserve"><value>Overview</value></data>
   <data name="DashboardViewPageSubtitle.Text" xml:space="preserve"><value>See inventory scale, risk, and recent work at a glance.</value></data>

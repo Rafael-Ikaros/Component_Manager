@@ -87,16 +87,13 @@ public sealed class ComponentEditorDialog(
         var panel = new StackPanel
         {
             Spacing = 16,
-            Width = 520,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         panel.Children.Add(CreateSectionHeader("基本信息", "名称、SKU、分类与封装。"));
-        var skuActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var lookupButton = new Button { Content = AppStrings.Get("Components_Catalog_ExactLookup") };
         var chinaSearchButton = new Button { Content = AppStrings.Get("Components_Catalog_OpenSearch") };
         var retryDomesticButton = new Button { Content = "重试国内查询 / Retry China lookup" };
-        skuActions.Children.Add(lookupButton);
-        skuActions.Children.Add(chinaSearchButton);
-        skuActions.Children.Add(retryDomesticButton);
+        var skuActions = CreateActionRow(lookupButton, chinaSearchButton, retryDomesticButton);
         var skuPanel = new StackPanel { Spacing = 6 };
         skuPanel.Children.Add(skuBox);
         skuPanel.Children.Add(skuActions);
@@ -137,18 +134,11 @@ public sealed class ComponentEditorDialog(
             IsTextSelectionEnabled = true,
             Visibility = Visibility.Collapsed,
         };
-        var candidateActions = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Visibility = Visibility.Collapsed,
-        };
         var fillCandidateButton = new Button { Content = AppStrings.Get("Components_Catalog_FillSelected") };
         var openProductButton = new Button { Content = AppStrings.Get("Components_Catalog_OpenProduct") };
         var openDatasheetButton = new Button { Content = AppStrings.Get("Components_Catalog_OpenDatasheet"), IsEnabled = false };
-        candidateActions.Children.Add(fillCandidateButton);
-        candidateActions.Children.Add(openProductButton);
-        candidateActions.Children.Add(openDatasheetButton);
+        var candidateActions = CreateActionRow(fillCandidateButton, openProductButton, openDatasheetButton);
+        candidateActions.Visibility = Visibility.Collapsed;
         panel.Children.Add(candidateList);
         panel.Children.Add(parameterText);
         panel.Children.Add(candidateActions);
@@ -303,21 +293,55 @@ public sealed class ComponentEditorDialog(
             editor.Description = descriptionBox.Text;
             editor.RecordCatalogFields(metadata.Sku);
         }
+        var overlayLayout = new Grid
+        {
+            MaxHeight = 620,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        overlayLayout.Children.Add(new ScrollViewer
+        {
+            Content = panel,
+            Padding = new Thickness(0, 0, 24, 0),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollMode = ScrollMode.Enabled,
+        });
         var dialog = new ContentDialog
         {
             Title = existing is null
                 ? AppStrings.Get("Components_Dialog_AddTitle")
                 : AppStrings.Get("Components_Dialog_EditTitle"),
-            Content = new ScrollViewer
-            {
-                Content = panel,
-                MaxHeight = 620,
-            },
+            Content = overlayLayout,
             PrimaryButtonText = AppStrings.Get("Common_Save"),
             CloseButtonText = AppStrings.Get("Common_Cancel"),
             DefaultButton = ContentDialogButton.Primary,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             XamlRoot = _xamlRoot,
         };
+        const double maximumDialogWidth = 720;
+        const double maximumContentHeight = 620;
+        const double verticalChromeAndMargins = 224;
+        const double windowMargin = 24;
+        var dialogPadding = new Thickness(24);
+        dialog.Resources["ContentDialogMinWidth"] = 0d;
+        dialog.Resources["ContentDialogMaxWidth"] = maximumDialogWidth;
+        dialog.Resources["ContentDialogPadding"] = dialogPadding;
+        void UpdateLayoutSize()
+        {
+            var dialogWidth = Math.Min(maximumDialogWidth, Math.Max(0, _xamlRoot.Size.Width - 2 * windowMargin));
+            var contentWidth = Math.Max(0, dialogWidth - dialogPadding.Left - dialogPadding.Right
+                - dialog.BorderThickness.Left - dialog.BorderThickness.Right);
+            if (overlayLayout.Width != contentWidth) overlayLayout.Width = contentWidth;
+            var contentHeight = Math.Min(maximumContentHeight, Math.Max(0, _xamlRoot.Size.Height - verticalChromeAndMargins));
+            if (overlayLayout.MaxHeight != contentHeight) overlayLayout.MaxHeight = contentHeight;
+            var actionColumns = contentWidth - 24 >= 560 ? 3 : 1;
+            UpdateActionRow(skuActions, actionColumns);
+            UpdateActionRow(candidateActions, actionColumns);
+        }
+        void OnRootChanged(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateLayoutSize();
+        dialog.Opened += (_, _) => UpdateLayoutSize();
         dialog.PrimaryButtonClick += (_, args) =>
         {
             editor.Sku = skuBox.Text;
@@ -337,8 +361,17 @@ public sealed class ComponentEditorDialog(
             }
         };
 
-        var result = await dialog.ShowAsync();
-        return result == ContentDialogResult.Primary ? draft : null;
+        UpdateLayoutSize();
+        _xamlRoot.Changed += OnRootChanged;
+        try
+        {
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary ? draft : null;
+        }
+        finally
+        {
+            _xamlRoot.Changed -= OnRootChanged;
+        }
     }
 
     private static string AppendOfficialNotes(string description, LcscProductMetadata metadata)
@@ -401,6 +434,41 @@ public sealed class ComponentEditorDialog(
     private static void AddUnique(List<string> notes, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value) && !notes.Any(note => note.Contains(value, StringComparison.Ordinal))) notes.Add(value);
+    }
+
+    private static Grid CreateActionRow(params Button[] buttons)
+    {
+        var grid = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+        foreach (var button in buttons)
+        {
+            button.Content = new TextBlock
+            {
+                Text = button.Content?.ToString() ?? string.Empty,
+                TextWrapping = TextWrapping.Wrap,
+                TextAlignment = TextAlignment.Center,
+            };
+            button.HorizontalAlignment = HorizontalAlignment.Stretch;
+            button.VerticalAlignment = VerticalAlignment.Stretch;
+            grid.Children.Add(button);
+        }
+        return grid;
+    }
+
+    private static void UpdateActionRow(Grid grid, int columns)
+    {
+        if (grid.ColumnDefinitions.Count == columns) return;
+        grid.ColumnDefinitions.Clear();
+        grid.RowDefinitions.Clear();
+        for (var column = 0; column < columns; column++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var row = 0; row < (grid.Children.Count + columns - 1) / columns; row++)
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var index = 0; index < grid.Children.Count; index++)
+        {
+            var element = (FrameworkElement)grid.Children[index];
+            Grid.SetColumn(element, index % columns);
+            Grid.SetRow(element, index / columns);
+        }
     }
 
     private static TextBox CreateTextBox(string? value, string placeholderText) =>

@@ -1,609 +1,562 @@
 <Page
-    x:Class="ComponentVault.WinUI.Views.ComponentsView"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:converters="using:ComponentVault.WinUI.Converters"
-    xmlns:controls="using:ComponentVault.WinUI.Controls"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:design="using:ComponentVault.WinUI.Design"
-    xmlns:models="using:ComponentVault.WinUI.Models"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    d:DataContext="{d:DesignInstance Type=design:DesignMainViewModel, IsDesignTimeCreatable=True}"
-    mc:Ignorable="d">
-    <Page.Resources>
-        <converters:CategoryDisplayConverter
-            x:Key="CategoryDisplayConverter" />
-        <DataTemplate
-            x:Key="CategoryOptionTemplate">
-            <TextBlock
-                Text="{Binding Converter={StaticResource CategoryDisplayConverter}}" />
-        </DataTemplate>
-    </Page.Resources>
-    <Grid
-        Padding="24"
-        RowSpacing="12">
-        <VisualStateManager.VisualStateGroups>
-            <VisualStateGroup x:Name="ResponsiveStates">
-                <VisualState x:Name="Narrow">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
-                    </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <Setter Target="ComponentSearchBox.(Grid.ColumnSpan)" Value="5" />
-                        <Setter Target="LowStockOnlyToggle.(Grid.Row)" Value="1" />
-                        <Setter Target="LowStockOnlyToggle.(Grid.Column)" Value="0" />
-                        <Setter Target="CategoryFilter.(Grid.Row)" Value="1" />
-                        <Setter Target="CategoryFilter.(Grid.Column)" Value="1" />
-                        <Setter Target="LocationFilter.(Grid.Row)" Value="1" />
-                        <Setter Target="LocationFilter.(Grid.Column)" Value="2" />
-                        <Setter Target="SortFilter.(Grid.Row)" Value="1" />
-                        <Setter Target="SortFilter.(Grid.Column)" Value="3" />
-                        <Setter Target="SortFilter.(Grid.ColumnSpan)" Value="2" />
-                        <Setter Target="FilterSummary.(Grid.Row)" Value="2" />
-                        <Setter Target="WorkspaceSummary.(Grid.Row)" Value="2" />
-                        <Setter Target="InventoryDetailColumn.Width" Value="0" />
-                        <Setter Target="InventoryWorkspace.ColumnSpacing" Value="0" />
-                        <Setter Target="InventoryListRow.Height" Value="*" />
-                        <Setter Target="InventoryDetailRow.Height" Value="*" />
-                        <Setter Target="InventoryDetailPane.(Grid.Row)" Value="1" />
-                        <Setter Target="InventoryDetailPane.(Grid.Column)" Value="0" />
-                    </VisualState.Setters>
-                </VisualState>
-                <VisualState x:Name="Wide">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1000" />
-                    </VisualState.StateTriggers>
-                </VisualState>
-            </VisualStateGroup>
-        </VisualStateManager.VisualStateGroups>
-        <Grid.RowDefinitions>
-            <RowDefinition
-                Height="Auto" />
-            <RowDefinition
-                Height="Auto" />
-            <RowDefinition
-                Height="*" />
-        </Grid.RowDefinitions>
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition
-                    Width="*" />
-                <ColumnDefinition
-                    Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel
-                Spacing="4">
-                <TextBlock
-                    x:Uid="ComponentsViewPageTitle"
-                    Style="{StaticResource PageTitleTextStyle}"
-                    Text="库存" />
-                <TextBlock
-                    x:Uid="ComponentsViewPageSubtitle"
-                    Style="{StaticResource PageSubtitleTextStyle}"
-                    Text="查找元器件、检查库存，并从详情中编辑或删除。" />
-            </StackPanel>
-            <CommandBar
-                Grid.Column="1"
-                Background="Transparent"
-                DefaultLabelPosition="Right"
-                IsDynamicOverflowEnabled="True">
-                <AppBarButton
-                    x:Uid="ComponentsViewAddButton"
-                    Click="OnAddComponentClicked"
-                    Icon="Add"
-                    Label="新增元器件" />
-                <CommandBar.SecondaryCommands>
-                    <AppBarButton Click="OnBatchJlcInboundClicked" Label="嘉立创批量入库">
-                        <AppBarButton.Icon><FontIcon Glyph="&#xE8B7;" /></AppBarButton.Icon>
-                    </AppBarButton>
-                    <AppBarButton Click="OnImportComponentHubClicked" Icon="Upload" Label="导入元器件" />
-                    <AppBarButton Click="OnKittingClicked" Icon="AllApps" Label="配套件" />
-                    <AppBarButton Click="OnManageLocationsClicked" Label="管理库位">
-                        <AppBarButton.Icon><FontIcon Glyph="&#xE707;" /></AppBarButton.Icon>
-                    </AppBarButton>
-                </CommandBar.SecondaryCommands>
-            </CommandBar>
-        </Grid>
-        <Border
-            Grid.Row="1"
-            Style="{StaticResource CardBorderStyle}">
-            <Grid
-                ColumnSpacing="12"
-                RowSpacing="8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition
-                        Width="2*" />
-                    <ColumnDefinition
-                        Width="Auto" />
-                    <ColumnDefinition
-                        Width="*" />
-                    <ColumnDefinition
-                        Width="*" />
-                    <ColumnDefinition
-                        Width="*" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition
-                        Height="Auto" />
-                    <RowDefinition
-                        Height="Auto" />
-                    <RowDefinition
-                        Height="Auto" />
-                </Grid.RowDefinitions>
-                <AutoSuggestBox
-                    x:Uid="ComponentsViewSearchBox"
-                    x:Name="ComponentSearchBox"
-                    PlaceholderText="搜索 SKU、型号、规格、分类或仓位；空格可组合关键词"
-                    QueryIcon="Find"
-                    Text="{Binding ComponentSearchText, Mode=TwoWay}"
-                    TextChanged="OnSearchTextChanged" />
-                <ToggleSwitch
-                    x:Uid="ComponentsViewLowStockToggle"
-                    x:Name="LowStockOnlyToggle"
-                    Grid.Column="1"
-                    Header="低库存"
-                    IsOn="{Binding ShowLowStockOnly, Mode=TwoWay}"
-                    Toggled="OnLowStockOnlyToggled" />
-                <ComboBox
-                    x:Uid="ComponentsViewCategoryCombo"
-                    x:Name="CategoryFilter"
-                    Grid.Column="2"
-                    Header="分类"
-                    ItemTemplate="{StaticResource CategoryOptionTemplate}"
-                    ItemsSource="{Binding InventoryCategoryOptions}"
-                    SelectedItem="{Binding SelectedComponentCategoryFilter, Mode=TwoWay}" />
-                <ComboBox
-                    x:Uid="ComponentsViewLocationCombo"
-                    x:Name="LocationFilter"
-                    Grid.Column="3"
-                    Header="仓位"
-                    ItemsSource="{Binding InventoryLocationOptions}"
-                    SelectedItem="{Binding SelectedComponentLocationFilter, Mode=TwoWay}" />
-                <ComboBox
-                    x:Uid="ComponentsViewSortCombo"
-                    x:Name="SortFilter"
-                    Grid.Column="4"
-                    Header="排序"
-                    ItemsSource="{Binding InventorySortOptions}"
-                    SelectedItem="{Binding SelectedComponentSortOption, Mode=TwoWay}" />
-                <TextBlock
-                    x:Name="FilterSummary"
-                    Grid.Row="1"
-                    Grid.ColumnSpan="3"
-                    Style="{StaticResource CaptionTextStyle}"
-                    Text="{Binding InventoryFilterSummary}"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    x:Name="WorkspaceSummary"
-                    Grid.Row="1"
-                    Grid.Column="3"
-                    Grid.ColumnSpan="2"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource CaptionTextStyle}"
-                    Text="{Binding InventoryWorkspaceSummary}"
-                    TextWrapping="Wrap" />
-            </Grid>
-        </Border>
-        <Grid
-            x:Name="InventoryWorkspace"
-            Grid.Row="2"
-            ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition
-                    Width="2.15*" />
-                <ColumnDefinition
-                    x:Name="InventoryDetailColumn"
-                    Width="1.2*" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition
-                    x:Name="InventoryListRow"
-                    Height="*" />
-                <RowDefinition
-                    x:Name="InventoryDetailRow"
-                    Height="0" />
-            </Grid.RowDefinitions>
-            <Border
-                x:Name="InventoryListPane"
-                Style="{StaticResource CardBorderStyle}">
-                <Grid
-                    RowSpacing="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition
-                            Height="Auto" />
-                        <RowDefinition
-                            Height="Auto" />
-                        <RowDefinition
-                            Height="*" />
-                    </Grid.RowDefinitions>
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock
-                            x:Name="InventoryListSummary"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource CaptionTextStyle}"
-                            Text="{Binding ComponentInventorySummary}" />
-                        <Button
-                            x:Name="StartBatchSelectionButton"
-                            Grid.Column="1"
-                            Click="OnStartBatchSelectionClicked"
-                            Content="批量选择" />
-                        <TextBlock
-                            x:Name="BatchSelectionSummary"
-                            VerticalAlignment="Center"
-                            Visibility="Collapsed"
-                            FontWeight="SemiBold"
-                            Text="已选择 0 项" />
-                        <StackPanel
-                            x:Name="BatchSelectionActions"
-                            Grid.Column="1"
-                            Orientation="Horizontal"
-                            Spacing="8"
-                            Visibility="Collapsed">
-                            <Button Click="OnSelectAllVisibleClicked" Content="选择当前结果" />
-                            <Button
-                                x:Name="TransferSelectedButton"
-                                Click="OnBatchTransferClicked"
-                                Content="转移所选"
-                                IsEnabled="False"
-                                Style="{StaticResource AccentButtonStyle}" />
-                            <Button Click="OnCancelBatchSelectionClicked" Content="完成" />
-                        </StackPanel>
-                    </Grid>
-                    <Grid
-                        Grid.Row="1"
-                        Padding="12,7"
-                        ColumnSpacing="10"
-                        Background="{StaticResource VaultPanelBrush}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition
-                                Width="2*" />
-                            <ColumnDefinition
-                                Width="1.2*" />
-                            <ColumnDefinition
-                                Width="1.1*" />
-                            <ColumnDefinition
-                                Width="70" />
-                            <ColumnDefinition
-                                Width="110" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock
-                            Style="{StaticResource CaptionTextStyle}"
-                            Text="元器件" />
-                        <TextBlock
-                            Grid.Column="1"
-                            Style="{StaticResource CaptionTextStyle}"
-                            Text="分类 / 封装" />
-                        <TextBlock
-                            Grid.Column="2"
-                            Style="{StaticResource CaptionTextStyle}"
-                            Text="仓位" />
-                        <TextBlock
-                            Grid.Column="3"
-                            Style="{StaticResource CaptionTextStyle}"
-                            Text="库存" />
-                        <TextBlock
-                            Grid.Column="4"
-                            Style="{StaticResource CaptionTextStyle}"
-                            Text="使用 / 总量" />
-                    </Grid>
-                    <ListView
-                        x:Name="ComponentsListView"
-                        Grid.Row="2"
-                        ItemsSource="{Binding Components}"
-                        SelectionChanged="OnComponentSelectionChanged"
-                        SelectionMode="Single">
-                        <ListView.ItemTemplate>
-                            <DataTemplate
-                                x:DataType="models:ComponentRecord">
-                                <Grid
-                                    Padding="12,9"
-                                    ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition
-                                            Width="2*" />
-                                        <ColumnDefinition
-                                            Width="1.2*" />
-                                        <ColumnDefinition
-                                            Width="1.1*" />
-                                        <ColumnDefinition
-                                            Width="70" />
-                                        <ColumnDefinition
-                                            Width="110" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid
-                                        ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition
-                                                Width="40" />
-                                            <ColumnDefinition
-                                                Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border
-                                            Width="40"
-                                            Height="40"
-                                            Background="{StaticResource VaultPanelBrush}"
-                                            CornerRadius="6">
-                                            <Grid>
-                                                <FontIcon
-                                                    Glyph=""
-                                                    FontSize="16"
-                                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                                <Image
-                                                    Source="{Binding ProductImageUrl}"
-                                                    Stretch="Uniform" />
-                                            </Grid>
-                                        </Border>
-                                        <StackPanel
-                                            Grid.Column="1">
-                                            <TextBlock
-                                                FontWeight="SemiBold"
-                                                Text="{Binding Name}"
-                                                TextTrimming="CharacterEllipsis" />
-                                            <TextBlock
-                                                Style="{StaticResource CaptionTextStyle}"
-                                                Text="{Binding Sku}" />
-                                            <TextBlock
-                                                Style="{StaticResource CaptionTextStyle}"
-                                                Text="{Binding DisplaySpecifications}"
-                                                TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </Grid>
-                                    <StackPanel
-                                        Grid.Column="1">
-                                        <TextBlock
-                                            Text="{Binding DisplayCategory}"
-                                            TextTrimming="CharacterEllipsis" />
-                                        <TextBlock
-                                            Style="{StaticResource CaptionTextStyle}"
-                                            Text="{Binding PackageName}"
-                                            TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <TextBlock
-                                        Grid.Column="2"
-                                        VerticalAlignment="Center"
-                                        Text="{Binding DisplayLocation}"
-                                        TextTrimming="CharacterEllipsis" />
-                                    <TextBlock
-                                        Grid.Column="3"
-                                        VerticalAlignment="Center"
-                                        FontWeight="SemiBold"
-                                        Text="{Binding Quantity}" />
-                                    <StackPanel
-                                        Grid.Column="4"
-                                        HorizontalAlignment="Center"
-                                        Spacing="0">
-                                        <controls:InventoryUsageRing
-                                            CurrentQuantity="{Binding Quantity}"
-                                            OutboundQuantity="{Binding CumulativeOutboundQuantity}" />
-                                        <StackPanel
-                                            Margin="0,-8,0,0"
-                                            HorizontalAlignment="Center"
-                                            Orientation="Horizontal"
-                                            Spacing="3">
-                                            <TextBlock
-                                                Style="{StaticResource CaptionTextStyle}"
-                                                Text="总量" />
-                                            <TextBlock
-                                                Style="{StaticResource CaptionTextStyle}"
-                                                Text="{Binding StatisticalTotal}" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                    <TextBlock
-                        x:Name="InventoryEmptyState"
-                        Grid.Row="2"
-                        Margin="24"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Text="{Binding InventoryEmptyMessage}"
-                        TextAlignment="Center"
-                        TextWrapping="Wrap"
-                        Visibility="Collapsed" />
-                </Grid>
-            </Border>
-            <Border
-                x:Name="InventoryDetailPane"
-                Grid.Column="1"
-                Style="{StaticResource CardBorderStyle}">
-                <ScrollViewer>
-                    <StackPanel
-                        Spacing="14">
-                        <Grid
-                            ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition
-                                    Width="72" />
-                                <ColumnDefinition
-                                    Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border
-                                Width="72"
-                                Height="72"
-                                Background="{StaticResource VaultPanelBrush}"
-                                CornerRadius="8">
-                                <Grid>
-                                    <FontIcon
-                                        Glyph=""
-                                        FontSize="24"
-                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                    <Image
-                                        Source="{Binding SelectedComponent.ProductImageUrl}"
-                                        Stretch="Uniform" />
-                                    <TextBlock Text="{Binding SelectedComponent.PhotoStatusHint}" TextWrapping="Wrap" VerticalAlignment="Bottom" />
-                                </Grid>
-                            </Border>
-                            <StackPanel
-                                Grid.Column="1"
-                                Spacing="2">
-                                <TextBlock
-                                    Style="{StaticResource SectionTitleTextStyle}"
-                                    Text="{Binding SelectedComponentName}"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    Style="{StaticResource CaptionTextStyle}"
-                                    Text="{Binding SelectedComponentSubtitle}"
-                                    TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Grid>
-                        <Grid
-                            ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition
-                                    Width="*" />
-                                <ColumnDefinition
-                                    Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid
-                                RowSpacing="6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition
-                                        Width="72" />
-                                    <ColumnDefinition
-                                        Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition
-                                        Height="Auto" />
-                                    <RowDefinition
-                                        Height="Auto" />
-                                    <RowDefinition
-                                        Height="Auto" />
-                                    <RowDefinition
-                                        Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock
-                                    Style="{StaticResource CaptionTextStyle}"
-                                    Text="现存" />
-                                <TextBlock
-                                    Grid.Column="1"
-                                    FontWeight="SemiBold"
-                                    Text="{Binding SelectedComponentQuantityText}" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Style="{StaticResource CaptionTextStyle}"
-                                    Text="最低库存" />
-                                <TextBlock
-                                    Grid.Row="1"
-                                    Grid.Column="1"
-                                    Text="{Binding SelectedComponentMinStockText}" />
-                                <TextBlock
-                                    Grid.Row="2"
-                                    Style="{StaticResource CaptionTextStyle}"
-                                    Text="仓位" />
-                                <TextBlock
-                                    Grid.Row="2"
-                                    Grid.Column="1"
-                                    Text="{Binding SelectedComponentLocation}" />
-                                <TextBlock
-                                    Grid.Row="3"
-                                    Style="{StaticResource CaptionTextStyle}"
-                                    Text="更新时间" />
-                                <TextBlock
-                                    Grid.Row="3"
-                                    Grid.Column="1"
-                                    Text="{Binding SelectedComponent.DisplayUpdatedAt}"
-                                    TextWrapping="Wrap" />
-                            </Grid>
-                            <controls:InventoryUsageRing
-                                Grid.Column="1"
-                                CurrentQuantity="{Binding SelectedComponent.Quantity}"
-                                OutboundQuantity="{Binding SelectedComponent.CumulativeOutboundQuantity}" />
-                        </Grid>
-                        <InfoBar
-                            IsOpen="True"
-                            IsClosable="False"
-                            Severity="{Binding SelectedComponentStatusSeverity}"
-                            Title="{Binding SelectedComponentStatusTitle}"
-                            Message="{Binding SelectedComponentStatusMessage}" />
-                        <StackPanel
-                            Spacing="4">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="基本参数" />
-                            <ItemsControl ItemsSource="{Binding SelectedComponent.DisplaySpecificationFields}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid ColumnSpacing="12" Margin="0,2">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="72" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Label}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                        <StackPanel
-                            Spacing="4">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="说明" />
-                            <TextBlock
-                                Text="{Binding SelectedComponentDescription}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <StackPanel Spacing="4">
-                            <TextBlock FontWeight="SemiBold" Text="库位分配" />
-                            <ItemsControl ItemsSource="{Binding SelectedComponent.DisplayAllocations}" />
-                        </StackPanel>
-                        <StackPanel
-                            Spacing="6">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="最近变动" />
-                            <TextBlock
-                                Style="{StaticResource CaptionTextStyle}"
-                                Text="{Binding SelectedComponentMovementSummary}" />
-                            <ItemsControl
-                                ItemsSource="{Binding SelectedComponentRecentMovements}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate
-                                        x:DataType="models:StockMovementRecord">
-                                        <Grid
-                                            Margin="0,3"
-                                            ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition
-                                                    Width="*" />
-                                                <ColumnDefinition
-                                                    Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock
-                                                Text="{Binding Reason}"
-                                                TextTrimming="CharacterEllipsis" />
-                                            <TextBlock
-                                                Grid.Column="1"
-                                                FontWeight="SemiBold"
-                                                Text="{Binding QuantityLabel}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                        <StackPanel
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <Button
-                                Click="OnEditComponentClicked"
-                                Content="编辑"
-                                IsEnabled="{Binding CanEditSelectedComponent}" />
-                            <Button
-                                Click="OnDeleteComponentClicked"
-                                Content="删除"
-                                IsEnabled="{Binding CanDeleteSelectedComponent}" />
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-        </Grid>
-    </Grid>
+	x:Class="ComponentVault.WinUI.Views.ComponentsView"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:controls="using:ComponentVault.WinUI.Controls"
+	xmlns:converters="using:ComponentVault.WinUI.Converters"
+	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+	xmlns:design="using:ComponentVault.WinUI.Design"
+	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+	xmlns:models="using:ComponentVault.WinUI.Models"
+	d:DataContext="{d:DesignInstance Type=design:DesignMainViewModel,
+	                                 IsDesignTimeCreatable=True}"
+	mc:Ignorable="d">
+	<Page.Resources>
+		<converters:CategoryDisplayConverter x:Key="CategoryDisplayConverter" />
+		<DataTemplate x:Key="CategoryOptionTemplate">
+			<TextBlock Text="{Binding Converter={StaticResource CategoryDisplayConverter}}" />
+		</DataTemplate>
+	</Page.Resources>
+	<Grid Padding="24" RowSpacing="12">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="Auto" />
+			<RowDefinition Height="*" />
+		</Grid.RowDefinitions>
+		<Grid>
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="*" />
+				<ColumnDefinition Width="Auto" />
+			</Grid.ColumnDefinitions>
+			<StackPanel Spacing="4">
+				<TextBlock
+					x:Uid="ComponentsViewPageTitle"
+					Style="{StaticResource PageTitleTextStyle}"
+					Text="库存" />
+				<TextBlock
+					x:Uid="ComponentsViewPageSubtitle"
+					Style="{StaticResource PageSubtitleTextStyle}"
+					Text="查找元器件、检查库存，并从详情中编辑或删除。" />
+			</StackPanel>
+			<CommandBar
+				Grid.Column="1"
+				Background="Transparent"
+				DefaultLabelPosition="Right"
+				IsDynamicOverflowEnabled="True">
+				<AppBarButton
+					x:Uid="ComponentsViewAddButton"
+					Click="OnAddComponentClicked"
+					Icon="Add"
+					Label="新增元器件" />
+				<CommandBar.SecondaryCommands>
+					<AppBarButton Click="OnBatchJlcInboundClicked" Label="嘉立创批量入库">
+						<AppBarButton.Icon>
+							<FontIcon Glyph="&#xE8B7;" />
+						</AppBarButton.Icon>
+					</AppBarButton>
+					<AppBarButton
+						Click="OnImportComponentHubClicked"
+						Icon="Upload"
+						Label="导入元器件" />
+					<AppBarButton
+						Click="OnKittingClicked"
+						Icon="AllApps"
+						Label="配套件" />
+					<AppBarButton Click="OnManageLocationsClicked" Label="管理库位">
+						<AppBarButton.Icon>
+							<FontIcon Glyph="&#xE707;" />
+						</AppBarButton.Icon>
+					</AppBarButton>
+				</CommandBar.SecondaryCommands>
+			</CommandBar>
+		</Grid>
+		<Border Grid.Row="1" Style="{StaticResource CardBorderStyle}">
+			<Grid ColumnSpacing="12" RowSpacing="8">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="2*" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="*" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
+				</Grid.RowDefinitions>
+				<ScrollViewer
+					x:Name="FilterControlsScrollViewer"
+					Grid.ColumnSpan="5"
+					HorizontalScrollBarVisibility="Auto"
+					HorizontalScrollMode="Enabled"
+					VerticalScrollBarVisibility="Disabled"
+					VerticalScrollMode="Disabled">
+					<Grid MinWidth="{Binding ViewportWidth, ElementName=FilterControlsScrollViewer}" ColumnSpacing="12">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="125" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<AutoSuggestBox
+							x:Name="ComponentSearchBox"
+							x:Uid="ComponentsViewSearchBox"
+							MinWidth="280"
+							VerticalAlignment="Center"
+							PlaceholderText="搜索 SKU、型号、规格、分类或仓位；空格可组合关键词"
+							QueryIcon="Find"
+							Text="{Binding ComponentSearchText, Mode=TwoWay}"
+							TextChanged="OnSearchTextChanged" />
+						<StackPanel
+							Grid.Column="1"
+							Orientation="Horizontal"
+							Spacing="8">
+							<TextBlock
+								x:Name="LowStockFilterLabel"
+								x:Uid="ComponentsViewLowStockLabel"
+								Width="auto"
+								VerticalAlignment="Center"
+								Text="低库存" />
+							<ToggleSwitch
+								x:Name="LowStockOnlyToggle"
+								Width="20"
+								VerticalAlignment="Center"
+								AutomationProperties.LabeledBy="{Binding ElementName=LowStockFilterLabel}"
+								IsOn="{Binding ShowLowStockOnly, Mode=TwoWay}"
+								Toggled="OnLowStockOnlyToggled" />
+						</StackPanel>
+						<StackPanel
+							Grid.Column="2"
+							Orientation="Horizontal"
+							Spacing="8">
+							<TextBlock
+								x:Name="CategoryFilterLabel"
+								x:Uid="ComponentsViewCategoryLabel"
+								VerticalAlignment="Center"
+								Text="分类" />
+							<ComboBox
+								x:Name="CategoryFilter"
+								Width="160"
+								VerticalAlignment="Center"
+								AutomationProperties.LabeledBy="{Binding ElementName=CategoryFilterLabel}"
+								ItemTemplate="{StaticResource CategoryOptionTemplate}"
+								ItemsSource="{Binding InventoryCategoryOptions}"
+								SelectedItem="{Binding SelectedComponentCategoryFilter, Mode=TwoWay}" />
+						</StackPanel>
+						<StackPanel
+							Grid.Column="3"
+							Orientation="Horizontal"
+							Spacing="8">
+							<TextBlock
+								x:Name="LocationFilterLabel"
+								x:Uid="ComponentsViewLocationLabel"
+								VerticalAlignment="Center"
+								Text="仓位" />
+							<ComboBox
+								x:Name="LocationFilter"
+								Width="160"
+								VerticalAlignment="Center"
+								AutomationProperties.LabeledBy="{Binding ElementName=LocationFilterLabel}"
+								ItemsSource="{Binding InventoryLocationOptions}"
+								SelectedItem="{Binding SelectedComponentLocationFilter, Mode=TwoWay}" />
+						</StackPanel>
+						<StackPanel
+							Grid.Column="4"
+							Orientation="Horizontal"
+							Spacing="8">
+							<TextBlock
+								x:Name="SortFilterLabel"
+								x:Uid="ComponentsViewSortLabel"
+								VerticalAlignment="Center"
+								Text="排序" />
+							<ComboBox
+								x:Name="SortFilter"
+								Width="144"
+								VerticalAlignment="Center"
+								AutomationProperties.LabeledBy="{Binding ElementName=SortFilterLabel}"
+								ItemsSource="{Binding InventorySortOptions}"
+								SelectedItem="{Binding SelectedComponentSortOption, Mode=TwoWay}" />
+						</StackPanel>
+					</Grid>
+				</ScrollViewer>
+				<TextBlock
+					x:Name="FilterSummary"
+					Grid.Row="1"
+					Grid.ColumnSpan="3"
+					Style="{StaticResource CaptionTextStyle}"
+					Text="{Binding InventoryFilterSummary}"
+					TextWrapping="Wrap" />
+				<TextBlock
+					x:Name="WorkspaceSummary"
+					Grid.Row="1"
+					Grid.Column="3"
+					Grid.ColumnSpan="2"
+					HorizontalAlignment="Right"
+					Style="{StaticResource CaptionTextStyle}"
+					Text="{Binding InventoryWorkspaceSummary}"
+					TextWrapping="Wrap" />
+			</Grid>
+		</Border>
+		<Grid
+			x:Name="InventoryWorkspace"
+			Grid.Row="2"
+			ColumnSpacing="12">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="2.15*" />
+				<ColumnDefinition x:Name="InventoryDetailColumn" Width="1.2*" />
+			</Grid.ColumnDefinitions>
+			<Grid.RowDefinitions>
+				<RowDefinition x:Name="InventoryListRow" Height="*" />
+				<RowDefinition x:Name="InventoryDetailRow" Height="0" />
+			</Grid.RowDefinitions>
+			<Border x:Name="InventoryListPane" Style="{StaticResource CardBorderStyle}">
+				<Grid RowSpacing="8">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="*" />
+					</Grid.RowDefinitions>
+					<Grid ColumnSpacing="8">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+						<TextBlock
+							x:Name="InventoryListSummary"
+							VerticalAlignment="Center"
+							Style="{StaticResource CaptionTextStyle}"
+							Text="{Binding ComponentInventorySummary}" />
+						<Button
+							x:Name="StartBatchSelectionButton"
+							Grid.Column="1"
+							Click="OnStartBatchSelectionClicked"
+							Content="批量选择" />
+						<TextBlock
+							x:Name="BatchSelectionSummary"
+							VerticalAlignment="Center"
+							FontWeight="SemiBold"
+							Text="已选择 0 项"
+							Visibility="Collapsed" />
+						<StackPanel
+							x:Name="BatchSelectionActions"
+							Grid.Column="1"
+							Orientation="Horizontal"
+							Spacing="8"
+							Visibility="Collapsed">
+							<Button Click="OnSelectAllVisibleClicked" Content="选择当前结果" />
+							<Button
+								x:Name="TransferSelectedButton"
+								Click="OnBatchTransferClicked"
+								Content="转移所选"
+								IsEnabled="False"
+								Style="{StaticResource AccentButtonStyle}" />
+							<Button Click="OnCancelBatchSelectionClicked" Content="完成" />
+						</StackPanel>
+					</Grid>
+					<Grid
+						Grid.Row="1"
+						Padding="12,7"
+						Background="{StaticResource VaultPanelBrush}"
+						ColumnSpacing="10">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="2*" />
+							<ColumnDefinition Width="1.2*" />
+							<ColumnDefinition Width="1.1*" />
+							<ColumnDefinition Width="70" />
+							<ColumnDefinition Width="110" />
+						</Grid.ColumnDefinitions>
+						<TextBlock Style="{StaticResource CaptionTextStyle}" Text="元器件" />
+						<TextBlock
+							Grid.Column="1"
+							Style="{StaticResource CaptionTextStyle}"
+							Text="分类 / 封装" />
+						<TextBlock
+							Grid.Column="2"
+							Style="{StaticResource CaptionTextStyle}"
+							Text="仓位" />
+						<TextBlock
+							Grid.Column="3"
+							Style="{StaticResource CaptionTextStyle}"
+							Text="库存" />
+						<TextBlock
+							Grid.Column="4"
+							Style="{StaticResource CaptionTextStyle}"
+							Text="使用 / 总量" />
+					</Grid>
+					<ListView
+						x:Name="ComponentsListView"
+						Grid.Row="2"
+						ItemsSource="{Binding Components}"
+						SelectionChanged="OnComponentSelectionChanged"
+						SelectionMode="Single">
+						<ListView.ItemTemplate>
+							<DataTemplate x:DataType="models:ComponentRecord">
+								<Grid Padding="12,9" ColumnSpacing="10">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="2*" />
+										<ColumnDefinition Width="1.2*" />
+										<ColumnDefinition Width="1.1*" />
+										<ColumnDefinition Width="70" />
+										<ColumnDefinition Width="110" />
+									</Grid.ColumnDefinitions>
+									<Grid ColumnSpacing="8">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="40" />
+											<ColumnDefinition Width="*" />
+										</Grid.ColumnDefinitions>
+										<Border
+											Width="40"
+											Height="40"
+											Background="{StaticResource VaultPanelBrush}"
+											CornerRadius="6">
+											<Grid>
+												<FontIcon
+													FontSize="16"
+													Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+													Glyph="" />
+												<Image Source="{Binding ProductImageUrl}" Stretch="Uniform" />
+											</Grid>
+										</Border>
+										<StackPanel Grid.Column="1">
+											<TextBlock
+												FontWeight="SemiBold"
+												Text="{Binding Name}"
+												TextTrimming="CharacterEllipsis" />
+											<TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Sku}" />
+											<TextBlock
+												Style="{StaticResource CaptionTextStyle}"
+												Text="{Binding DisplaySpecifications}"
+												TextTrimming="CharacterEllipsis" />
+										</StackPanel>
+									</Grid>
+									<StackPanel Grid.Column="1">
+										<TextBlock Text="{Binding DisplayCategory}" TextTrimming="CharacterEllipsis" />
+										<TextBlock
+											Style="{StaticResource CaptionTextStyle}"
+											Text="{Binding PackageName}"
+											TextTrimming="CharacterEllipsis" />
+									</StackPanel>
+									<TextBlock
+										Grid.Column="2"
+										VerticalAlignment="Center"
+										Text="{Binding DisplayLocation}"
+										TextTrimming="CharacterEllipsis" />
+									<TextBlock
+										Grid.Column="3"
+										VerticalAlignment="Center"
+										FontWeight="SemiBold"
+										Text="{Binding Quantity}" />
+									<StackPanel
+										Grid.Column="4"
+										HorizontalAlignment="Center"
+										Spacing="0">
+										<controls:InventoryUsageRing CurrentQuantity="{Binding Quantity}" OutboundQuantity="{Binding CumulativeOutboundQuantity}" />
+										<StackPanel
+											Margin="0,-8,0,0"
+											HorizontalAlignment="Center"
+											Orientation="Horizontal"
+											Spacing="3">
+											<TextBlock Style="{StaticResource CaptionTextStyle}" Text="总量" />
+											<TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding StatisticalTotal}" />
+										</StackPanel>
+									</StackPanel>
+								</Grid>
+							</DataTemplate>
+						</ListView.ItemTemplate>
+					</ListView>
+					<TextBlock
+						x:Name="InventoryEmptyState"
+						Grid.Row="2"
+						Margin="24"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						Text="{Binding InventoryEmptyMessage}"
+						TextAlignment="Center"
+						TextWrapping="Wrap"
+						Visibility="Collapsed" />
+				</Grid>
+			</Border>
+			<Border
+				x:Name="InventoryDetailPane"
+				Grid.Column="1"
+				Style="{StaticResource CardBorderStyle}">
+				<ScrollViewer>
+					<StackPanel Spacing="14">
+						<Grid ColumnSpacing="12">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="72" />
+								<ColumnDefinition Width="*" />
+							</Grid.ColumnDefinitions>
+							<Border
+								Width="72"
+								Height="72"
+								Background="{StaticResource VaultPanelBrush}"
+								CornerRadius="8">
+								<Grid>
+									<FontIcon
+										FontSize="24"
+										Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+										Glyph="" />
+									<Image Source="{Binding SelectedComponent.ProductImageUrl}" Stretch="Uniform" />
+									<TextBlock
+										VerticalAlignment="Bottom"
+										Text="{Binding SelectedComponent.PhotoStatusHint}"
+										TextWrapping="Wrap" />
+								</Grid>
+							</Border>
+							<StackPanel Grid.Column="1" Spacing="2">
+								<TextBlock
+									Style="{StaticResource SectionTitleTextStyle}"
+									Text="{Binding SelectedComponentName}"
+									TextWrapping="Wrap" />
+								<TextBlock
+									Style="{StaticResource CaptionTextStyle}"
+									Text="{Binding SelectedComponentSubtitle}"
+									TextWrapping="Wrap" />
+							</StackPanel>
+						</Grid>
+						<Grid ColumnSpacing="12">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*" />
+								<ColumnDefinition Width="Auto" />
+							</Grid.ColumnDefinitions>
+							<Grid RowSpacing="6">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="72" />
+									<ColumnDefinition Width="*" />
+								</Grid.ColumnDefinitions>
+								<Grid.RowDefinitions>
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+									<RowDefinition Height="Auto" />
+								</Grid.RowDefinitions>
+								<TextBlock Style="{StaticResource CaptionTextStyle}" Text="现存" />
+								<TextBlock
+									Grid.Column="1"
+									FontWeight="SemiBold"
+									Text="{Binding SelectedComponentQuantityText}" />
+								<TextBlock
+									Grid.Row="1"
+									Style="{StaticResource CaptionTextStyle}"
+									Text="最低库存" />
+								<TextBlock
+									Grid.Row="1"
+									Grid.Column="1"
+									Text="{Binding SelectedComponentMinStockText}" />
+								<TextBlock
+									Grid.Row="2"
+									Style="{StaticResource CaptionTextStyle}"
+									Text="仓位" />
+								<TextBlock
+									Grid.Row="2"
+									Grid.Column="1"
+									Text="{Binding SelectedComponentLocation}" />
+								<TextBlock
+									Grid.Row="3"
+									Style="{StaticResource CaptionTextStyle}"
+									Text="更新时间" />
+								<TextBlock
+									Grid.Row="3"
+									Grid.Column="1"
+									Text="{Binding SelectedComponent.DisplayUpdatedAt}"
+									TextWrapping="Wrap" />
+							</Grid>
+							<controls:InventoryUsageRing
+								Grid.Column="1"
+								CurrentQuantity="{Binding SelectedComponent.Quantity}"
+								OutboundQuantity="{Binding SelectedComponent.CumulativeOutboundQuantity}" />
+						</Grid>
+						<InfoBar
+							Title="{Binding SelectedComponentStatusTitle}"
+							IsClosable="False"
+							IsOpen="True"
+							Message="{Binding SelectedComponentStatusMessage}"
+							Severity="{Binding SelectedComponentStatusSeverity}" />
+						<StackPanel Spacing="4">
+							<TextBlock FontWeight="SemiBold" Text="基本参数" />
+							<ItemsControl ItemsSource="{Binding SelectedComponent.DisplaySpecificationFields}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<Grid Margin="0,2" ColumnSpacing="12">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="72" />
+												<ColumnDefinition Width="*" />
+											</Grid.ColumnDefinitions>
+											<TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding Label}" />
+											<TextBlock
+												Grid.Column="1"
+												Text="{Binding Value}"
+												TextWrapping="Wrap" />
+										</Grid>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</StackPanel>
+						<StackPanel Spacing="4">
+							<TextBlock FontWeight="SemiBold" Text="说明" />
+							<TextBlock Text="{Binding SelectedComponentDescription}" TextWrapping="Wrap" />
+						</StackPanel>
+						<StackPanel Spacing="4">
+							<TextBlock FontWeight="SemiBold" Text="库位分配" />
+							<ItemsControl ItemsSource="{Binding SelectedComponent.DisplayAllocations}" />
+						</StackPanel>
+						<StackPanel Spacing="6">
+							<TextBlock FontWeight="SemiBold" Text="最近变动" />
+							<TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding SelectedComponentMovementSummary}" />
+							<ItemsControl ItemsSource="{Binding SelectedComponentRecentMovements}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="models:StockMovementRecord">
+										<Grid Margin="0,3" ColumnSpacing="8">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*" />
+												<ColumnDefinition Width="Auto" />
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="{Binding Reason}" TextTrimming="CharacterEllipsis" />
+											<TextBlock
+												Grid.Column="1"
+												FontWeight="SemiBold"
+												Text="{Binding QuantityLabel}" />
+										</Grid>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</StackPanel>
+						<StackPanel Orientation="Horizontal" Spacing="8">
+							<Button
+								Click="OnEditComponentClicked"
+								Content="编辑"
+								IsEnabled="{Binding CanEditSelectedComponent}" />
+							<Button
+								Click="OnDeleteComponentClicked"
+								Content="删除"
+								IsEnabled="{Binding CanDeleteSelectedComponent}" />
+						</StackPanel>
+					</StackPanel>
+				</ScrollViewer>
+			</Border>
+		</Grid>
+		<VisualStateManager.VisualStateGroups>
+			<VisualStateGroup x:Name="ResponsiveStates">
+				<VisualState x:Name="Narrow">
+					<VisualState.StateTriggers>
+						<AdaptiveTrigger MinWindowWidth="0" />
+					</VisualState.StateTriggers>
+					<VisualState.Setters>
+						<Setter Target="InventoryDetailColumn.Width" Value="0" />
+						<Setter Target="InventoryWorkspace.ColumnSpacing" Value="0" />
+						<Setter Target="InventoryListRow.Height" Value="*" />
+						<Setter Target="InventoryDetailRow.Height" Value="*" />
+						<Setter Target="InventoryDetailPane.(Grid.Row)" Value="1" />
+						<Setter Target="InventoryDetailPane.(Grid.Column)" Value="0" />
+					</VisualState.Setters>
+				</VisualState>
+				<VisualState x:Name="Wide">
+					<VisualState.StateTriggers>
+						<AdaptiveTrigger MinWindowWidth="1000" />
+					</VisualState.StateTriggers>
+				</VisualState>
+			</VisualStateGroup>
+		</VisualStateManager.VisualStateGroups>
+	</Grid>
 </Page>
