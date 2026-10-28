@@ -390,104 +390,103 @@ private fun InventoryListPane(
     val selectedItems = uiState.list.items.filter { it.id in selectedIds }
     fun exitSelection() { selecting = false; selectedIds = emptyList(); transferVisible = false }
 
-    Column(
-        modifier = modifier.padding(contentPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    LazyColumn(
+        modifier = modifier.padding(contentPadding).testTag("inventory_list"),
+        state = listState,
+        contentPadding = PaddingValues(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compactRows) 4.dp else 12.dp),
     ) {
-        InventoryFilterHeader(
-            uiState = uiState,
-            statusMessage = statusMessage,
-            onQueryChange = onQueryChange,
-            onStockFilterChange = onStockFilterChange,
-            onCategoryChange = onCategoryChange,
-            onLocationChange = onLocationChange,
-            onSortChange = onSortChange,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.inventory_ui_result_count, uiState.list.items.size),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (onBatchTransfer != null && !selecting) {
-                TextButton(onClick = { selecting = true }) {
-                    Text(stringResource(R.string.inventory_ui_select))
-                }
-            }
-            if (!selecting) {
-                TextButton(onClick = onScanInventory) {
-                    Text(stringResource(R.string.location_qr_scan))
-                }
-            }
-            if (!selecting) {
-                Box {
-                    IconButton(onClick = { actionsExpanded = true }) {
-                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions))
-                    }
-                    DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.label_tool_title)) },
-                            onClick = { actionsExpanded = false; onOpenBluetoothPrint() },
-                        )
-                    }
-                }
-            }
-        }
-        if (selecting) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(R.string.batch_transfer_selected_count, selectedItems.size),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleSmall,
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                InventoryFilterHeader(
+                    uiState = uiState,
+                    statusMessage = statusMessage,
+                    onQueryChange = onQueryChange,
+                    onStockFilterChange = onStockFilterChange,
+                    onCategoryChange = onCategoryChange,
+                    onLocationChange = onLocationChange,
+                    onSortChange = onSortChange,
                 )
-                TextButton(onClick = ::exitSelection) { Text(stringResource(R.string.action_cancel)) }
-                FilledTonalButton(
-                    enabled = selectedItems.isNotEmpty(),
-                    onClick = { transferVisible = true },
-                ) { Text(stringResource(R.string.batch_transfer_select)) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.inventory_ui_result_count, uiState.list.items.size),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (onBatchTransfer != null && !selecting) {
+                        TextButton(onClick = { selecting = true }) {
+                            Text(stringResource(R.string.inventory_ui_select))
+                        }
+                    }
+                    if (!selecting) {
+                        TextButton(onClick = onScanInventory) {
+                            Text(stringResource(R.string.location_qr_scan))
+                        }
+                    }
+                    if (!selecting) {
+                        Box {
+                            IconButton(onClick = { actionsExpanded = true }) {
+                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions))
+                            }
+                            DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.label_tool_title)) },
+                                    onClick = { actionsExpanded = false; onOpenBluetoothPrint() },
+                                )
+                            }
+                        }
+                    }
+                }
+                if (selecting) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.batch_transfer_selected_count, selectedItems.size),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        TextButton(onClick = ::exitSelection) { Text(stringResource(R.string.action_cancel)) }
+                        FilledTonalButton(
+                            enabled = selectedItems.isNotEmpty(),
+                            onClick = { transferVisible = true },
+                        ) { Text(stringResource(R.string.batch_transfer_select)) }
+                    }
+                }
             }
         }
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = PaddingValues(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compactRows) 4.dp else 12.dp),
-        ) {
-            if (uiState.list.items.isEmpty()) {
-                item {
-                    EmptyPane(if (uiState.totalComponentCount == 0) {
-                        stringResource(R.string.batch_transfer_inventory_empty)
-                    } else {
-                        strings.common.emptyNoComponentsMatchFilter
-                    })
-                }
-            } else {
-                items(uiState.list.items, key = { it.id }) { item ->
-                    InventoryListRow(
-                        item = item,
-                        compact = compactRows,
-                        storageLocations = uiState.storageLocations,
-                        selected = if (selecting) item.id in selectedIds else item.id == uiState.list.selectedComponentId,
-                        selectionMode = selecting,
-                        onClick = {
-                            if (selecting) selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
-                            else onSelectComponent(item.id)
-                        },
-                        onInbound = if (onQuickMovement == null || selecting) null else ({ quickMovement = item to true }),
-                        onOutbound = if (onQuickMovement == null || selecting) null else ({ quickMovement = item to false }),
-                        onTransfer = if (onBatchTransfer == null || selecting) null else ({ quickTransferItem = item }),
-                        onDelete = if (selecting) null else ({ onRequestDeleteComponent(item.id) }),
-                    )
-                }
+        if (uiState.list.items.isEmpty()) {
+            item {
+                EmptyPane(if (uiState.totalComponentCount == 0) {
+                    stringResource(R.string.batch_transfer_inventory_empty)
+                } else {
+                    strings.common.emptyNoComponentsMatchFilter
+                })
+            }
+        } else {
+            items(uiState.list.items, key = { it.id }) { item ->
+                InventoryListRow(
+                    item = item,
+                    compact = compactRows,
+                    storageLocations = uiState.storageLocations,
+                    selected = if (selecting) item.id in selectedIds else item.id == uiState.list.selectedComponentId,
+                    selectionMode = selecting,
+                    onClick = {
+                        if (selecting) selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
+                        else onSelectComponent(item.id)
+                    },
+                    onInbound = if (onQuickMovement == null || selecting) null else ({ quickMovement = item to true }),
+                    onOutbound = if (onQuickMovement == null || selecting) null else ({ quickMovement = item to false }),
+                    onTransfer = if (onBatchTransfer == null || selecting) null else ({ quickTransferItem = item }),
+                    onDelete = if (selecting) null else ({ onRequestDeleteComponent(item.id) }),
+                )
             }
         }
     }

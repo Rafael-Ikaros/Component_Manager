@@ -229,6 +229,7 @@ jobs:
           --tests 'com.componentvault.android.ui.screen.SettingsDraftUiTest'
           --tests 'com.componentvault.android.ui.screen.SettingsAdaptiveDraftUiTest'
           --tests 'com.componentvault.android.ui.screen.InventoryTabletRowUiTest'
+          --tests 'com.componentvault.android.ui.screen.InventoryShortViewportUiTest'
           --tests 'com.componentvault.android.ui.screen.LocationManagementUiTest'
           --tests 'com.componentvault.android.ui.screen.ImportFlowUiTest'
           --tests 'com.componentvault.android.ui.screen.UiScreenshotTest'
