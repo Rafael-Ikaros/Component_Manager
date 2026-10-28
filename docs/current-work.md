@@ -1,4 +1,15 @@
-# 2026-10-28 平板第一阶段（dev.24 已发布）
+# 2026-10-28 0.7.8 正式发布
+
+- 用户明确暂停后续平板布局阶段，并授权在功能验收后发布正式版、更新 Docker；Android 实机测试改用小米 9，之后没有操作平板或修改其显示参数。
+- 提交 `1a79492` 增加 Android / Windows 启动检查更新，仅发现更高版本弹窗，最新或失败静默；Android 27 项、Windows 26 项直接测试通过。独立 Android 测试包用真实 GitHub 响应验证旧版弹窗和当前最新版静默，临时包已卸载，原包数据未清理。
+- Windows 正常 UI 验证共享预设人工匹配和保存、跳过、复核取消及确认，BOM 和配套件各扣料一次。SQLite 核对 C100=8、C101=16、四条流水和两批回执符合预期；原配置四个文件哈希全部恢复一致。手动更新检查因 GitHub API 限流未覆盖成功联网提示分支，不将直接测试称为该分支的桌面联网验收。
+- 小米 9 从 dev.20 保留数据覆盖安装签名候选，升级前后完整 Excel 的元件、库位、分配、流水逐项一致，活动库存仍为 26 项、810 件、30 条流水。照片下载副本的补充窄测是 Robolectric 测试，不将其表述为首次缺失原因已解决。
+- 发布提交 `856e118` 的 [CI 40710180811](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/40710180811)最终全部成功。首次既有同步调度测试因计时断言失败，先取消公开发布，再重跑失败项通过并恢复发布；未修改生产同步逻辑或移动 tag。
+- [正式发布 40710180699](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/40710180699)成功，[v0.7.8](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.8)为公开正式版，Android APK、Windows 自包含 ZIP、Web ZIP 齐全。Docker Hub 固定/浮动 API 与 Web 标签各自摘要一致，均含 amd64/arm64，详见 [Docker Hub 发布核对](dockerhub.md)。
+- 从公开 Release 下载 APK，SHA256 `585f8d3cd3bb18a14cf987008612391bce6ddf7811b5c96e4438e4794f2e1197` 与 GitHub asset digest 一致，实际 `install -r` 成功；启动读回 0.7.8 / 708999，无更新弹窗，库存计数保持 26/810/30。完整前后备份比对在此前签名候选完成；公开包完成安装、启动、版本与计数复核。
+- 完整稳定版日志见 [CHANGELOG](CHANGELOG.md) 和 [0.7.8 正式说明](releases/0.7.8.md)。保留 dev.24 下载照片副本缺失及偶发空列表的未定位观察；没有新增实体打印验收。`server/data/` 未改动、未提交。
+
+# 2026-10-28 平板第一阶段（dev.24 已发布，历史记录）
 
 - 当前结论：[v0.7.8-dev.24](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.8-dev.24)公开预发布成功，prerelease=true/draft=false，Android/Windows ZIP/Web三附件齐全，Docker发布跳过。发布提交8ad302986e862fbef761983d2ac00f473f1fd69d的CI40700652274与Release From Changelog40700652428均成功。下列记录保留实现及验收过程。
 - 公开APK SHA256 6f5b8f545e118d451730e6ee9e3b30ebb7a095cba4f7fdacb4e3e12cf5e888d8，与API digest一致；已后台install-r保留数据覆盖，包版本读回dev.24/708024。为避免打断用户当前页面，公开包未再启动前台UI或重导出；实际UI与全表/原图比对在相同生产源码的最终签名候选上完成。显示读回2136×3200、DPI400、font1.0，无size/density override。设备测试临时文件已清理，原始证据仅留本机忽略目录，未提交；server/data未动。

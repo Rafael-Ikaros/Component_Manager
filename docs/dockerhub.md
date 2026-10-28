@@ -11,7 +11,12 @@
 - API：`sha256:81985ac9cced8b12de193d67818e9fd5d814be4af46c0a42a32a87d174bf98dc`
 - Web：`sha256:5e022b6aa65025fc360bdfda8b12a40ac4ef4d83a0a10e29ed69bd14219ef076`
 
-以上 digest 是 `0.7.0` 的历史记录。2026-09-27 已核对 `latest = 0.7.6`、`web-latest = web-0.7.6`，API 与 Web 均包含 `linux/amd64` 和 `linux/arm64`。后续部署仍应核对 Docker Hub Tags，不能仅凭 GitHub Release 存在就推断镜像发布成功。
+以上 digest 是 `0.7.0` 的历史记录。**2026-10-28 已核对 0.7.8 正式镜像**：[发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/40710180699)成功，Docker Hub 的固定与浮动标签分别一致，均包含 `linux/amd64` 和 `linux/arm64`：
+
+- API `0.7.8` / `latest`：`sha256:66727a8b28ea304af2027de96aa1f10148a5b1dcb7b497112c6c35eab3b7eabe`。
+- Web `web-0.7.8` / `web-latest`：`sha256:3e007d091436cac675c0f6ca5cb27f98e55467963922a36000d855a0fe11488f`。
+
+0.7.8 包含照片、BOM 预设同步及从订单更新已有资料；API、Web 需成对升级。保留原项目和整个 `/data`，先备份再拉取并重建，不能只重启旧容器。后续浮动标签仍可能更新，部署时请核对 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)，不能仅凭 GitHub Release 存在推断镜像发布成功。
 
 ## 先分清账号、仓库和两种 Token
 
