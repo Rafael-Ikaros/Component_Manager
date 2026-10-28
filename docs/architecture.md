@@ -25,6 +25,8 @@
 - `ComponentSaveCoordinator` 负责导入查重、追加确认和失败重试，应用壳只处理页面与标签入口。`BomImportOperations` 负责文件解析与只读匹配预览，`InventoryBackupOperations` 负责文档 URI 读写；业务提交继续经 Repository。
 - `InventoryRepository` 保留配置、读取和预览入口；`InventoryWriteService` 管理元件、库位、出入库、批量入库和转移事务，`InventoryImportCatalog` 管理识别、官方查询、学习映射与查询缓存。学习映射写入复用元件保存的同一个 SQLite 事务。
 - `InventorySyncService` 管理网络交换、账户绑定、上传快照、拉取和队列确认；与保存同步配置共用配置锁。账户检查仍在上传前，拉取及队列确认同事务提交，随后保存游标。`InventoryPreferenceKeys` 集中共享键值，不改变已有设置文件或键名。
+- 流水的来源/目标库位区分 JSON 空值与文本。同步事务仅修正不存在对应真实库位的历史 `null` 字符串引用，保留流水、库存和原时间；不新增 schema 迁移。
+- Android 设置和库存内容消费外层安全区域后处理 IME inset，避免键盘把整页平移到屏外；主导航切换清除输入焦点。库存筛选以当前列表栏的宽度换行，双栏设备不依赖横向滑动寻找库位或排序。
 - `InventoryWorkbookService` 管理备份预览、恢复和恢复失败时的图片清理；`BomReleaseCommitter` 和 `ComponentHubImporter` 管理各自提交。`InventorySqlOps` 只提供接受现有连接的分配/队列辅助，不另开事务。数据库文件、schema v5、升级备份和历史数据格式保持不变。
 
 Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享库存状态。完整编辑器在应用根节点使用同一组合位置，紧凑全屏与宽屏对话框切换不另建草稿状态。完整编辑器的文字、数量、库位以及导入来源使用 Compose 保存状态；待提交扫码批次通过 `SavedStateHandle` 保存用户输入，重建时重新读取当前库存，恢复到复核状态，不自动执行库存写入。取消或成功后清理草稿，提交失败保留供修正。已采纳的本地图片随编辑会话恢复；明确取消（包括系统返回）才删除会话新建图片，保存成功保留采用的图片。系统保存状态恢复不等同于长期草稿备份，不保证强制停止或设备重启恢复；提交期间中断应先核对记录，避免手动重复入库/出库。

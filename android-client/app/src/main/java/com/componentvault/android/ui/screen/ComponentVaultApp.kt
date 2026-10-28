@@ -26,6 +26,8 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.componentvault.android.data.ComponentImportParser
 import com.componentvault.android.data.LabelPrintQueueCodec
@@ -54,6 +56,8 @@ fun ComponentVaultApp(
     val layoutMode = rememberInventoryLayoutMode()
     val strings = runtimeComponentVaultStrings()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
     val componentSaveCoordinator = remember(viewModel) {
         ComponentSaveCoordinator(
@@ -541,6 +545,8 @@ fun ComponentVaultApp(
                     destination = destination,
                     layoutMode = layoutMode,
                     onDestinationChange = { nextDestination ->
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
                         destination = nextDestination
                         resetSecondaryRoutes()
                     },

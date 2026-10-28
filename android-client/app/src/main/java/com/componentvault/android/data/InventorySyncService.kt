@@ -490,8 +490,8 @@ internal class InventorySyncService(
                 put("happened_at", cursor.getString(cursor.getColumnIndexOrThrow("happened_at")))
                 put("updated_at", cursor.getString(cursor.getColumnIndexOrThrow("updated_at")))
                 put("deleted", cursor.getInt(cursor.getColumnIndexOrThrow("deleted")) == 1)
-                put("location_id", cursor.getString(cursor.getColumnIndexOrThrow("location_id")))
-                put("destination_location_id", cursor.getString(cursor.getColumnIndexOrThrow("destination_location_id")))
+                put("location_id", nullableMovementLocation(db, cursor.getString(cursor.getColumnIndexOrThrow("location_id"))))
+                put("destination_location_id", nullableMovementLocation(db, cursor.getString(cursor.getColumnIndexOrThrow("destination_location_id"))))
             }
         }
     }
@@ -626,6 +626,14 @@ internal class InventorySyncService(
         for (index in 0 until locations.length()) {
             upsertRemoteStorageLocation(db, locations.getJSONObject(index))
         }
+        // Older clients stored JSON null as the literal string "null". Repair only
+        // those dangling references, inside the pull transaction, retaining every movement.
+        for (column in listOf("location_id", "destination_location_id")) {
+            db.execSQL(
+                "UPDATE stock_movements SET $column = NULL WHERE $column = 'null' " +
+                    "AND NOT EXISTS (SELECT 1 FROM storage_locations WHERE id = 'null')",
+            )
+        }
         val components = pullResponse.optJSONArray("components") ?: JSONArray()
         for (index in 0 until components.length()) {
             val component = components.getJSONObject(index)
@@ -747,8 +755,8 @@ internal class InventorySyncService(
             put("happened_at", movement.getString("happened_at"))
             put("updated_at", movement.getString("updated_at"))
             put("deleted", if (movement.getBoolean("deleted")) 1 else 0)
-            put("location_id", movement.optString("location_id").takeIf(String::isNotBlank))
-            put("destination_location_id", movement.optString("destination_location_id").takeIf(String::isNotBlank))
+            put("location_id", nullableMovementLocation(db, if (movement.isNull("location_id")) null else movement.optString("location_id")))
+            put("destination_location_id", nullableMovementLocation(db, if (movement.isNull("destination_location_id")) null else movement.optString("destination_location_id")))
         }
         db.insertWithOnConflict(
             "stock_movements",
@@ -756,6 +764,15 @@ internal class InventorySyncService(
             values,
             SQLiteDatabase.CONFLICT_REPLACE,
         )
+    }
+
+    private fun nullableMovementLocation(db: SQLiteDatabase, value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        if (value != "null") return value
+        // A real location named "null" remains a valid reference.
+        return db.rawQuery("SELECT 1 FROM storage_locations WHERE id = ?", arrayOf(value)).use {
+            if (it.moveToFirst()) value else null
+        }
     }
 
     private fun removeQueuedIfSuperseded(

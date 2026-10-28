@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
@@ -274,6 +275,7 @@ internal fun SettingsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding)
+                .imePadding()
                 .padding(rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp)),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -304,6 +306,7 @@ internal fun SettingsContent(
 
             LazyColumn(
                 modifier = Modifier
+                    .testTag("settings_detail_list")
                     .weight(1.1f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -365,7 +368,8 @@ internal fun SettingsContent(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .consumeWindowInsets(contentPadding),
+                .consumeWindowInsets(contentPadding)
+                .imePadding(),
             contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -392,7 +396,8 @@ internal fun SettingsContent(
             modifier = Modifier
                 .testTag("settings_detail_list")
                 .fillMaxSize()
-                .consumeWindowInsets(contentPadding),
+                .consumeWindowInsets(contentPadding)
+                .imePadding(),
             contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

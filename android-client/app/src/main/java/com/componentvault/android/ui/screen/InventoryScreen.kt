@@ -1,10 +1,11 @@
 package com.componentvault.android.ui.screen
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -12,12 +13,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.platform.testTag
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Clear
@@ -55,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -158,6 +160,7 @@ internal fun InventoryContent(
     onBatchTransfer: BatchTransferAction? = null,
     onQuickMovement: QuickMovementAction? = null,
 ) {
+    val focusManager = LocalFocusManager.current
     if (layoutMode.showsListDetail) {
         val navigator = rememberListDetailPaneScaffoldNavigator<String>()
         val scope = rememberCoroutineScope()
@@ -171,6 +174,7 @@ internal fun InventoryContent(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding)
+                .imePadding()
                 .padding(rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp)),
             navigator = navigator,
             listPane = {
@@ -187,6 +191,7 @@ internal fun InventoryContent(
                         onScanInventory = onScanInventory,
                         onSortChange = onSortChange,
                         onSelectComponent = { componentId ->
+                            focusManager.clearFocus()
                             onSelectComponent(componentId)
                             scope.launch {
                                 navigator.navigateTo(
@@ -220,7 +225,8 @@ internal fun InventoryContent(
         InventoryListPane(
             modifier = Modifier
                 .fillMaxSize()
-                .consumeWindowInsets(contentPadding),
+                .consumeWindowInsets(contentPadding)
+                .imePadding(),
             contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 12.dp),
             uiState = uiState,
             statusMessage = statusMessage,
@@ -231,6 +237,7 @@ internal fun InventoryContent(
             onScanInventory = onScanInventory,
             onSortChange = onSortChange,
             onSelectComponent = { componentId ->
+                focusManager.clearFocus()
                 onSelectComponent(componentId)
                 onOpenComponentDetail(componentId)
             },
@@ -461,9 +468,9 @@ private fun InventoryListPane(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun InventoryFilterHeader(
+internal fun InventoryFilterHeader(
     uiState: InventoryScreenUiState,
     statusMessage: String,
     onQueryChange: (String) -> Unit,
@@ -495,9 +502,10 @@ private fun InventoryFilterHeader(
             },
             singleLine = true,
         )
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             FilterChip(
                 selected = uiState.filters.stockFilter == InventoryStockFilter.All,

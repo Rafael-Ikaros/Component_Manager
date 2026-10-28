@@ -34,6 +34,8 @@ Android 的“记录 → 扫描标签”支持嘉立创原厂包装码：按料�
 
 同步遵循本地优先：原生客户端先写入自己的 SQLite，再按需推送和拉取。BOM 扣料是客户端本地事务；它没有跨设备共享的工程扣料账本。Web 库存写入默认关闭，启用后直接写入服务端 SQLite，并可同步回原生客户端。详见[架构与数据流](docs/architecture.md)和[接口集成](docs/integration-guide.md)。
 
+Android 库存筛选按当前栏宽换行，设置和库存页面在键盘弹出时保留可滚动的操作区域；切换主页面会结束当前键盘输入。同步中的可空流水库位按空值保存，已有误存的 `null` 引用在同步时修正，不删除流水或改变库存。
+
 Android 核心代码按库存显示、扫码复核、导入确认、库存写入、识别与学习、同步、工作簿和 BOM 提交分开维护，保留原页面、数据库和偏好设置。模块职责见[Android 功能模块边界](docs/architecture.md#android-功能模块边界)，阶段进度与实机验收见[重构计划](docs/android-refactor-plan.md)和[工作记录](docs/current-work.md)。
 
 项目 BOM 按“选择文件 → 库存匹配 → 确认出库”操作。嘉立创 EDA 导出的 `Supplier Part`、`Manufacturer Part`、`Quantity` 等列自动识别；需要修正时再展开带样例的列选择。没有料号的测试点等行保留待处理，可手选库存或明确跳过，并在确认前恢复。可选保存为本地项目预设，下次重新核对实时库存后使用。详见[嘉立创 BOM 导入与扣料教程](docs/bom-and-migration.md#嘉立创-eda-导出文件示例)。
