@@ -2,6 +2,7 @@ package com.componentvault.android.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDropDown
@@ -43,11 +46,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -161,66 +167,93 @@ internal fun InventoryContent(
     onQuickMovement: QuickMovementAction? = null,
 ) {
     val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+    val selectionModeState = rememberSaveable { mutableStateOf(false) }
+    val selectedIdsState = rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var lastNavigatedComponentId by rememberSaveable { mutableStateOf<String?>(null) }
     if (layoutMode.showsListDetail) {
-        val navigator = rememberListDetailPaneScaffoldNavigator<String>()
-        val scope = rememberCoroutineScope()
-
-        LaunchedEffect(uiState.list.selectedComponentId) {
-            val selectedComponentId = uiState.list.selectedComponentId ?: return@LaunchedEffect
-            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, selectedComponentId)
-        }
-
-        NavigableListDetailPaneScaffold(
-            modifier = Modifier
-                .fillMaxSize()
+        BoxWithConstraints(
+            Modifier.fillMaxSize()
                 .consumeWindowInsets(contentPadding)
                 .imePadding()
                 .padding(rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp)),
-            navigator = navigator,
-            listPane = {
-                AnimatedPane {
-                    InventoryListPane(
-                        uiState = uiState,
-                        statusMessage = statusMessage,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(),
-                        onQueryChange = onQueryChange,
-                        onStockFilterChange = onStockFilterChange,
-                        onCategoryChange = onCategoryChange,
-                        onLocationChange = onLocationChange,
-                        onScanInventory = onScanInventory,
-                        onSortChange = onSortChange,
-                        onSelectComponent = { componentId ->
-                            focusManager.clearFocus()
-                            onSelectComponent(componentId)
-                            scope.launch {
-                                navigator.navigateTo(
-                                    ListDetailPaneScaffoldRole.Detail,
-                                    componentId,
-                                )
+        ) {
+            val scaffoldDirective = calculatePaneScaffoldDirective(currentWindowAdaptiveInfo()).copy(
+                maxHorizontalPartitions = if (maxWidth >= 836.dp) 2 else 1,
+                horizontalPartitionSpacerSize = 16.dp,
+            )
+            val navigator = rememberListDetailPaneScaffoldNavigator<String>(scaffoldDirective = scaffoldDirective)
+            val scope = rememberCoroutineScope()
+
+            LaunchedEffect(uiState.list.selectedComponentId) {
+                val selectedComponentId = uiState.list.selectedComponentId ?: return@LaunchedEffect
+                if (selectedComponentId != lastNavigatedComponentId) {
+                    lastNavigatedComponentId = selectedComponentId
+                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, selectedComponentId)
+                }
+            }
+
+            NavigableListDetailPaneScaffold(
+                modifier = Modifier.fillMaxSize(),
+                navigator = navigator,
+                listPane = {
+                    AnimatedPane(modifier = Modifier.preferredWidth(420.dp)) {
+                        InventoryListPane(
+                            uiState = uiState,
+                            statusMessage = statusMessage,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(),
+                            compactRows = true,
+                            listState = listState,
+                            selectionModeState = selectionModeState,
+                            selectedIdsState = selectedIdsState,
+                            onQueryChange = onQueryChange,
+                            onStockFilterChange = onStockFilterChange,
+                            onCategoryChange = onCategoryChange,
+                            onLocationChange = onLocationChange,
+                            onScanInventory = onScanInventory,
+                            onSortChange = onSortChange,
+                            onSelectComponent = { componentId ->
+                                focusManager.clearFocus()
+                                lastNavigatedComponentId = componentId
+                                onSelectComponent(componentId)
+                                scope.launch {
+                                    navigator.navigateTo(
+                                        ListDetailPaneScaffoldRole.Detail,
+                                        componentId,
+                                    )
+                                }
+                            },
+                            onOpenBluetoothPrint = onOpenBluetoothPrint,
+                            onRequestDeleteComponent = onRequestDeleteComponent,
+                            onBatchTransfer = onBatchTransfer,
+                            onQuickMovement = onQuickMovement,
+                        )
+                    }
+                },
+                detailPane = {
+                    AnimatedPane {
+                        Column(Modifier.fillMaxSize()) {
+                            if (scaffoldDirective.maxHorizontalPartitions == 1) {
+                                TextButton(onClick = { scope.launch { navigator.navigateBack() } }) {
+                                    Text(vaultStrings().common.actionBack)
+                                }
                             }
-                        },
-                        onOpenBluetoothPrint = onOpenBluetoothPrint,
-                        onRequestDeleteComponent = onRequestDeleteComponent,
-                        onBatchTransfer = onBatchTransfer,
-                        onQuickMovement = onQuickMovement,
-                    )
-                }
-            },
-            detailPane = {
-                AnimatedPane {
-                    InventoryDetailPane(
-                        detail = uiState.detail,
-                        storageLocations = uiState.storageLocations,
-                        modifier = Modifier.fillMaxSize(),
-                        onEditComponent = onEditComponent,
-                        onGenerateLabel = { component -> onGenerateLabel(component.id) },
-                        onRequestDeleteComponent = onRequestDeleteComponent,
-                        onRecordMovement = onRecordMovement,
-                    )
-                }
-            },
-        )
+                            InventoryDetailPane(
+                                detail = uiState.detail,
+                                storageLocations = uiState.storageLocations,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                adaptiveLayout = true,
+                                onEditComponent = onEditComponent,
+                                onGenerateLabel = { component -> onGenerateLabel(component.id) },
+                                onRequestDeleteComponent = onRequestDeleteComponent,
+                                onRecordMovement = onRecordMovement,
+                            )
+                        }
+                    }
+                },
+            )
+        }
     } else {
         InventoryListPane(
             modifier = Modifier
@@ -230,6 +263,10 @@ internal fun InventoryContent(
             contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 12.dp),
             uiState = uiState,
             statusMessage = statusMessage,
+            compactRows = layoutMode.widthClass != InventoryWidthClass.Compact,
+            listState = listState,
+            selectionModeState = selectionModeState,
+            selectedIdsState = selectedIdsState,
             onQueryChange = onQueryChange,
             onStockFilterChange = onStockFilterChange,
             onCategoryChange = onCategoryChange,
@@ -305,6 +342,7 @@ internal fun InventoryDetailRoute(
                 .fillMaxSize()
                 .consumeWindowInsets(padding),
             contentPadding = rememberContentPadding(padding, horizontal = 16.dp, vertical = 16.dp),
+            adaptiveLayout = rememberInventoryLayoutMode().widthClass != InventoryWidthClass.Compact,
             onEditComponent = onEditComponent,
             onGenerateLabel = onGenerateLabel,
             onRequestDeleteComponent = onRequestDeleteComponent,
@@ -319,6 +357,10 @@ private fun InventoryListPane(
     contentPadding: PaddingValues,
     uiState: InventoryScreenUiState,
     statusMessage: String,
+    compactRows: Boolean = false,
+    listState: LazyListState,
+    selectionModeState: MutableState<Boolean>,
+    selectedIdsState: MutableState<List<String>>,
     onQueryChange: (String) -> Unit,
     onStockFilterChange: (InventoryStockFilter) -> Unit,
     onCategoryChange: (String?) -> Unit,
@@ -336,17 +378,17 @@ private fun InventoryListPane(
     LaunchedEffect(diagnostic) {
         com.componentvault.android.data.AppDiagnostics.record("inventory_render", *diagnostic.toTypedArray())
     }
-    var selecting by androidx.compose.runtime.remember { mutableStateOf(false) }
-    var selectedIds by androidx.compose.runtime.remember { mutableStateOf(emptySet<String>()) }
+    var selecting by selectionModeState
+    var selectedIds by selectedIdsState
     var transferVisible by androidx.compose.runtime.remember { mutableStateOf(false) }
     var quickMovement by androidx.compose.runtime.remember { mutableStateOf<Pair<com.componentvault.android.model.InventoryListItemUiState, Boolean>?>(null) }
     var quickTransferItem by androidx.compose.runtime.remember { mutableStateOf<com.componentvault.android.model.InventoryListItemUiState?>(null) }
     var actionsExpanded by androidx.compose.runtime.remember { mutableStateOf(false) }
     LaunchedEffect(uiState.list.items.map { it.id }) {
-        selectedIds = selectedIds.intersect(uiState.list.items.map { it.id }.toSet())
+        selectedIds = selectedIds.intersect(uiState.list.items.map { it.id }.toSet()).toList()
     }
     val selectedItems = uiState.list.items.filter { it.id in selectedIds }
-    fun exitSelection() { selecting = false; selectedIds = emptySet(); transferVisible = false }
+    fun exitSelection() { selecting = false; selectedIds = emptyList(); transferVisible = false }
 
     Column(
         modifier = modifier.padding(contentPadding),
@@ -416,8 +458,9 @@ private fun InventoryListPane(
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactRows) 4.dp else 12.dp),
         ) {
             if (uiState.list.items.isEmpty()) {
                 item {
@@ -431,6 +474,7 @@ private fun InventoryListPane(
                 items(uiState.list.items, key = { it.id }) { item ->
                     InventoryListRow(
                         item = item,
+                        compact = compactRows,
                         storageLocations = uiState.storageLocations,
                         selected = if (selecting) item.id in selectedIds else item.id == uiState.list.selectedComponentId,
                         selectionMode = selecting,
@@ -648,6 +692,7 @@ internal fun InventoryDetailPane(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 12.dp),
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    adaptiveLayout: Boolean = false,
     onEditComponent: (String) -> Unit,
     onGenerateLabel: (ComponentRecord) -> Unit,
     onRequestDeleteComponent: (String) -> Unit,
@@ -674,84 +719,96 @@ internal fun InventoryDetailPane(
         }
 
         item {
-            SectionPane(
-                title = component.name,
-                supporting = strings.inventory.componentSubtitle(
-                    component.sku,
-                    localizedCategoryLabel(component.category),
-                    component.packageName,
-                ),
-            ) {
-                ProductThumbnail(
-                    sku = component.sku,
-                    imageUrl = component.productImageUrl,
-                    description = component.description,
-                    imageSize = 112.dp,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
+            if (adaptiveLayout) {
+                InventoryTabletDetailSummary(
+                    component = component,
+                    onEditComponent = onEditComponent,
+                    onGenerateLabel = onGenerateLabel,
+                    onRequestDeleteComponent = onRequestDeleteComponent,
+                    onRecordMovement = onRecordMovement,
                 )
-                StatusBanner(
-                    message = if (component.isLowStock) {
-                        strings.inventory.selectedComponentLowStockStatus
-                    } else {
-                        strings.inventory.selectedComponentHealthyStatus
-                    },
-                    containerColor = if (component.isLowStock) {
-                        VaultWarningContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    contentColor = if (component.isLowStock) {
-                        VaultWarning
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+            } else {
+                SectionPane(
+                    title = component.name,
+                    supporting = strings.inventory.componentSubtitle(
+                        component.sku,
+                        localizedCategoryLabel(component.category),
+                        component.packageName,
+                    ),
                 ) {
-                    MetricTile(
-                        label = strings.inventory.metricQuantity,
-                        value = component.quantity.toString(),
-                        modifier = Modifier.weight(1f),
+                    ProductThumbnail(
+                        sku = component.sku,
+                        imageUrl = component.productImageUrl,
+                        description = component.description,
+                        imageSize = 112.dp,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
-                    MetricTile(
-                        label = strings.inventory.metricMinStock,
-                        value = component.minStock.toString(),
-                        modifier = Modifier.weight(1f),
+                    StatusBanner(
+                        message = if (component.isLowStock) {
+                            strings.inventory.selectedComponentLowStockStatus
+                        } else {
+                            strings.inventory.selectedComponentHealthyStatus
+                        },
+                        containerColor = if (component.isLowStock) {
+                            VaultWarningContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        contentColor = if (component.isLowStock) {
+                            VaultWarning
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    FilledTonalButton(onClick = { onEditComponent(component.id) }) {
-                        Text(strings.common.actionEdit)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        MetricTile(
+                            label = strings.inventory.metricQuantity,
+                            value = component.quantity.toString(),
+                            modifier = Modifier.weight(1f),
+                        )
+                        MetricTile(
+                            label = strings.inventory.metricMinStock,
+                            value = component.minStock.toString(),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilledTonalButton(onClick = { onEditComponent(component.id) }) {
+                            Text(strings.common.actionEdit)
+                        }
+                        OutlinedButton(
+                            onClick = { onRecordMovement(component.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(strings.common.actionRecordMovement)
+                        }
                     }
                     OutlinedButton(
-                        onClick = { onRecordMovement(component.id) },
+                        onClick = { onGenerateLabel(component) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(strings.common.actionRecordMovement)
+                        Text(strings.common.actionGenerateLabel)
                     }
-                }
-                OutlinedButton(
-                    onClick = { onGenerateLabel(component) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(strings.common.actionGenerateLabel)
-                }
-                TextButton(onClick = { onRequestDeleteComponent(component.id) }) {
-                    Text(strings.common.actionDelete)
+                    TextButton(onClick = { onRequestDeleteComponent(component.id) }) {
+                        Text(strings.common.actionDelete)
+                    }
                 }
             }
         }
         item {
             SectionPane(title = strings.inventory.detailBasicTitle) {
-                ValueBlock(label = strings.common.fieldSku, value = component.sku)
-                ValueBlock(label = strings.common.fieldName, value = component.name)
-                ValueBlock(label = strings.common.fieldCategory, value = localizedCategoryLabel(component.category))
-                ValueBlock(label = strings.common.fieldPackage, value = component.packageName)
+                val fields = mutableListOf(
+                    strings.common.fieldSku to component.sku,
+                    strings.common.fieldName to component.name,
+                    strings.common.fieldCategory to localizedCategoryLabel(component.category),
+                    strings.common.fieldPackage to component.packageName,
+                )
                 component.officialParameters().forEach { (key, value) ->
                     val label = when (officialParameterKind(key)) {
                         "resistance" -> stringResource(R.string.inventory_param_resistance)
@@ -766,7 +823,12 @@ internal fun InventoryDetailPane(
                         else -> key
                     }
                     val locale = LocalContext.current.resources.configuration.locales[0] ?: Locale.getDefault()
-                    ValueBlock(label = label, value = localizedOfficialParameterValue(officialParameterKind(key), value, locale))
+                    fields += label to localizedOfficialParameterValue(officialParameterKind(key), value, locale)
+                }
+                if (adaptiveLayout) {
+                    InventoryDetailFieldGrid(fields = fields)
+                } else {
+                    fields.forEach { (label, value) -> ValueBlock(label = label, value = value) }
                 }
             }
         }

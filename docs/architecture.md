@@ -27,6 +27,7 @@
 - `InventorySyncService` 管理网络交换、账户绑定、上传快照、拉取和队列确认；与保存同步配置共用配置锁。账户检查仍在上传前，拉取及队列确认同事务提交，随后保存游标。`InventoryPreferenceKeys` 集中共享键值，不改变已有设置文件或键名。
 - 流水的来源/目标库位区分 JSON 空值与文本。同步事务仅修正不存在对应真实库位的历史 `null` 字符串引用，保留流水、库存和原时间；不新增 schema 迁移。
 - Android 设置和库存内容消费外层安全区域后处理 IME inset，避免键盘把整页平移到屏外；主导航切换清除输入焦点。库存筛选以当前列表栏的宽度换行，双栏设备不依赖横向滑动寻找库位或排序。
+- 平板库存行和详情呈现独立在 `InventoryTabletParts.kt`，复用原左滑动作和业务回调；Expanded 窗口在扣除导航、页边距后的净宽达到836dp时显示420dp列表与详情，否则沿同一 Adaptive navigator 单窗格切换，Medium走独立详情路线。主界面及各主导航目的地使用 SaveableStateHolder 保留列表/设置上下文。设置净宽达到700dp时采用240dp分组导航及最大640dp表单，较窄时逐页进入；输入草稿与分组滚动使用 Compose 保存状态，不自动保存业务配置或触发同步。
 - 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。BOM/迁移预览的说明、行和末尾操作共用一个 LazyColumn，配套件在自身列表处理 IME，标签模板尺寸页由底部操作栏避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。
 - `InventoryWorkbookService` 管理备份预览、恢复和恢复失败时的图片清理；`BomReleaseCommitter` 和 `ComponentHubImporter` 管理各自提交。`InventorySqlOps` 只提供接受现有连接的分配/队列辅助，不另开事务。数据库文件、schema v5、升级备份和历史数据格式保持不变。
 

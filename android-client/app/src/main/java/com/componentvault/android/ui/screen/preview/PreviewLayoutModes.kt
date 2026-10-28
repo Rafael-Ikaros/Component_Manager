@@ -14,7 +14,7 @@ internal val CompactPreviewLayout = InventoryLayoutMode(
 
 internal val MediumPreviewLayout = InventoryLayoutMode(
     widthClass = InventoryWidthClass.Medium,
-    supportsListDetail = true,
+    supportsListDetail = false,
     formPresentation = InventoryFormPresentation.FullScreenRoute,
     secondaryPanePresentation = InventorySecondaryPanePresentation.SplitPane,
 )

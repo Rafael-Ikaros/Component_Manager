@@ -16,7 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -177,6 +177,7 @@ internal fun ComponentVaultAppShellContent(
         strings.shell.destinationLabel(destination)
     }
     val effectiveSnackbarHostState = snackbarHostState ?: remember { SnackbarHostState() }
+    val destinationStateHolder = rememberSaveableStateHolder()
 
     val topBar: @Composable () -> Unit = {
         TopAppBar(
@@ -239,7 +240,7 @@ internal fun ComponentVaultAppShellContent(
             snackbarHost = { SnackbarHost(effectiveSnackbarHostState) },
             containerColor = MaterialTheme.colorScheme.background,
         ) { padding ->
-            key(destination) {
+            destinationStateHolder.SaveableStateProvider(destination.name) {
                 ShellContent(
                     contentPadding = padding,
                     uiState = uiState,

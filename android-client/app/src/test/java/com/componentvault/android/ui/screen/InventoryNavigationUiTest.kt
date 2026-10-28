@@ -28,6 +28,16 @@ class InventoryNavigationUiTest {
     private val context: Application get() = RuntimeEnvironment.getApplication()
 
     @Test
+    fun systemBackFromMainSettingsReturnsToInventory() {
+        val model = InventoryViewModel(context)
+        compose.setContent { MaterialTheme { ComponentVaultApp(model) } }
+        compose.onNodeWithContentDescription(context.getString(R.string.destination_settings), useUnmergedTree = true).performClick()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithText(context.getString(R.string.search_components_placeholder)).assertIsDisplayed()
+        assertFalse(compose.activity.isFinishing)
+    }
+
+    @Test
     fun importMenuOffersBatchWithoutMaintenanceEntries() {
         compose.setContent {
             MaterialTheme {

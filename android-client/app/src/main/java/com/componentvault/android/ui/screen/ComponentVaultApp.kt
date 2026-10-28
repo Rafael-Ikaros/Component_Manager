@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -59,6 +60,7 @@ fun ComponentVaultApp(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val shellStateHolder = rememberSaveableStateHolder()
     val componentSaveCoordinator = remember(viewModel) {
         ComponentSaveCoordinator(
             saveComponent = viewModel::saveComponent,
@@ -144,6 +146,12 @@ fun ComponentVaultApp(
         uiState.movements.items.filter { it.componentId == compactDetailComponent.id }.take(5)
     }
     val selectedSettingsSection = SettingsSection.entries.firstOrNull { it.name == selectedSettingsSectionName }
+
+    LaunchedEffect(uiState.inventory.list.selectedComponentId) {
+        if (compactDetailComponentId != null) {
+            compactDetailComponentId = uiState.inventory.list.selectedComponentId
+        }
+    }
 
     fun resetSecondaryRoutes() {
         compactDetailComponentId = null
@@ -272,9 +280,14 @@ fun ComponentVaultApp(
     BackHandler(enabled = importSurfaceVisible && !layoutMode.prefersDialogForms) {
         closeImportSurface()
     }
-    BackHandler(enabled = destination == InventoryDestination.Settings && selectedSettingsSection != null && !layoutMode.showsListDetail) {
-        if (selectedSettingsSection != null) {
+    BackHandler(enabled = destination == InventoryDestination.Settings) {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        if (selectedSettingsSection != null && !layoutMode.showsListDetail) {
             selectedSettingsSectionName = null
+        } else {
+            destination = InventoryDestination.Inventory
+            resetSecondaryRoutes()
         }
     }
     BackHandler(enabled = destination == InventoryDestination.Inventory && compactDetailComponentId != null && !layoutMode.showsListDetail) {
@@ -540,138 +553,140 @@ fun ComponentVaultApp(
             }
 
             else -> {
-                ComponentVaultAppShell(
-                    uiState = uiState,
-                    destination = destination,
-                    layoutMode = layoutMode,
-                    onDestinationChange = { nextDestination ->
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                        destination = nextDestination
-                        resetSecondaryRoutes()
-                    },
-                    onQueryChange = viewModel::updateComponentQuery,
-                    onStockFilterChange = { stockFilter ->
-                        viewModel.setLowStockOnly(stockFilter == InventoryStockFilter.LowStock)
-                    },
-                    onCategoryChange = viewModel::updateCategoryFilter,
-                    onLocationChange = viewModel::updateLocationFilter,
-                    onScanInventory = { inventoryScannerVisible = true },
-                    onSortChange = viewModel::updateSort,
-                    onSelectComponent = viewModel::selectComponent,
-                    onOpenComponentDetail = { componentId ->
-                        viewModel.selectComponent(componentId)
-                        if (!layoutMode.showsListDetail) {
-                            compactDetailComponentId = componentId
-                        }
-                    },
-                    onAddComponent = { showAddEntrySheet = true },
-                    onImportComponent = { importSurfaceVisible = true },
-                    onGenerateLabel = { componentId ->
-                        uiState.availableComponents.firstOrNull { it.id == componentId }?.let { component ->
-                            labelPrintSeed = component.toLabelSeed()
-                            labelPrintVisible = true
-                        }
-                    },
-                    onOpenBluetoothPrint = {
-                        locationLabelTargetId = null
-                        labelPrintSeed = null
-                        labelPrintFromToolPicker = false
-                        labelToolPickerVisible = true
-                    },
-                    onEditComponent = { componentId ->
-                        viewModel.selectComponent(componentId)
-                        openComponentEditor(componentId)
-                    },
-                    onRequestDeleteComponent = { componentId ->
-                        viewModel.selectComponent(componentId)
-                        showDeleteConfirmation = true
-                    },
-                    onBatchTransfer = viewModel::transferComponentsBatch,
-                    onQuickMovement = viewModel::recordMovement,
-                    onScanMovementLabel = {
-                        destination = InventoryDestination.Movements
-                        movementBatchReviewVisible = false
-                        if (uiState.movements.batchSession.isActive) viewModel.openMovementScanner()
-                        else movementScanModeVisible = true
-                    },
-                    onRetryMovementScan = viewModel::openMovementScanner,
-                    onDismissMovementScanResult = viewModel::clearMovementScanState,
-                    onDiscardMovementBatch = {
-                        viewModel.discardMovementBatchSession()
-                        movementBatchReviewVisible = false
-                    },
-                    onOpenMovementBatchReview = { movementBatchReviewVisible = true },
-                    onUpdateMovementBatchItemMovementType = viewModel::updateMovementBatchItemMovementType,
-                    onUpdateMovementBatchItemQuantity = viewModel::updateMovementBatchItemQuantity,
-                    onUpdateMovementBatchItemReason = viewModel::updateMovementBatchItemReason,
-                    onUpdateMovementBatchItemNote = viewModel::updateMovementBatchItemNote,
-                    onRemoveMovementBatchItem = viewModel::removeMovementBatchItem,
-                    onSearchInventoryBySku = { sku ->
-                        destination = InventoryDestination.Inventory
-                        compactDetailComponentId = null
-                        compactMovementDetailId = null
-                        selectedSettingsSectionName = null
-                        viewModel.updateComponentQuery(sku)
-                    },
-                    onRecordMovement = { componentId ->
-                        componentId?.let(viewModel::selectComponent)
-                        openMovementEditor(componentId)
-                    },
-                    onOpenLowStockInventory = {
-                        destination = InventoryDestination.Inventory
-                        compactDetailComponentId = null
-                        compactMovementDetailId = null
-                        selectedSettingsSectionName = null
-                        viewModel.focusLowStockInventory()
-                    },
-                    onSelectOverviewComponent = { componentId ->
-                        destination = InventoryDestination.Inventory
-                        compactMovementDetailId = null
-                        selectedSettingsSectionName = null
-                        viewModel.focusLowStockInventory(componentId)
-                        if (!layoutMode.showsListDetail) {
-                            compactDetailComponentId = componentId
-                        }
-                    },
-                    onOpenMovements = { movementId ->
-                        destination = InventoryDestination.Movements
-                        compactDetailComponentId = null
-                        selectedSettingsSectionName = null
-                        viewModel.selectMovement(movementId)
-                        compactMovementDetailId = movementId?.takeIf { !layoutMode.showsListDetail }
-                    },
-                    onSelectMovement = { movementId ->
-                        viewModel.selectMovement(movementId)
-                    },
-                    onOpenMovementDetail = ::openCompactMovementDetail,
-                    onOpenSettingsHome = { openSettingsRoute() },
-                    onOpenSyncSettings = { openSettingsRoute(SettingsSection.Sync) },
-                    selectedSettingsSection = selectedSettingsSection,
-                    onBackFromSettingsSection = { selectedSettingsSectionName = null },
-                    settingsContent = { padding ->
-                        SettingsContent(
-                            contentPadding = padding,
-                            syncConfiguration = uiState.syncConfiguration,
-                            appPreferences = uiState.appPreferences,
-                            storageLocations = uiState.inventory.storageLocations,
-                            importLearningSummary = uiState.importLearningSummary,
-                            isBusy = uiState.isBusy,
-                            statusMessage = "",
-                            layoutMode = layoutMode,
-                            selectedSection = selectedSettingsSection,
-                            onSelectSection = { section -> selectedSettingsSectionName = section?.name },
-                            onSaveSyncSettings = viewModel::saveSyncConfiguration,
-                            onSaveAppPreferences = viewModel::saveAppPreferences,
-                            onTestConnection = viewModel::testConnection,
-                            onSyncNow = viewModel::runSync,
-                            onClearImportLearningMappings = viewModel::clearImportLearningMappings,
-                            onManageLocations = { storageLocationsVisible = true },
-                            onBackupRestore = { inventoryBackupVisible = true },
-                        )
-                    },
-                    snackbarHostState = snackbarHostState,
-                )
+                shellStateHolder.SaveableStateProvider("main_shell") {
+                    ComponentVaultAppShell(
+                        uiState = uiState,
+                        destination = destination,
+                        layoutMode = layoutMode,
+                        onDestinationChange = { nextDestination ->
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            destination = nextDestination
+                            resetSecondaryRoutes()
+                        },
+                        onQueryChange = viewModel::updateComponentQuery,
+                        onStockFilterChange = { stockFilter ->
+                            viewModel.setLowStockOnly(stockFilter == InventoryStockFilter.LowStock)
+                        },
+                        onCategoryChange = viewModel::updateCategoryFilter,
+                        onLocationChange = viewModel::updateLocationFilter,
+                        onScanInventory = { inventoryScannerVisible = true },
+                        onSortChange = viewModel::updateSort,
+                        onSelectComponent = viewModel::selectComponent,
+                        onOpenComponentDetail = { componentId ->
+                            viewModel.selectComponent(componentId)
+                            if (!layoutMode.showsListDetail) {
+                                compactDetailComponentId = componentId
+                            }
+                        },
+                        onAddComponent = { showAddEntrySheet = true },
+                        onImportComponent = { importSurfaceVisible = true },
+                        onGenerateLabel = { componentId ->
+                            uiState.availableComponents.firstOrNull { it.id == componentId }?.let { component ->
+                                labelPrintSeed = component.toLabelSeed()
+                                labelPrintVisible = true
+                            }
+                        },
+                        onOpenBluetoothPrint = {
+                            locationLabelTargetId = null
+                            labelPrintSeed = null
+                            labelPrintFromToolPicker = false
+                            labelToolPickerVisible = true
+                        },
+                        onEditComponent = { componentId ->
+                            viewModel.selectComponent(componentId)
+                            openComponentEditor(componentId)
+                        },
+                        onRequestDeleteComponent = { componentId ->
+                            viewModel.selectComponent(componentId)
+                            showDeleteConfirmation = true
+                        },
+                        onBatchTransfer = viewModel::transferComponentsBatch,
+                        onQuickMovement = viewModel::recordMovement,
+                        onScanMovementLabel = {
+                            destination = InventoryDestination.Movements
+                            movementBatchReviewVisible = false
+                            if (uiState.movements.batchSession.isActive) viewModel.openMovementScanner()
+                            else movementScanModeVisible = true
+                        },
+                        onRetryMovementScan = viewModel::openMovementScanner,
+                        onDismissMovementScanResult = viewModel::clearMovementScanState,
+                        onDiscardMovementBatch = {
+                            viewModel.discardMovementBatchSession()
+                            movementBatchReviewVisible = false
+                        },
+                        onOpenMovementBatchReview = { movementBatchReviewVisible = true },
+                        onUpdateMovementBatchItemMovementType = viewModel::updateMovementBatchItemMovementType,
+                        onUpdateMovementBatchItemQuantity = viewModel::updateMovementBatchItemQuantity,
+                        onUpdateMovementBatchItemReason = viewModel::updateMovementBatchItemReason,
+                        onUpdateMovementBatchItemNote = viewModel::updateMovementBatchItemNote,
+                        onRemoveMovementBatchItem = viewModel::removeMovementBatchItem,
+                        onSearchInventoryBySku = { sku ->
+                            destination = InventoryDestination.Inventory
+                            compactDetailComponentId = null
+                            compactMovementDetailId = null
+                            selectedSettingsSectionName = null
+                            viewModel.updateComponentQuery(sku)
+                        },
+                        onRecordMovement = { componentId ->
+                            componentId?.let(viewModel::selectComponent)
+                            openMovementEditor(componentId)
+                        },
+                        onOpenLowStockInventory = {
+                            destination = InventoryDestination.Inventory
+                            compactDetailComponentId = null
+                            compactMovementDetailId = null
+                            selectedSettingsSectionName = null
+                            viewModel.focusLowStockInventory()
+                        },
+                        onSelectOverviewComponent = { componentId ->
+                            destination = InventoryDestination.Inventory
+                            compactMovementDetailId = null
+                            selectedSettingsSectionName = null
+                            viewModel.focusLowStockInventory(componentId)
+                            if (!layoutMode.showsListDetail) {
+                                compactDetailComponentId = componentId
+                            }
+                        },
+                        onOpenMovements = { movementId ->
+                            destination = InventoryDestination.Movements
+                            compactDetailComponentId = null
+                            selectedSettingsSectionName = null
+                            viewModel.selectMovement(movementId)
+                            compactMovementDetailId = movementId?.takeIf { !layoutMode.showsListDetail }
+                        },
+                        onSelectMovement = { movementId ->
+                            viewModel.selectMovement(movementId)
+                        },
+                        onOpenMovementDetail = ::openCompactMovementDetail,
+                        onOpenSettingsHome = { openSettingsRoute() },
+                        onOpenSyncSettings = { openSettingsRoute(SettingsSection.Sync) },
+                        selectedSettingsSection = selectedSettingsSection,
+                        onBackFromSettingsSection = { selectedSettingsSectionName = null },
+                        settingsContent = { padding ->
+                            SettingsContent(
+                                contentPadding = padding,
+                                syncConfiguration = uiState.syncConfiguration,
+                                appPreferences = uiState.appPreferences,
+                                storageLocations = uiState.inventory.storageLocations,
+                                importLearningSummary = uiState.importLearningSummary,
+                                isBusy = uiState.isBusy,
+                                statusMessage = "",
+                                layoutMode = layoutMode,
+                                selectedSection = selectedSettingsSection,
+                                onSelectSection = { section -> selectedSettingsSectionName = section?.name },
+                                onSaveSyncSettings = viewModel::saveSyncConfiguration,
+                                onSaveAppPreferences = viewModel::saveAppPreferences,
+                                onTestConnection = viewModel::testConnection,
+                                onSyncNow = viewModel::runSync,
+                                onClearImportLearningMappings = viewModel::clearImportLearningMappings,
+                                onManageLocations = { storageLocationsVisible = true },
+                                onBackupRestore = { inventoryBackupVisible = true },
+                            )
+                        },
+                        snackbarHostState = snackbarHostState,
+                    )
+                }
             }
         }
 

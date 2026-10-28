@@ -232,6 +232,7 @@ internal fun InventoryListRow(
     onTransfer: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    compact: Boolean = false,
 ) {
     if (!selectionMode && listOf(onInbound, onOutbound, onTransfer, onDelete).any { it != null }) {
         BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -305,11 +306,11 @@ internal fun InventoryListRow(
                             settleJob?.cancel()
                             settleJob = scope.launch { animate(offsetPx, 0f) { value, _ -> offsetPx = value } }
                         } else onClick()
-                    }, selectionMode, storageLocations)
+                    }, selectionMode, storageLocations, compact)
             }
         }
     } else {
-        InventoryListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations)
+        InventoryListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations, compact)
     }
 }
 @OptIn(ExperimentalLayoutApi::class)
@@ -321,7 +322,12 @@ private fun InventoryListRowContent(
     onClick: () -> Unit,
     selectionMode: Boolean,
     storageLocations: List<StorageLocationRecord>,
+    compact: Boolean,
 ) {
+    if (compact) {
+        InventoryTabletListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations)
+        return
+    }
     val strings = vaultStrings()
     val localizedCategory = localizedCategoryLabel(item.category)
 

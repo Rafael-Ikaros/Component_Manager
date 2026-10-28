@@ -62,7 +62,7 @@ internal fun rememberInventoryLayoutMode(): InventoryLayoutMode {
 
         InventoryLayoutMode(
             widthClass = widthClass,
-            supportsListDetail = widthClass != InventoryWidthClass.Compact,
+            supportsListDetail = widthClass == InventoryWidthClass.Expanded,
             formPresentation = when (widthClass) {
                 InventoryWidthClass.Compact,
                 InventoryWidthClass.Medium,

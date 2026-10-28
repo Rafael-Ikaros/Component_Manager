@@ -4,6 +4,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,8 +18,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -36,6 +43,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -44,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -186,54 +196,54 @@ internal fun SettingsContent(
     storageLocations: List<StorageLocationRecord> = emptyList(),
 ) {
     val strings = vaultStrings()
-    var serverUrl by remember(syncConfiguration.serverBaseUrl) {
+    var serverUrl by rememberSaveable(syncConfiguration.serverBaseUrl) {
         mutableStateOf(syncConfiguration.serverBaseUrl)
     }
-    var externalServerUrl by remember(syncConfiguration.externalServerBaseUrl) {
+    var externalServerUrl by rememberSaveable(syncConfiguration.externalServerBaseUrl) {
         mutableStateOf(syncConfiguration.externalServerBaseUrl)
     }
-    var apiToken by remember(syncConfiguration.apiToken) {
+    var apiToken by rememberSaveable(syncConfiguration.apiToken) {
         mutableStateOf(syncConfiguration.apiToken)
     }
-    var autoSyncEnabled by remember(syncConfiguration.autoSyncEnabled) {
+    var autoSyncEnabled by rememberSaveable(syncConfiguration.autoSyncEnabled) {
         mutableStateOf(syncConfiguration.autoSyncEnabled)
     }
-    var defaultImportLocation by remember(appPreferences.defaultImportLocation) {
+    var defaultImportLocation by rememberSaveable(appPreferences.defaultImportLocation) {
         mutableStateOf(appPreferences.defaultImportLocation)
     }
-    var defaultImportMinStockText by remember(appPreferences.defaultImportMinStock) {
+    var defaultImportMinStockText by rememberSaveable(appPreferences.defaultImportMinStock) {
         mutableStateOf(appPreferences.defaultImportMinStock.toString())
     }
-    var rememberLastImportLocation by remember(appPreferences.rememberLastImportLocation) {
+    var rememberLastImportLocation by rememberSaveable(appPreferences.rememberLastImportLocation) {
         mutableStateOf(appPreferences.rememberLastImportLocation)
     }
-    var syncAfterLocalChanges by remember(appPreferences.syncAfterLocalChanges) {
+    var syncAfterLocalChanges by rememberSaveable(appPreferences.syncAfterLocalChanges) {
         mutableStateOf(appPreferences.syncAfterLocalChanges)
     }
-    var enableLocalAutoRecognition by remember(appPreferences.enableLocalAutoRecognition) {
+    var enableLocalAutoRecognition by rememberSaveable(appPreferences.enableLocalAutoRecognition) {
         mutableStateOf(appPreferences.enableLocalAutoRecognition)
     }
-    var preferAggressiveAutoRecognition by remember(appPreferences.preferAggressiveAutoRecognition) {
+    var preferAggressiveAutoRecognition by rememberSaveable(appPreferences.preferAggressiveAutoRecognition) {
         mutableStateOf(appPreferences.preferAggressiveAutoRecognition)
     }
-    var enableLocalImportLearning by remember(appPreferences.enableLocalImportLearning) {
+    var enableLocalImportLearning by rememberSaveable(appPreferences.enableLocalImportLearning) {
         mutableStateOf(appPreferences.enableLocalImportLearning)
     }
-    var enableServerJlcLookup by remember(appPreferences.enableServerJlcLookup) {
+    var enableServerJlcLookup by rememberSaveable(appPreferences.enableServerJlcLookup) {
         mutableStateOf(appPreferences.enableServerJlcLookup)
     }
-    var enablePublicJlcLookup by remember(appPreferences.enablePublicJlcLookup) {
+    var enablePublicJlcLookup by rememberSaveable(appPreferences.enablePublicJlcLookup) {
         mutableStateOf(appPreferences.enablePublicJlcLookup)
     }
-    var ocrEngineMode by remember(appPreferences.ocrEngineMode) {
+    var ocrEngineMode by rememberSaveable(appPreferences.ocrEngineMode) {
         mutableStateOf(appPreferences.ocrEngineMode)
     }
-    var appLanguage by remember(appPreferences.appLanguage) {
+    var appLanguage by rememberSaveable(appPreferences.appLanguage) {
         mutableStateOf(appPreferences.appLanguage)
     }
-    var showToken by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var showClearLearningConfirmation by remember { mutableStateOf(false) }
+    var showToken by rememberSaveable { mutableStateOf(false) }
+    var errorMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var showClearLearningConfirmation by rememberSaveable { mutableStateOf(false) }
 
     val hasUnsavedConnection = serverUrl.trim().trimEnd('/') != syncConfiguration.serverBaseUrl ||
         externalServerUrl.trim().trimEnd('/') != syncConfiguration.externalServerBaseUrl ||
@@ -270,188 +280,142 @@ internal fun SettingsContent(
         }
     }
 
-    if (layoutMode.showsListDetail) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .consumeWindowInsets(contentPadding)
-                .imePadding()
-                .padding(rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp)),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+    val detailStates = SettingsSection.entries.associateWith { rememberLazyListState() }
+    val navigationState = rememberLazyListState()
+    val sectionStateHolder = rememberSaveableStateHolder()
+    val section = selectedSection ?: SettingsSection.Sync
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding)
+            .consumeWindowInsets(contentPadding)
+            .imePadding()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+    ) {
+        // Budget the content left after the shell, insets and page margins.
+        val showTwoPanes = layoutMode.showsListDetail && maxWidth >= 700.dp
+        BackHandler(enabled = !showTwoPanes && selectedSection != null) {
+            onSelectSection(null)
+        }
+        val detail: @Composable (Modifier) -> Unit = { modifier ->
+            sectionStateHolder.SaveableStateProvider(section.name) {
+                LazyColumn(
+                    modifier = modifier.testTag("settings_detail_list"),
+                    state = detailStates.getValue(section),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    settingsSectionDetailItems(
+                        section = section,
+                        showSectionHeading = showTwoPanes,
+                        strings = strings,
+                        serverUrl = serverUrl,
+                        onServerUrlChange = { serverUrl = it },
+                        externalServerUrl = externalServerUrl,
+                        onExternalServerUrlChange = { externalServerUrl = it },
+                        apiToken = apiToken,
+                        onApiTokenChange = { apiToken = it },
+                        autoSyncEnabled = autoSyncEnabled,
+                        onAutoSyncChange = { autoSyncEnabled = it },
+                        defaultImportLocation = defaultImportLocation,
+                        onDefaultImportLocationChange = { defaultImportLocation = it },
+                        defaultImportMinStockText = defaultImportMinStockText,
+                        onDefaultImportMinStockChange = { defaultImportMinStockText = it },
+                        rememberLastImportLocation = rememberLastImportLocation,
+                        onRememberLastImportLocationChange = { rememberLastImportLocation = it },
+                        syncAfterLocalChanges = syncAfterLocalChanges,
+                        onSyncAfterLocalChangesChange = { syncAfterLocalChanges = it },
+                        enableLocalAutoRecognition = enableLocalAutoRecognition,
+                        onEnableLocalAutoRecognitionChange = { enableLocalAutoRecognition = it },
+                        preferAggressiveAutoRecognition = preferAggressiveAutoRecognition,
+                        onPreferAggressiveAutoRecognitionChange = { preferAggressiveAutoRecognition = it },
+                        enableLocalImportLearning = enableLocalImportLearning,
+                        onEnableLocalImportLearningChange = { enableLocalImportLearning = it },
+                        enableServerJlcLookup = enableServerJlcLookup,
+                        onEnableServerJlcLookupChange = { enableServerJlcLookup = it },
+                        enablePublicJlcLookup = enablePublicJlcLookup,
+                        onEnablePublicJlcLookupChange = { enablePublicJlcLookup = it },
+                        ocrEngineMode = ocrEngineMode,
+                        onOcrEngineModeChange = { ocrEngineMode = it },
+                        appLanguage = appLanguage,
+                        onAppLanguageChange = { appLanguage = it },
+                        importLearningSummary = importLearningSummary,
+                        showToken = showToken,
+                        onToggleToken = { showToken = !showToken },
+                        isBusy = isBusy,
+                        syncRunning = syncConfiguration.syncState == "Running",
+                        syncSummary = syncConfiguration.syncSummary,
+                        errorMessage = errorMessage,
+                        hasUnsavedConnection = hasUnsavedConnection,
+                        onSave = { saveDraft(true) },
+                        onTestConnection = {
+                            onTestConnection(serverUrl, apiToken, externalServerUrl)
+                        },
+                        onSyncNow = {
+                            onSyncNow()
+                        },
+                        onClearImportLearningMappings = { showClearLearningConfirmation = true },
+                    )
+                    if (section == SettingsSection.Sync) {
+                        item { SettingsSyncStatusPane(syncConfiguration) }
+                    }
+                }
+            }
+        }
+        if (showTwoPanes) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.width(240.dp).fillMaxHeight().testTag("settings_group_list"),
+                    state = navigationState,
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item {
+                        Text(strings.shell.settingsDestination, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            syncConfiguration.syncSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    item {
+                        SettingsSectionList(
+                            selectedSection = section,
+                            onSelectSection = onSelectSection,
+                            onManageLocations = onManageLocations,
+                            onBackupRestore = onBackupRestore,
+                            compact = true,
+                        )
+                    }
+                }
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    detail(Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight())
+                }
+            }
+        } else if (selectedSection == null) {
             LazyColumn(
-                modifier = Modifier
-                    .weight(0.9f)
-                    .fillMaxHeight(),
+                modifier = Modifier.fillMaxSize().testTag("settings_group_list"),
+                state = navigationState,
+                contentPadding = PaddingValues(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    SettingsSummaryPane(
-                        syncConfiguration = syncConfiguration,
-                        appPreferences = appPreferences,
-                        storageLocations = storageLocations,
-                        importLearningSummary = importLearningSummary,
-                        statusMessage = statusMessage,
-                    )
-                }
-                item {
                     SettingsSectionList(
-                        selectedSection = selectedSection ?: SettingsSection.Sync,
+                        selectedSection = null,
                         onSelectSection = onSelectSection,
                         onManageLocations = onManageLocations,
                         onBackupRestore = onBackupRestore,
                     )
                 }
             }
-
-            LazyColumn(
-                modifier = Modifier
-                    .testTag("settings_detail_list")
-                    .weight(1.1f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                settingsSectionDetailItems(
-                    section = selectedSection ?: SettingsSection.Sync,
-                    showSectionHeading = true,
-                    strings = strings,
-                    serverUrl = serverUrl,
-                    onServerUrlChange = { serverUrl = it },
-                    externalServerUrl = externalServerUrl,
-                    onExternalServerUrlChange = { externalServerUrl = it },
-                    apiToken = apiToken,
-                    onApiTokenChange = { apiToken = it },
-                    autoSyncEnabled = autoSyncEnabled,
-                    onAutoSyncChange = { autoSyncEnabled = it },
-                    defaultImportLocation = defaultImportLocation,
-                    onDefaultImportLocationChange = { defaultImportLocation = it },
-                    defaultImportMinStockText = defaultImportMinStockText,
-                    onDefaultImportMinStockChange = { defaultImportMinStockText = it },
-                    rememberLastImportLocation = rememberLastImportLocation,
-                    onRememberLastImportLocationChange = { rememberLastImportLocation = it },
-                    syncAfterLocalChanges = syncAfterLocalChanges,
-                    onSyncAfterLocalChangesChange = { syncAfterLocalChanges = it },
-                    enableLocalAutoRecognition = enableLocalAutoRecognition,
-                    onEnableLocalAutoRecognitionChange = { enableLocalAutoRecognition = it },
-                    preferAggressiveAutoRecognition = preferAggressiveAutoRecognition,
-                    onPreferAggressiveAutoRecognitionChange = { preferAggressiveAutoRecognition = it },
-                    enableLocalImportLearning = enableLocalImportLearning,
-                    onEnableLocalImportLearningChange = { enableLocalImportLearning = it },
-                    enableServerJlcLookup = enableServerJlcLookup,
-                    onEnableServerJlcLookupChange = { enableServerJlcLookup = it },
-                    enablePublicJlcLookup = enablePublicJlcLookup,
-                    onEnablePublicJlcLookupChange = { enablePublicJlcLookup = it },
-                    ocrEngineMode = ocrEngineMode,
-                    onOcrEngineModeChange = { ocrEngineMode = it },
-                    appLanguage = appLanguage,
-                    onAppLanguageChange = { appLanguage = it },
-                    importLearningSummary = importLearningSummary,
-                    showToken = showToken,
-                    onToggleToken = { showToken = !showToken },
-                    isBusy = isBusy,
-                    syncRunning = syncConfiguration.syncState == "Running",
-                    syncSummary = syncConfiguration.syncSummary,
-                    errorMessage = errorMessage,
-                    hasUnsavedConnection = hasUnsavedConnection,
-                    onSave = { saveDraft(true) },
-                    onTestConnection = {
-                        onTestConnection(serverUrl, apiToken, externalServerUrl)
-                    },
-                    onSyncNow = {
-                        onSyncNow()
-                    },
-                    onClearImportLearningMappings = { showClearLearningConfirmation = true },
-                )
-            }
-        }
-    } else if (selectedSection == null) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .consumeWindowInsets(contentPadding)
-                .imePadding(),
-            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                SettingsSummaryPane(
-                    syncConfiguration = syncConfiguration,
-                    appPreferences = appPreferences,
-                    storageLocations = storageLocations,
-                    importLearningSummary = importLearningSummary,
-                    statusMessage = statusMessage,
-                )
-            }
-            item {
-                SettingsSectionList(
-                    selectedSection = null,
-                    onSelectSection = onSelectSection,
-                    onManageLocations = onManageLocations,
-                    onBackupRestore = onBackupRestore,
-                )
-            }
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier
-                .testTag("settings_detail_list")
-                .fillMaxSize()
-                .consumeWindowInsets(contentPadding)
-                .imePadding(),
-            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            settingsSectionDetailItems(
-                section = selectedSection,
-                showSectionHeading = false,
-                strings = strings,
-                serverUrl = serverUrl,
-                onServerUrlChange = { serverUrl = it },
-                    externalServerUrl = externalServerUrl,
-                    onExternalServerUrlChange = { externalServerUrl = it },
-                apiToken = apiToken,
-                onApiTokenChange = { apiToken = it },
-                autoSyncEnabled = autoSyncEnabled,
-                onAutoSyncChange = { autoSyncEnabled = it },
-                defaultImportLocation = defaultImportLocation,
-                onDefaultImportLocationChange = { defaultImportLocation = it },
-                defaultImportMinStockText = defaultImportMinStockText,
-                onDefaultImportMinStockChange = { defaultImportMinStockText = it },
-                rememberLastImportLocation = rememberLastImportLocation,
-                onRememberLastImportLocationChange = { rememberLastImportLocation = it },
-                syncAfterLocalChanges = syncAfterLocalChanges,
-                onSyncAfterLocalChangesChange = { syncAfterLocalChanges = it },
-                enableLocalAutoRecognition = enableLocalAutoRecognition,
-                onEnableLocalAutoRecognitionChange = { enableLocalAutoRecognition = it },
-                preferAggressiveAutoRecognition = preferAggressiveAutoRecognition,
-                onPreferAggressiveAutoRecognitionChange = { preferAggressiveAutoRecognition = it },
-                enableLocalImportLearning = enableLocalImportLearning,
-                onEnableLocalImportLearningChange = { enableLocalImportLearning = it },
-                enableServerJlcLookup = enableServerJlcLookup,
-                onEnableServerJlcLookupChange = { enableServerJlcLookup = it },
-                enablePublicJlcLookup = enablePublicJlcLookup,
-                onEnablePublicJlcLookupChange = { enablePublicJlcLookup = it },
-                ocrEngineMode = ocrEngineMode,
-                onOcrEngineModeChange = { ocrEngineMode = it },
-                appLanguage = appLanguage,
-                onAppLanguageChange = { appLanguage = it },
-                importLearningSummary = importLearningSummary,
-                showToken = showToken,
-                onToggleToken = { showToken = !showToken },
-                isBusy = isBusy,
-                syncRunning = syncConfiguration.syncState == "Running",
-                    syncSummary = syncConfiguration.syncSummary,
-                errorMessage = errorMessage,
-                hasUnsavedConnection = hasUnsavedConnection,
-                onSave = { saveDraft(true) },
-                onTestConnection = {
-                    onTestConnection(serverUrl, apiToken, externalServerUrl)
-                },
-                onSyncNow = {
-                    onSyncNow()
-                },
-                onClearImportLearningMappings = { showClearLearningConfirmation = true },
-            )
+        } else {
+            detail(Modifier.widthIn(max = 640.dp).fillMaxWidth().fillMaxHeight())
         }
     }
 
@@ -485,6 +449,7 @@ private fun SettingsSectionList(
     onSelectSection: (SettingsSection) -> Unit,
     onManageLocations: (() -> Unit)? = null,
     onBackupRestore: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val strings = vaultStrings()
     Column(
@@ -495,19 +460,20 @@ private fun SettingsSectionList(
             Text(stringResource(R.string.settings_inventory_data), style = MaterialTheme.typography.titleSmall)
             onManageLocations?.let { action ->
                 SettingsSectionCard(stringResource(R.string.settings_locations_title),
-                    stringResource(R.string.settings_locations_hint), false, action)
+                    stringResource(R.string.settings_locations_hint).takeUnless { compact }, false, action)
             }
             onBackupRestore?.let { action ->
                 SettingsSectionCard(stringResource(R.string.backup_title),
-                    stringResource(R.string.settings_backup_hint), false, action)
+                    stringResource(R.string.settings_backup_hint).takeUnless { compact }, false, action)
             }
         }
         SettingsSection.entries.forEach { section ->
             SettingsSectionCard(
                 title = section.title(strings),
-                supporting = section.supporting(strings),
+                supporting = section.supporting(strings).takeUnless { compact },
                 selected = section == selectedSection,
                 onClick = { onSelectSection(section) },
+                modifier = Modifier.testTag("settings_group_${section.name}"),
             )
         }
     }
@@ -516,13 +482,15 @@ private fun SettingsSectionList(
 @Composable
 private fun SettingsSectionCard(
     title: String,
-    supporting: String,
+    supporting: String?,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) {
@@ -541,30 +509,27 @@ private fun SettingsSectionCard(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text(
-                text = supporting,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun SettingsSummaryPane(
+private fun SettingsSyncStatusPane(
     syncConfiguration: SyncConfiguration,
-    appPreferences: AppPreferences,
-    storageLocations: List<StorageLocationRecord>,
-    importLearningSummary: ImportLearningSummary,
-    statusMessage: String,
 ) {
     val strings = vaultStrings()
 
     SectionPane(
-        title = strings.settings.summaryTitle,
+        title = stringResource(R.string.sync_run_label),
         supporting = strings.settings.summarySubtitle,
     ) {
-        ValueBlock(label = stringResource(R.string.sync_run_label), value = syncConfiguration.syncSummary)
         ValueBlock(label = stringResource(R.string.sync_bom_success_label),
             value = syncConfiguration.bomLastSyncedAt.ifBlank { stringResource(R.string.sync_never) })
         PhotoSyncSettings(syncConfiguration)
@@ -583,26 +548,6 @@ private fun SettingsSummaryPane(
         ValueBlock(
             label = strings.settings.lastResult,
             value = syncConfiguration.lastSyncMessage,
-        )
-        ValueBlock(
-            label = strings.common.fieldLocation,
-            value = displayLocationName(appPreferences.suggestedImportLocation, storageLocations, strings.common.labelNotConfigured),
-        )
-        ValueBlock(
-            label = strings.settings.ocrEngineLabel,
-            value = strings.settings.ocrEngineLabel(appPreferences.ocrEngineMode),
-        )
-        ValueBlock(
-            label = strings.settings.languageLabel,
-            value = strings.settings.appLanguageLabel(appPreferences.appLanguage),
-        )
-        ValueBlock(
-            label = strings.settings.learnedMappingsCount,
-            value = if (importLearningSummary.mappingCount > 0) {
-                importLearningSummary.mappingCount.toString()
-            } else {
-                strings.settings.noLearnedMappings
-            },
         )
     }
 }
