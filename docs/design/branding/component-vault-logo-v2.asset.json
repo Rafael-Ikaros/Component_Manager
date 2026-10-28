@@ -1,0 +1,39 @@
+{
+  "product": "Component Vault",
+  "design": "CV geometric mark with a component in the negative space",
+  "status": "selected_for_next_dev",
+  "selected_on": "2026-10-29",
+  "source_file": "component-vault-logo-v2.png",
+  "generation_prompt": "component-vault-logo-v2.prompt.txt",
+  "generation": {
+    "tool": "image_gen",
+    "mode": "built-in"
+  },
+  "raster": {
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGBA",
+    "transparent_alpha": true
+  },
+  "integration": {
+    "status": "pending_next_dev",
+    "android": {
+      "current_reference": "android-client/app/src/main/AndroidManifest.xml",
+      "next_steps": [
+        "Create launcher adaptive foreground and background resources from this selected mark.",
+        "Set android:icon and android:roundIcon to application-owned resources.",
+        "Check launcher masking and legibility on device."
+      ]
+    },
+    "windows": {
+      "current_project": "windows-client/ComponentVault.WinUI/ComponentVault.WinUI.csproj",
+      "next_steps": [
+        "Export a multi-size ICO and set ApplicationIcon for the portable executable.",
+        "Check the actual window and taskbar icon; adapt window icon handling if required.",
+        "Derive the existing package PNG assets with separate wide and splash layouts."
+      ]
+    },
+    "release_channel": "dev_prerelease",
+    "production_icon_references_changed": false
+  }
+}

@@ -1,0 +1,10 @@
+Use case: logo-brand.
+Asset type: one original compact app logo for Component Vault, a personal electronic parts inventory application.
+Primary request: a radically simpler, elegant abstract brand mark, different from a literal microchip or drawer cabinet.
+Design direction: combine the initials C and V into ONE custom geometric symbol that subtly suggests an open storage container holding a small electronic component. The C is a broad softly squared open loop; a decisive V-shaped fold or negative-space cut is integrated into its lower-right structure. Aim for a clever unified silhouette with 2 or 3 broad shapes, strong optical balance, and generous clean negative space. The C and V should be custom geometry rather than typeset text. At most one small solid square can imply a stored component, only if it improves the simplicity. Explore the shape thoughtfully; do not merely place the two letters side by side.
+Style: exceptionally clean flat vector-like identity, contemporary, restrained and friendly, mathematically neat but optically balanced, crisp solid fills, no texture, no bevels, no lighting, no gradients or shadows.
+Colors: one deep muted teal approximately #0F766E, with at most one lighter desaturated jade accent approximately #A6C8B6. Genuine transparency around and within negative spaces.
+Composition: a single centered symbol on a square transparent canvas, approximately 65 to 70 percent of the canvas width, with ample equal optical clear space. Must read clearly as a 24–48px app icon.
+Text: no words, labels, captions, small letters, watermarks or presentation board. Only the integrated geometric C/V symbol itself.
+Avoid: chip pins, drawers, handles, four-square grids, robot faces, cartoon characters, busy circuitry, literal warehouse buildings, security shields, padlocks, checkmarks, mountains, cloud icons, 3D objects, app tile background, multiple concepts. Do not imitate existing brand marks.
+Return only the finished single standalone logo with actual transparent alpha.
