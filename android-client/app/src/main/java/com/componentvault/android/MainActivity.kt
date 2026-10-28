@@ -11,10 +11,13 @@ import androidx.compose.runtime.setValue
 import com.componentvault.android.ui.screen.ComponentVaultApp
 import com.componentvault.android.ui.screen.InventoryViewModel
 import com.componentvault.android.ui.screen.StartupFailureScreen
+import com.componentvault.android.ui.screen.StartupUpdatePrompt
+import com.componentvault.android.ui.screen.StartupUpdateViewModel
 import com.componentvault.android.ui.screen.startupFailureDetails
 import com.componentvault.android.ui.theme.ComponentVaultTheme
 
 class MainActivity : AppCompatActivity() {
+    private val startupUpdateViewModel: StartupUpdateViewModel by viewModels()
     private val inventoryViewModel: InventoryViewModel by viewModels {
         InventoryViewModel.factory(application)
     }
@@ -36,6 +39,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else if (model != null) {
                     ComponentVaultApp(viewModel = model)
+                    StartupUpdatePrompt(
+                        release = startupUpdateViewModel.availableRelease,
+                        onDismiss = startupUpdateViewModel::dismiss,
+                    )
                 }
             }
         }

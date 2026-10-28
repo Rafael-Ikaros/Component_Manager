@@ -94,4 +94,8 @@
   <data name="Windows_App_FatalAppFailureTitle" xml:space="preserve"><value>Component Vault encountered a fatal application error.</value></data>
   <data name="Windows_App_MainViewModelMissing" xml:space="preserve"><value>MainViewModel was not initialized.</value></data>
   <data name="Windows_Diagnostics_LogPathPattern" xml:space="preserve"><value>Log: {0}</value></data>
+  <data name="MainWindow_UpdateAvailableTitle" xml:space="preserve"><value>New version available: {0}</value></data>
+  <data name="MainWindow_UpdateAvailableMessage" xml:space="preserve"><value>View the release notes and download the update in Settings. Updates are not downloaded or installed automatically.</value></data>
+  <data name="MainWindow_ViewUpdate" xml:space="preserve"><value>View update</value></data>
+  <data name="MainWindow_UpdateLater" xml:space="preserve"><value>Later</value></data>
 </root>

@@ -63,6 +63,7 @@ import com.componentvault.android.R
 import com.componentvault.android.data.GitHubReleaseUpdateChecker
 import com.componentvault.android.data.ReleaseCheckResult
 import com.componentvault.android.data.UpdateChannel
+import com.componentvault.android.data.UpdateChannelPreferences
 import com.componentvault.android.model.AppLanguage
 import com.componentvault.android.model.AppPreferences
 import com.componentvault.android.model.ImportLearningSummary
@@ -559,11 +560,8 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
     val coroutineScope = rememberCoroutineScope()
     val updateChecker = remember { GitHubReleaseUpdateChecker() }
     val context = LocalContext.current
-    val channelPreferences = remember { context.getSharedPreferences("component_vault_update", Context.MODE_PRIVATE) }
     var updateChannel by remember {
-        mutableStateOf(
-            if (channelPreferences.getString("channel", "stable") == "dev") UpdateChannel.Dev else UpdateChannel.Stable,
-        )
+        mutableStateOf(UpdateChannelPreferences.read(context))
     }
     var isChecking by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<ReleaseCheckResult?>(null) }
@@ -628,7 +626,7 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
         Column {
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
               updateChannel = UpdateChannel.Stable
-              channelPreferences.edit().putString("channel", "stable").apply()
+              UpdateChannelPreferences.write(context, updateChannel)
               updateResult = null
           }) {
             RadioButton(
@@ -640,7 +638,7 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
           }
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
               updateChannel = UpdateChannel.Dev
-              channelPreferences.edit().putString("channel", "dev").apply()
+              UpdateChannelPreferences.write(context, updateChannel)
               updateResult = null
           }) {
             RadioButton(
@@ -710,7 +708,7 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
 }
 
 @Composable
-private fun SettingsUpdateResult(
+internal fun SettingsUpdateResult(
     result: ReleaseCheckResult?,
     onOpenRelease: (String) -> Unit,
 ) {

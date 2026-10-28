@@ -1,7 +1,10 @@
 using ComponentVault.WinUI.Views;
 using ComponentVault.WinUI.Localization;
+using ComponentVault.WinUI.Services;
+using ComponentVault.WinUI.Services.Updates;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace ComponentVault.WinUI;
 
@@ -10,6 +13,8 @@ public sealed partial class MainWindow : Window
     private readonly ViewModels.MainViewModel _viewModel;
     private bool _updatingSelection;
     private bool _syncDialogOpen;
+    private readonly StartupUpdateCheck _startupUpdateCheck = new();
+    private readonly CancellationTokenSource _windowClosed = new();
 
     public MainWindow()
     {
@@ -22,6 +27,52 @@ public sealed partial class MainWindow : Window
         AppNavigationView.SelectionChanged += OnSelectionChanged;
         AppNavigationView.BackRequested += OnBackRequested;
         NavigateTo("Overview");
+        AppNavigationView.Loaded += OnWindowLoaded;
+        Closed += (_, _) => _windowClosed.Cancel();
+    }
+
+    private async void OnWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        AppNavigationView.Loaded -= OnWindowLoaded;
+        var channel = UpdatePreferences.LoadChannel();
+        var token = _windowClosed.Token;
+        var result = await _startupUpdateCheck.CheckOnceAsync(
+            AppVersion.Current, channel, new GitHubReleaseClient().CheckAsync, token);
+        if (result is null || token.IsCancellationRequested) return;
+
+        try
+        {
+            // Never interrupt an editor or another popup. No await between this check and ShowAsync.
+            while (!token.IsCancellationRequested)
+            {
+                if (UpdatePreferences.LoadChannel() != channel) return;
+                var root = AppNavigationView.XamlRoot;
+                if (root is not null && !_syncDialogOpen && !_viewModel.IsBusy
+                    && !VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(popup => popup.IsOpen))
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = AppStrings.Format("MainWindow_UpdateAvailableTitle", result.Release!.Tag),
+                        Content = AppStrings.Get("MainWindow_UpdateAvailableMessage"),
+                        PrimaryButtonText = AppStrings.Get("MainWindow_ViewUpdate"),
+                        CloseButtonText = AppStrings.Get("MainWindow_UpdateLater"),
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = root,
+                    };
+                    using var registration = token.Register(() => DispatcherQueue.TryEnqueue(() => dialog.Hide()));
+                    if (await dialog.ShowAsync() == ContentDialogResult.Primary && !token.IsCancellationRequested)
+                    {
+                        NavigateTo("Settings");
+                        if (RootFrame.Content is SettingsView settings)
+                            settings.ShowStartupUpdate(result);
+                    }
+                    return;
+                }
+                await Task.Delay(500, token);
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { /* Optional startup notification must not interrupt offline work. */ }
     }
 
     public void NavigateTo(string tag)

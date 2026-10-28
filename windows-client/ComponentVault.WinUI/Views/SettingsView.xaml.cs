@@ -6,7 +6,6 @@ using ComponentVault.WinUI.Services.Updates;
 using ComponentVault.WinUI.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
@@ -35,9 +34,8 @@ public sealed partial class SettingsView : Page
     {
         InitializeComponent();
         DataContext = ViewModelResolver.ResolveMainViewModel();
-        CurrentVersionText.Text = GetCurrentVersion();
-        var savedChannel = LoadUpdateChannel();
-        _updateChannel = savedChannel == "dev" ? UpdateChannel.Dev : UpdateChannel.Stable;
+        CurrentVersionText.Text = AppVersion.Current;
+        _updateChannel = UpdatePreferences.LoadChannel();
         UpdateChannelComboBox.SelectedIndex = _updateChannel == UpdateChannel.Dev ? 1 : 0;
         UpdateChannelHint.Text = ChannelHint();
         LoadValuesFromCurrentContext();
@@ -356,20 +354,7 @@ public sealed partial class SettingsView : Page
         try
         {
             var result = await _releaseClient.CheckAsync(CurrentVersionText.Text, _updateChannel, _updateCancellation.Token);
-            _latestRelease = result.Release;
-            UpdateInfoBar.Title = result.IsSuccess ? "更新检查完成" : "无法完成更新检查";
-            UpdateInfoBar.Message = result.Message;
-            UpdateInfoBar.Severity = result.Comparison == UpdateComparison.UpdateAvailable
-                ? InfoBarSeverity.Success
-                : result.IsSuccess ? InfoBarSeverity.Informational : InfoBarSeverity.Warning;
-            LatestVersionText.Text = result.Release?.Tag ?? "不可用";
-            PublishedAtText.Text = result.Release?.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
-            ReleaseNotesText.Text = string.IsNullOrWhiteSpace(result.Release?.Notes) ? "该 Release 没有正文更新日志。" : result.Release.Notes;
-            var canDownloadUpdate = result.Comparison == UpdateComparison.UpdateAvailable;
-            DownloadPortableButton.IsEnabled = canDownloadUpdate && result.Release?.PortableDownload is not null;
-            UpdateAssetHint.Text = result.Release is not null && result.Release.PortableDownload is null
-                ? "此 Release 缺少 Windows 便携版，请打开发布页核对资产。"
-                : "应用不会自动下载或替换当前程序。下载后请解压便携版并运行其中的 ComponentVault.WinUI.exe。";
+            DisplayUpdateResult(result);
         }
         catch (OperationCanceledException) { }
         finally
@@ -380,6 +365,37 @@ public sealed partial class SettingsView : Page
             UpdateChannelComboBox.IsEnabled = true;
             UpdateProgressRing.IsActive = false;
         }
+    }
+
+    public void DisplayUpdateResult(UpdateCheckResult result)
+    {
+        _latestRelease = result.Release;
+        UpdateInfoBar.Title = result.IsSuccess ? "更新检查完成" : "无法完成更新检查";
+        UpdateInfoBar.Message = result.Message;
+        UpdateInfoBar.Severity = result.Comparison == UpdateComparison.UpdateAvailable
+            ? InfoBarSeverity.Success
+            : result.IsSuccess ? InfoBarSeverity.Informational : InfoBarSeverity.Warning;
+        LatestVersionText.Text = result.Release?.Tag ?? "不可用";
+        PublishedAtText.Text = result.Release?.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
+        ReleaseNotesText.Text = string.IsNullOrWhiteSpace(result.Release?.Notes) ? "该 Release 没有正文更新日志。" : result.Release.Notes;
+        var canDownloadUpdate = result.Comparison == UpdateComparison.UpdateAvailable;
+        DownloadPortableButton.IsEnabled = canDownloadUpdate && result.Release?.PortableDownload is not null;
+        UpdateAssetHint.Text = result.Release is not null && result.Release.PortableDownload is null
+            ? "此 Release 缺少 Windows 便携版，请打开发布页核对资产。"
+            : "应用不会自动下载或替换当前程序。下载后请解压便携版并运行其中的 ComponentVault.WinUI.exe。";
+    }
+
+    public void ShowStartupUpdate(UpdateCheckResult result)
+    {
+        DisplayUpdateResult(result);
+        if (IsLoaded) UpdateInfoBar.StartBringIntoView();
+        else Loaded += OnUpdateDetailsLoaded;
+    }
+
+    private void OnUpdateDetailsLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnUpdateDetailsLoaded;
+        UpdateInfoBar.StartBringIntoView();
     }
 
     private async void OnDownloadPortableClicked(object sender, RoutedEventArgs e)
@@ -422,7 +438,7 @@ public sealed partial class SettingsView : Page
     {
         if (UpdateChannelComboBox.SelectedItem is not ComboBoxItem item) return;
         _updateChannel = item.Tag?.ToString() == "dev" ? UpdateChannel.Dev : UpdateChannel.Stable;
-        SaveUpdateChannel(_updateChannel == UpdateChannel.Dev ? "dev" : "stable");
+        UpdatePreferences.SaveChannel(_updateChannel);
         UpdateChannelHint.Text = ChannelHint();
         _latestRelease = null;
         LatestVersionText.Text = "尚未检查";
@@ -433,39 +449,4 @@ public sealed partial class SettingsView : Page
         ? "开发版会检查预发布版和更高的正式版，测试覆盖可能较少。"
         : "正式版仅检查稳定 Release；切回后不会自动降级已安装的开发版。";
 
-    private static string UpdateChannelPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "ComponentVault", "update-channel.txt");
-
-    private static string LoadUpdateChannel()
-    {
-        try { return File.ReadAllText(UpdateChannelPath).Trim(); }
-        catch { return "stable"; }
-    }
-
-    private static void SaveUpdateChannel(string channel)
-    {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(UpdateChannelPath)!);
-            File.WriteAllText(UpdateChannelPath, channel);
-        }
-        catch { }
-    }
-
-    private static string GetCurrentVersion()
-    {
-        var informational = Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (!string.IsNullOrWhiteSpace(informational)) return informational.Split('+')[0];
-        try
-        {
-            var version = Windows.ApplicationModel.Package.Current.Id.Version;
-            return $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
-        }
-        catch
-        {
-            return Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "未知";
-        }
-    }
 }

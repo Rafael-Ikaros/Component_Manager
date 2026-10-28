@@ -422,7 +422,7 @@
                                 Text="更新" />
                             <TextBlock
                                 Style="{StaticResource CaptionTextStyle}"
-                                Text="手动读取公开 GitHub Release；不会发送同步令牌。" />
+                                Text="启动后自动检查新版本，也可手动检查；不会发送同步令牌。" />
                         </StackPanel>
                         <StackPanel
                             Grid.Column="1"

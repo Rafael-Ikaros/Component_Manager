@@ -94,4 +94,8 @@
   <data name="Windows_App_FatalAppFailureTitle" xml:space="preserve"><value>元件仓库遇到了致命应用错误。</value></data>
   <data name="Windows_App_MainViewModelMissing" xml:space="preserve"><value>MainViewModel 尚未初始化。</value></data>
   <data name="Windows_Diagnostics_LogPathPattern" xml:space="preserve"><value>日志：{0}</value></data>
+  <data name="MainWindow_UpdateAvailableTitle" xml:space="preserve"><value>发现新版本 {0}</value></data>
+  <data name="MainWindow_UpdateAvailableMessage" xml:space="preserve"><value>可在设置中查看更新内容并下载。应用不会自动下载或安装更新。</value></data>
+  <data name="MainWindow_ViewUpdate" xml:space="preserve"><value>查看更新</value></data>
+  <data name="MainWindow_UpdateLater" xml:space="preserve"><value>稍后</value></data>
 </root>
