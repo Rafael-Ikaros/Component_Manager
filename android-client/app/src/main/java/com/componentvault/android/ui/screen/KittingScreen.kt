@@ -100,7 +100,7 @@ internal fun KittingScreen(inventoryViewModel: InventoryViewModel, onDismiss: ()
         }
     }
     SecondaryPageScaffold(title = "配套件", onBack = onDismiss, navigationEnabled = !session.busy) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().padding(horizontal = 16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
             item { Text("从库存逐项选料，或从 BOM 预设带入。复核后确认一次扣减库存。", style = MaterialTheme.typography.bodyMedium) }
             item { OutlinedTextField(session.projectName, { session.projectName = it; session.invalidate() }, label = { Text("配套件名称") }, enabled = !session.busy && !session.applied, modifier = Modifier.fillMaxWidth()) }
             item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

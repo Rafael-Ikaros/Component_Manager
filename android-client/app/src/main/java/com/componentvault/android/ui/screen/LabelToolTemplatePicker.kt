@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -51,12 +54,12 @@ internal fun LabelToolTemplatePicker(
         bottomBar = {
             if (template != null) Button(onClick = { if (template != null && paper != null) onSelect(template, paper) },
                 enabled = paper != null,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp)) {
                 Text(stringResource(R.string.label_ui_open_editor))
             }
         },
     ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+        Column(Modifier.padding(padding).consumeWindowInsets(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (template == null) {
                 Text(stringResource(R.string.label_ui_choose_template_hint),
