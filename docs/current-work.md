@@ -1,4 +1,4 @@
-# 2026-10-28 Android 其余页面显示验收（dev.23 验收完成，准备发布）
+# 2026-10-28 Android 其余页面显示验收（dev.23 已发布）
 
 - 起点4546004，设备仍为Android16/SDK36、dev.22/708022，rotation lock1、常亮15。测试前从真实应用完整导出before.xlsx，2组件26件2库位1流水1图片；不清数据，不连接正式服务端，不提交出入库。
 - 实机确认横屏元件编辑说明、手动流水备注聚焦后Dialog整页上移，保存/取消节点为0bounds且滚动不可达。共用AdaptiveFormSurface修正独立Dialog窗口IME/安全区和760dp最大宽度，Compact分支消费insets；短视口单项回归通过。
@@ -10,6 +10,8 @@
 - 15行合成BOM只读匹配2项/待处理13项；横屏手工搜索C100实际返回原元件，搜索框、按钮和末尾复核/导出可滚至IME上方；旋转竖屏后在末行展开搜索，搜索和末尾操作也可见。未选定替代或扣料，退出明确放弃本轮合成进度，不清其他预设。
 - 真实应用before/after完整Excel逐项比较PASS：2组件26件2库位3分配1流水1图片，业务行变化0，原图hash一致。常亮仍15、rotation恢复lock1，不清数据。未做迁移文件应用、真实扫描、实体打印或完整Windows UI回归；两项新增UI回归只覆盖本次约束问题。
 - 用户选择“先发显示修复，再重做平板”。新增[平板布局提案](design/tablet-ui-proposal.md)及独立HTML交互原型，参考Android官方Canonical layouts、Reply、Now in Android；五页横竖屏10张浏览器截图检查与BOM/标签弹窗交互通过。它不是生产Android实现，后续dev分阶段重排库存/设置、BOM和标签工作区，不变更数据库或同步协议。
+- 发布提交dda3b33的CI40685838089全部成功，Release From Changelog40685838216成功。[v0.7.8-dev.23](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.8-dev.23)为公开预发布，Android/Windows ZIP/Web三个附件齐全，Docker发布跳过。公开APK SHA256 6674cacaf0ad2f174ae6233e9e32b04c703f66bf31fe27b54c23db7c9e08f5c1，与Release API digest一致。
+- 公开APK再次install-r保留数据覆盖成功，重启回读dev.23/708023，首页仍2组件26件1流水，库存C100原图实际显示。所有修改已提交master；原有未跟踪server/data未动。原始备份与截图证据仅保留本机.tmp，不提交到仓库。
 
 # 2026-10-28 Issue #25 手机验收与大屏显示修复（dev.22 已发布）
 
