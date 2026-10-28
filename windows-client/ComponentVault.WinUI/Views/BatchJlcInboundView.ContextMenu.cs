@@ -126,6 +126,7 @@ public sealed partial class BatchJlcInboundView
         menu.Items.Add(CreateTableContextCommand(InvertPendingSelectionButton, OnInvertPendingSelection));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(CreateTableContextCommand(RetryButton, OnRetryPending));
+        menu.Items.Add(CreateTableContextCommand(ConfirmPendingButton, OnConfirmPending));
         menu.Items.Add(CreateTableContextCommand(RemoveButton, OnRemovePending));
         return menu;
     }

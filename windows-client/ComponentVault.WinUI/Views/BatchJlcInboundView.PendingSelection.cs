@@ -166,6 +166,7 @@ public sealed partial class BatchJlcInboundView
         TogglePendingSelectionButton.IsEnabled = !_busy && _pending.Count > 0;
         InvertPendingSelectionButton.IsEnabled = !_busy && _pending.Count > 0;
         RetryButton.IsEnabled = !_busy && selectedCount > 0;
+        ConfirmPendingButton.IsEnabled = !_busy && selectedCount > 0;
         RemoveButton.IsEnabled = !_busy && selectedCount > 0;
         var text = $"已选 {selectedCount}/{_pending.Count} 条";
         if (PendingSelectionText.Text != text)

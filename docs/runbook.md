@@ -829,3 +829,17 @@ Actions 的 `android-check` 先运行库存扫码与数量边界的直接测试�
 API/Web 同时升级，客户端 `/auth/ping` 应见 `photo_protocol:1`。本开发版不推进 Docker `latest` 正式标签；测试源码 Compose 构建可沿用本手册既有步骤。无新环境变量和端口，保留整个 `/data` 挂载及账户数据库。
 
 照片保存在 `<账户数据库路径>.photos/`，普通账户各自独立；备份/恢复必须同时包含 SQLite、配置和这些目录，建议停写后复制整个数据卷。只恢复数据库会缺少图片字节，客户端将提示在仍有原图的设备上同步。服务端清理超过24小时未引用文件，删除账户会同步清除其照片目录。客户端清理下载缓存只影响副本，不修改库存或服务器图片。详见[照片教程](photo-sync.md)。
+
+### Windows 订单与更新日志检查
+
+Windows CI 明确执行以下三个测试项目；发布候选构建执行新增的后两个独立测试项目：
+
+```powershell
+dotnet test windows-client/ComponentVault.WinUI.CoreTests/ComponentVault.WinUI.CoreTests.csproj -c Release
+dotnet test windows-client/ComponentVault.WinUI/Tests/JlcOrderImport/JlcOrderImport.Tests.csproj -c Release
+dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/ReleaseNotesMarkdown.Tests.csproj -c Release
+```
+
+只有改动相关部分时才需在本地运行对应项目。候选构建可通过 `Release Artifacts` 的 `workflow_dispatch` 设置 `source_ref` 为完整提交 SHA、`release_tag` 为拟验证的 dev 标签，并将 `publish_github_release` 设为 `false`；这样只生成验证附件，不创建公开 Release。桌面验收通过后再写具体版本的 CHANGELOG 标题触发发布；仅编辑 Unreleased 不发布。dev 不推送 Docker 稳定标签。
+
+订单复核、待验收项和服务端 Issue #25 的实现建议见 [2026-10-28 记录](issues-2026-10-28.md)。

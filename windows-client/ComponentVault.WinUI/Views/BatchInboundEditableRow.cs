@@ -1,4 +1,5 @@
 using ComponentVault.WinUI.Models;
+using ComponentVault.WinUI.Services.BatchInbound;
 using ComponentVault.WinUI.Services.Catalog;
 using ComponentVault.WinUI.ViewModels;
 using Microsoft.UI.Xaml;
@@ -36,7 +37,26 @@ public sealed class BatchInboundEditableRow : ObservableObject
         set => SetProperty(ref _pendingWidth, value);
     }
 
-    public string Sku { get; set; } = "";
+    private string _sku = "";
+    public string SourceWarning { get; set; } = "";
+    public bool SourceWarningConfirmed { get; set; }
+    public string Sku
+    {
+        get => _sku;
+        set
+        {
+            var changed = _sku.Length > 0 && BatchInboundReviewState.SkuChanged(_sku, value);
+            if (!SetProperty(ref _sku, value) || !changed || !BatchInboundReviewState.IsOrder(Raw)) return;
+            Name = Category = PackageName = Description = "";
+            SourceWarningConfirmed = false;
+            Reason = "料号已修改，请重新查询或补齐资料后确认。";
+            OnPropertyChanged(nameof(Name));
+            OnPropertyChanged(nameof(Category));
+            OnPropertyChanged(nameof(PackageName));
+            OnPropertyChanged(nameof(Description));
+            OnPropertyChanged(nameof(Reason));
+        }
+    }
     public double QuantityInput { get; set; } = double.NaN;
     public string LocationId { get; set; } = "";
     public string Name { get; set; } = "";

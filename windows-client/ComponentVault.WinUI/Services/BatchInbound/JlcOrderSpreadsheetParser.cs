@@ -163,7 +163,7 @@ public static partial class JlcOrderSpreadsheetParser
         var error = string.Join("\n", line.Errors.Distinct(StringComparer.Ordinal));
         return new(line.ReceiptId, line.Raw)
         {
-            Status = "captured", Sku = line.Sku, QuantityText = line.QuantityText,
+            Status = "captured", Sku = line.Sku, MetadataSku = line.Sku, SourceWarning = error, QuantityText = line.QuantityText,
             Name = displayName, Category = line.Category, PackageName = line.Package,
             Description = string.Join("\n", details), Error = error, Selected = error.Length == 0,
         };

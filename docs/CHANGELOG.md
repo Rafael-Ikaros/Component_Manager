@@ -17,6 +17,12 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+- Windows：合入库存表格与批量入库交互调整、立创订单 `.xls` 导入和 Markdown 更新日志显示；订单入库仍需明确确认。
+- 修复订单行修改 C 料号后沿用旧商品资料；查询与人工确认分离，退款、缺订单及冲突警告在重试和草稿恢复后保留。旧草稿与库存数据继续保留。
+- 将独立订单导入、范围选择及 Markdown 测试加入 Windows CI 与发布候选检查；修复 README.md 更新日志链接定位。
+- 核对 GitHub Issues：当前仅 #25 开启。服务端通过订单 Excel 更新已有元件资料且数量不变的功能尚未实现，具体方案见 [分析记录](issues-2026-10-28.md)。桌面人工验收与公开 dev 发布状态以该记录为准。
+
+
 ## [0.7.8-dev.20] - 2026-10-22
 
 - 修复GitHub账户改名后检查更新失败：Android、Windows切换至Rafael-Ikaros/Component_Manager，更新发布页与可信下载URL校验，并同步关于、反馈和服务端默认查询地址。手机已实际读取版本及更新日志。旧客户端需手动覆盖安装本版一次，无需卸载或清数据。

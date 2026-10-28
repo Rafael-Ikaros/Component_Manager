@@ -284,6 +284,12 @@ jobs:
       - name: Run Windows core sync regressions
         run: dotnet test windows-client/ComponentVault.WinUI.CoreTests/ComponentVault.WinUI.CoreTests.csproj -c Release
 
+      - name: Run Windows JLC order import regressions
+        run: dotnet test windows-client/ComponentVault.WinUI/Tests/JlcOrderImport/JlcOrderImport.Tests.csproj -c Release
+
+      - name: Run Windows release notes Markdown tests
+        run: dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/ReleaseNotesMarkdown.Tests.csproj -c Release
+
       - name: Publish Windows portable bundle
         shell: pwsh
         run: |

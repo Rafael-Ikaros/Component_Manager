@@ -22,7 +22,9 @@ public static class ReleaseNotesMarkdown
         {
             // Release notes use documentation-relative links such as dockerhub.md.
             var path = link.Split(['?', '#'])[0];
+            var fileName = path[(path.LastIndexOf('/') + 1)..];
             var baseUri = !path.Contains('/') && path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                && fileName is not ("README.md" or "AGENTS.md")
                 ? new Uri(RepositoryBase, "docs/") : RepositoryBase;
             if (!Uri.TryCreate(baseUri, link, out uri)) return null;
         }

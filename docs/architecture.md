@@ -877,3 +877,11 @@ dev18 直接验收记录：真实 Windows 服务将共享预设发送到隔离 F
 - 库存提交在附件阶段前完成。库存 pending 来自本地队列，BOM pending 比较当前 ID/updated_at 与服务器已确认版本，照片按当前引用和原有 manifest 推导；请求期间的新本地改动保持待处理。旧服务器/账户/配置范围的完成时间不显示成当前配置成功。
 - UI 摘要和设置复用同一状态来源，分别标明库存/BOM/照片最近完成时间。人工冲突合并、自动后台恢复和跨设备生产批次账本仍不在范围内。
 - 库存偶尔为空尚无证实的源码根因；仅在数据发布和实际库存列表渲染时加入脱敏计数诊断，记录数目及筛选激活形状，不记录搜索词、元件、库位名或凭据。诊断沿用当前进程的有界反馈缓冲，复现后应在关闭应用前导出反馈。
+
+## Windows 订单复核与资料更新边界（2026-10-28）
+
+`BatchInboundReviewState` 独立处理订单资料身份、来源警告和草稿恢复。`BatchScanItem` 追加 `MetadataSku`、`SourceWarning`、`SourceWarningConfirmed` 可选状态；旧 JSON 草稿按已有资料和错误恢复，不清空用户草稿、不修改 SQLite schema。可编辑行修改 SKU 时清空旧名称/分类/封装/描述并撤销旧确认，查询只补齐资料，明确的人工确认才解除来源警告。
+
+`.github/workflows/ci.yml` 明确运行 `ComponentVault.WinUI.CoreTests`、`Tests/JlcOrderImport`、`Tests/ReleaseNotesMarkdown`；`release.yml` 发布候选增加后两个独立测试，各项目测试职责不同；生产项目排除 `Tests/**`。Markdown 根目录 `README.md` 链接按仓库根目录解析，既有 `dockerhub.md` 等文档链接保持 docs 语义。
+
+Issue #25 的订单资料更新仍是设计方案，不能从订单入库提交器调用；未来应使用账户范围内、带当前版本检查的资料专用更新，保留事务内最新数量、分配与流水。详见 [本轮方案](issues-2026-10-28.md)。

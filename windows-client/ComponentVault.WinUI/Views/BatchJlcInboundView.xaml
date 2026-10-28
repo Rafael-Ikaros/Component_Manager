@@ -141,7 +141,11 @@
 								<Button
 									x:Name="RetryButton"
 									Click="OnRetryPending"
-									Content="重试或标记所选" />
+									Content="重新查询所选" />
+								<Button
+									x:Name="ConfirmPendingButton"
+									Click="OnConfirmPending"
+									Content="确认资料无误" />
 								<Button
 									x:Name="RemoveButton"
 									Click="OnRemovePending"
@@ -240,7 +244,7 @@
 												Grid.Column="1"
 												VerticalAlignment="Center"
 												Foreground="DarkOrange"
-												Text="{x:Bind Reason}"
+												Text="{x:Bind Reason, Mode=OneWay}"
 												TextWrapping="Wrap" />
 										</Grid>
 										<Grid Grid.Row="1" ColumnSpacing="6">

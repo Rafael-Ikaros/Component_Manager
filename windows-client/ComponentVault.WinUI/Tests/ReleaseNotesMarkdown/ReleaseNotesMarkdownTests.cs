@@ -140,6 +140,10 @@ public sealed class ReleaseNotesMarkdownTests
     [InlineData("dockerhub.md?plain=1#deploy", "blob/master/docs/dockerhub.md?plain=1#deploy")]
     [InlineData("dockerhub.md?return=/settings", "blob/master/docs/dockerhub.md?return=/settings")]
     [InlineData("DOCKERHUB.MD", "blob/master/docs/DOCKERHUB.MD")]
+    [InlineData("README.md", "blob/master/README.md")]
+    [InlineData("AGENTS.md", "blob/master/AGENTS.md")]
+    [InlineData("CHANGELOG.md", "blob/master/docs/CHANGELOG.md")]
+    [InlineData("./README.md", "blob/master/README.md")]
     [InlineData("images/example.png", "blob/master/images/example.png")]
     public void RelativeLinksUseTheCurrentRepositoryAndDocumentationBase(string input, string expectedPath)
     {

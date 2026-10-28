@@ -50,8 +50,9 @@ public sealed partial class BatchJlcInboundView:Page
             foreach (var item in _drafts.Load())
             {
                 if (ViewModel.IsBatchReceiptCommitted(item.ReceiptId) || item.Status == "captured") continue;
-                var row = FromDraft(item, ViewModel.StorageLocations.ToArray());
-                (item.Status == "ready" ? _ready : _pending).Add(row);
+                var restored = BatchInboundReviewState.Restore(item);
+                var row = FromDraft(restored, ViewModel.StorageLocations.ToArray());
+                (item.Status == "ready" && ReadyForReview(row) ? _ready : _pending).Add(row);
             }
             RefreshCount();
         }
@@ -117,7 +118,7 @@ public sealed partial class BatchJlcInboundView:Page
         var cache = new Dictionary<string, LcscCatalogLookupResult>(StringComparer.OrdinalIgnoreCase);
         var locations = ViewModel.StorageLocations.ToArray();
         var defaultLocation = (DefaultLocationBox.SelectedItem as StorageLocationRecord)?.Id ?? locations.FirstOrDefault()?.Id ?? "";
-        var source = scans.Select(scan => (Scan: scan, OrderImport: IsOrderImport(scan.Raw), Row: CreateRow(scan))).ToArray();
+        var source = scans.Select(BatchInboundReviewState.Restore).Select(scan => (Scan: scan, OrderImport: IsOrderImport(scan.Raw), Row: CreateRow(scan))).ToArray();
         // Show all spreadsheet data before awaiting the first catalog request.
         foreach (var entry in source.Where(entry => entry.OrderImport))
         {
@@ -236,6 +237,7 @@ public sealed partial class BatchJlcInboundView:Page
             return new()
             {
                 ReceiptId = scan.ReceiptId, Raw = scan.Raw, Selected = scan.Selected,
+                SourceWarning = scan.SourceWarning ?? "", SourceWarningConfirmed = scan.SourceWarningConfirmed,
                 Sku = editedSku ?? parsed.Sku, QuantityInput = editedQuantity ?? parsed.Quantity ?? double.NaN,
                 LocationId = string.IsNullOrWhiteSpace(scan.LocationId) ? defaultLocation : scan.LocationId,
                 Name = skuChanged ? "" : scan.Name.Length > 0 ? scan.Name : parsed.PartName ?? parsed.Model ?? "",
@@ -247,7 +249,8 @@ public sealed partial class BatchJlcInboundView:Page
         static string OrderReviewReason(BatchScanItem scan, BatchInboundEditableRow row, string missingMetadataReason)
         {
             // A successful lookup must not approve quantities, refunds or ambiguous source rows.
-            if (scan.Status == "captured" && !string.IsNullOrWhiteSpace(scan.Error)) return scan.Error;
+            var warning = BatchInboundReviewState.UnconfirmedWarning(row.SourceWarning, row.SourceWarningConfirmed);
+            if (!string.IsNullOrWhiteSpace(warning)) return warning;
             if (row.Quantity is null) return "订购数量无效，请手动确认正整数数量。";
             return ReadyForReview(row) ? "" : missingMetadataReason;
         }
@@ -286,7 +289,7 @@ public sealed partial class BatchJlcInboundView:Page
             CancelLookupButton.IsEnabled = false;
         }
     }
-    private static bool ReadyForReview(BatchInboundEditableRow x)=>x.Quantity is not null&&LcscPublicCatalog.NormalizeSku(x.Sku) is not null&&new BatchInboundMetadata(x.Name,x.Category,x.PackageName,x.Description).HasRequiredFields;
+    private static bool ReadyForReview(BatchInboundEditableRow x)=>string.IsNullOrWhiteSpace(BatchInboundReviewState.UnconfirmedWarning(x.SourceWarning,x.SourceWarningConfirmed))&&x.Quantity is not null&&LcscPublicCatalog.NormalizeSku(x.Sku) is not null&&new BatchInboundMetadata(x.Name,x.Category,x.PackageName,x.Description).HasRequiredFields;
     private static bool Complete(BatchInboundEditableRow x)=>ReadyForReview(x)&&!string.IsNullOrWhiteSpace(x.LocationId);
     private static string CatalogNotes(LcscProductMetadata m){var lines=new List<string>();void Add(string? x){if(!string.IsNullOrWhiteSpace(x))lines.Add(x);}Add(m.LookupNotice);Add(m.Model is null?null:$"型号：{m.Model}");Add(m.Description is null?null:$"官方描述：{m.Description}");Add(m.Brand is null?null:$"品牌：{m.Brand}");Add($"官方商品页：{m.OfficialUrl}");Add(m.CategoryPath is null?null:$"官方分类路径：{m.CategoryPath}");Add(m.ImageUrl is null?null:$"商品图片：{m.ImageUrl}");Add(m.DatasheetUrl is null?null:$"数据手册：{m.DatasheetUrl}");if(m.Parameters is not null)foreach(var p in m.Parameters)Add($"参数·{p.Key}：{p.Value}");return string.Join("\n",lines);}
     private void Remove(string receipt){var ready=_ready.FirstOrDefault(x=>x.ReceiptId==receipt);if(ready is not null)_ready.Remove(ready);var pending=_pending.FirstOrDefault(x=>x.ReceiptId==receipt);if(pending is not null)_pending.Remove(pending);}
@@ -377,8 +380,9 @@ public sealed partial class BatchJlcInboundView:Page
         try
         {
             var selected = PendingList.SelectedItems.Cast<BatchInboundEditableRow>().ToArray();
-            var manualReady = selected.Where(row => ReadyForReview(row) &&
-                (IsOrderImport(row.Raw) || row.Sku.Equals(JlcQrParser.Parse(row.Raw).Sku, StringComparison.OrdinalIgnoreCase))).ToArray();
+            // Preserve the existing QR workflow; order warnings require the explicit confirmation action.
+            var manualReady = selected.Where(row => !IsOrderImport(row.Raw) && ReadyForReview(row)
+                && row.Sku.Equals(JlcQrParser.Parse(row.Raw).Sku, StringComparison.OrdinalIgnoreCase)).ToArray();
             foreach (var row in manualReady)
             {
                 row.Reason = "";
@@ -390,6 +394,22 @@ public sealed partial class BatchJlcInboundView:Page
         }
         catch (Exception exception) { await ShowBatchErrorAsync("待处理重试失败", exception.Message); }
         finally { SetBusy(false); }
+    }
+    private void OnConfirmPending(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        foreach (var row in PendingList.SelectedItems.Cast<BatchInboundEditableRow>().ToArray())
+        {
+            if (!IsOrderImport(row.Raw) && !row.Sku.Equals(JlcQrParser.Parse(row.Raw).Sku, StringComparison.OrdinalIgnoreCase)) continue;
+            var metadata = new BatchInboundMetadata(row.Name, row.Category, row.PackageName, row.Description);
+            if (row.Quantity is null || LcscPublicCatalog.NormalizeSku(row.Sku) is null || !metadata.HasRequiredFields) continue;
+            row.SourceWarningConfirmed = true;
+            row.Reason = "";
+            _pending.Remove(row);
+            _ready.Add(row);
+        }
+        SaveRemaining();
+        RefreshCount();
     }
     private void OnRemovePending(object sender,RoutedEventArgs e){if(_busy)return;foreach(var row in PendingList.SelectedItems.Cast<BatchInboundEditableRow>().ToArray()){_pending.Remove(row);_removed.Add(row.ReceiptId);}SaveRemaining();RefreshCount();}
     private void OnDraftFieldChanged(object sender,RoutedEventArgs e)=>PersistEdits();
@@ -407,8 +427,8 @@ public sealed partial class BatchJlcInboundView:Page
     private void SaveRemaining(){var shown=_ready.Concat(_pending).Select(x=>x.ReceiptId).ToHashSet();var captured=_drafts.Load().Where(x=>!shown.Contains(x.ReceiptId)&&!_removed.Contains(x.ReceiptId)&&!ViewModel.IsBatchReceiptCommitted(x.ReceiptId));_drafts.Save(captured.Concat(_ready.Concat(_pending).Select(ToDraft)).ToArray());}
     private void RefreshCount()=>CountText.Text=$"草稿 {_drafts.Load().Count}/500 条 · 待核对 {_ready.Count} · 待处理 {_pending.Count}";
     private void OnUnloaded(object sender,RoutedEventArgs e){EndReadyPointerSelection(false);EndPendingPointerSelection();CancelLookupButton.IsEnabled=false;_generation++;_lookupCancellation?.Cancel();if(_draftLoadFailed)return;try{SaveRemaining();}catch(Exception ex){CountText.Text=ex.Message;}}
-    private static BatchScanItem ToDraft(BatchInboundEditableRow x)=>new(x.ReceiptId,x.Raw){Status=x.Reason.Length==0&&ReadyForReview(x)?"ready":"pending",Selected=x.Selected,Sku=x.Sku,QuantityText=x.Quantity?.ToString()??"",LocationId=x.LocationId,Name=x.Name,Category=x.Category,PackageName=x.PackageName,Description=x.Description,Error=x.Reason};
-    private static BatchInboundEditableRow FromDraft(BatchScanItem x,IReadOnlyList<StorageLocationRecord> locations)=>new(){ReceiptId=x.ReceiptId,Raw=x.Raw,Selected=x.Selected,Sku=x.Sku,QuantityInput=int.TryParse(x.QuantityText,out var q)?q:double.NaN,LocationId=x.LocationId,Name=x.Name,Category=x.Category,PackageName=x.PackageName,Description=x.Description,Reason=x.Error,LocationOptions=locations};
-    private void SetBusy(bool value){if(value){EndReadyPointerSelection();EndPendingPointerSelection();}_busy=value;ImportOrdersButton.IsEnabled=!value;HeaderBackButton.IsEnabled=!value;CollectButton.IsEnabled=!value;ParseButton.IsEnabled=!value;ClearButton.IsEnabled=!value;ApplyLocationButton.IsEnabled=!value;SubmitButton.IsEnabled=!value;RetryButton.IsEnabled=!value;RemoveButton.IsEnabled=!value;CaptureBox.IsEnabled=!value;ReadyList.IsEnabled=!value;PendingList.IsEnabled=!value;DefaultLocationBox.IsEnabled=!value;CreateLocationButton.IsEnabled=!value;UpdateReadySelectionState();UpdatePendingSelectionState();}
+    private static BatchScanItem ToDraft(BatchInboundEditableRow x)=>new(x.ReceiptId,x.Raw){MetadataSku=x.Sku,Status=x.Reason.Length==0&&ReadyForReview(x)?"ready":"pending",Selected=x.Selected,SourceWarning=x.SourceWarning,SourceWarningConfirmed=x.SourceWarningConfirmed,Sku=x.Sku,QuantityText=x.Quantity?.ToString()??"",LocationId=x.LocationId,Name=x.Name,Category=x.Category,PackageName=x.PackageName,Description=x.Description,Error=x.Reason};
+    private static BatchInboundEditableRow FromDraft(BatchScanItem x,IReadOnlyList<StorageLocationRecord> locations)=>new(){ReceiptId=x.ReceiptId,Raw=x.Raw,Selected=x.Selected,SourceWarning=x.SourceWarning ?? "",SourceWarningConfirmed=x.SourceWarningConfirmed,Sku=x.Sku,QuantityInput=int.TryParse(x.QuantityText,out var q)?q:double.NaN,LocationId=x.LocationId,Name=x.Name,Category=x.Category,PackageName=x.PackageName,Description=x.Description,Reason=x.Error,LocationOptions=locations};
+    private void SetBusy(bool value){if(value){EndReadyPointerSelection();EndPendingPointerSelection();}_busy=value;ImportOrdersButton.IsEnabled=!value;HeaderBackButton.IsEnabled=!value;CollectButton.IsEnabled=!value;ParseButton.IsEnabled=!value;ClearButton.IsEnabled=!value;ApplyLocationButton.IsEnabled=!value;SubmitButton.IsEnabled=!value;RetryButton.IsEnabled=!value;ConfirmPendingButton.IsEnabled=!value;RemoveButton.IsEnabled=!value;CaptureBox.IsEnabled=!value;ReadyList.IsEnabled=!value;PendingList.IsEnabled=!value;DefaultLocationBox.IsEnabled=!value;CreateLocationButton.IsEnabled=!value;UpdateReadySelectionState();UpdatePendingSelectionState();}
     private async Task ShowBatchErrorAsync(string title,string message)=>await new ContentDialog{Title=title,Content=new TextBlock{Text=message,TextWrapping=TextWrapping.Wrap},CloseButtonText="关闭",XamlRoot=XamlRoot}.ShowAsync();
 }
