@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.heightIn
@@ -38,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -523,19 +525,23 @@ internal fun BomImportScreen(
         }
 
         Column(
-            modifier = Modifier.fillMaxSize().padding(scaffoldPadding).padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(scaffoldPadding).consumeWindowInsets(scaffoldPadding).imePadding().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                if (selectedMode == BomImportMode.Bom) {
-                    stringResource(R.string.bom_preview_summary, fileName, projectName, productionSets)
-                } else {
-                    stringResource(R.string.migration_preview_summary, fileName)
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (message.isNotBlank()) StatusMessage(message, messageIsError)
+            val previewHeader: @Composable () -> Unit = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        if (selectedMode == BomImportMode.Bom) {
+                            stringResource(R.string.bom_preview_summary, fileName, projectName, productionSets)
+                        } else {
+                            stringResource(R.string.migration_preview_summary, fileName)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (message.isNotBlank()) StatusMessage(message, messageIsError)
+                }
+            }
             preview?.let { current ->
             val skippedRequirements = current.parsed.requirements.filter { it.identity.canonicalKey in excludedKeys }
             val shortageIds = current.lines.filter {
@@ -549,18 +555,23 @@ internal fun BomImportScreen(
             val procurementEntries = procurement.entries.filter { it.projectKey == procurementProjectKey }
             val procurementByRequirement = procurementEntries.associateBy { it.requirementCanonicalKey }
             val procurementEligibleKeys = bomProcurementEligible(current).mapTo(mutableSetOf()) { it.identity.canonicalKey }
-            Text(stringResource(R.string.bom_match_counts, readyCount, problemLines.size, skippedRequirements.size), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(if (current.canCommit) R.string.bom_ready_to_review else if (current.lines.isEmpty()) R.string.bom_restore_to_release else R.string.bom_resolve_hint),
-                color = if (current.canCommit) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-            )
-            TextButton(onClick = { showAllLines = !showAllLines }) {
-                Text(if (showAllLines) stringResource(R.string.bom_show_issues) else stringResource(R.string.bom_show_all, current.matchingLines.size))
-            }
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag("bom_preview_list"),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                item { previewHeader() }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.bom_match_counts, readyCount, problemLines.size, skippedRequirements.size), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(if (current.canCommit) R.string.bom_ready_to_review else if (current.lines.isEmpty()) R.string.bom_restore_to_release else R.string.bom_resolve_hint),
+                            color = if (current.canCommit) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        )
+                        TextButton(onClick = { showAllLines = !showAllLines }) {
+                            Text(if (showAllLines) stringResource(R.string.bom_show_issues) else stringResource(R.string.bom_show_all, current.matchingLines.size))
+                        }
+                    }
+                }
                 item {
                     TextButton(enabled = !busy && !releaseApplied, onClick = { presetToSave = current }) {
                         Text(stringResource(R.string.bom_save_preset))
@@ -707,29 +718,33 @@ internal fun BomImportScreen(
                         }
                     }
                 }
-            }
-            Button(
-                enabled = current.canCommit && !busy && !releaseApplied,
-                onClick = { confirmKind = "bom" },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.bom_review_release, current.lines.size)) }
-            OutlinedButton(
-                enabled = !busy,
-                onClick = { exportPicker.launch("${fileName.substringBeforeLast('.').ifBlank { "bom" }}-缺料.csv") },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (BomShortageCsvExporter.shortageCount(current) == 0) "导出 CSV（无缺料）" else "导出缺料 CSV") }
-            if (releaseApplied) {
-                OutlinedButton(
-                    onClick = {
-                        releaseId = UUID.randomUUID().toString()
-                        batchId = UUID.randomUUID().toString()
-                        releaseApplied = false
-                        preview = null
-                        message = "已创建新生产批次，请重新生成预览。"
-                        messageIsError = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("新建生产批次") }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            enabled = current.canCommit && !busy && !releaseApplied,
+                            onClick = { confirmKind = "bom" },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.bom_review_release, current.lines.size)) }
+                        OutlinedButton(
+                            enabled = !busy,
+                            onClick = { exportPicker.launch("${fileName.substringBeforeLast('.').ifBlank { "bom" }}-缺料.csv") },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (BomShortageCsvExporter.shortageCount(current) == 0) "导出 CSV（无缺料）" else "导出缺料 CSV") }
+                        if (releaseApplied) {
+                            OutlinedButton(
+                                onClick = {
+                                    releaseId = UUID.randomUUID().toString()
+                                    batchId = UUID.randomUUID().toString()
+                                    releaseApplied = false
+                                    preview = null
+                                    message = "已创建新生产批次，请重新生成预览。"
+                                    messageIsError = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("新建生产批次") }
+                        }
+                    }
+                }
             }
             }
             hubPreview?.let { current ->
@@ -737,6 +752,7 @@ internal fun BomImportScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                item { previewHeader() }
                 items(current.components, key = { it.sourceIndex }) { item ->
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp)) {
@@ -751,29 +767,33 @@ internal fun BomImportScreen(
                 items(current.issues, key = { "issue-${it.sourceIndex}" }) { issue ->
                     Text(issue.message, color = MaterialTheme.colorScheme.error)
                 }
-            }
-            if (current.conflicts.any { !it.skipped }) {
-                OutlinedButton(
-                    enabled = !busy,
-                    onClick = {
-                        val bytes = fileBytes ?: return@OutlinedButton
-                        busy = true
-                        val token = session.token()
-                        viewModel.previewComponentHub(bytes, skipDuplicates = true) { result ->
-                            if (!session.isCurrent(token)) return@previewComponentHub
-                            busy = false
-                            result.onSuccess { hubPreview = it; message = "已明确跳过 ${it.skippedDuplicateCount} 个冲突。"; messageIsError = false }
-                                .onFailure { message = it.message ?: "无法应用跳过策略。"; messageIsError = true }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (current.conflicts.any { !it.skipped }) {
+                            OutlinedButton(
+                                enabled = !busy,
+                                onClick = {
+                                    val bytes = fileBytes ?: return@OutlinedButton
+                                    busy = true
+                                    val token = session.token()
+                                    viewModel.previewComponentHub(bytes, skipDuplicates = true) { result ->
+                                        if (!session.isCurrent(token)) return@previewComponentHub
+                                        busy = false
+                                        result.onSuccess { hubPreview = it; message = "已明确跳过 ${it.skippedDuplicateCount} 个冲突。"; messageIsError = false }
+                                            .onFailure { message = it.message ?: "无法应用跳过策略。"; messageIsError = true }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("明确跳过重复项") }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("明确跳过重复项") }
+                        Button(
+                            enabled = current.canConfirm && !busy,
+                            onClick = { confirmKind = "hub" },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("确认迁移") }
+                    }
+                }
             }
-            Button(
-                enabled = current.canConfirm && !busy,
-                onClick = { confirmKind = "hub" },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("确认迁移") }
             }
         }
     }
@@ -853,17 +873,15 @@ internal fun BomImportScreen(
             title = { Text(if (kind == "bom") "确认批量出库" else "确认 Component Hub 迁移") },
             text = {
                 if (kind == "bom" && bom != null) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.bom_confirm_summary, bom.parsed.projectName, bom.parsed.productionSets, bom.lines.size, excludedKeys.size, bom.lines.sumOf { it.requirement.requiredQuantity.toLong() }))
-                        LazyColumn(Modifier.heightIn(max = 280.dp)) {
-                            items(bom.lines, key = { it.requirement.identity.canonicalKey }) { line ->
-                                Text(
-                                    "${line.componentSku ?: "未匹配"} × ${line.requirement.requiredQuantity}" +
-                                        line.allocationPlan.joinToString(prefix = "（", postfix = "）") {
-                                            "${displayLocationName(it.locationId, viewModel.uiState.inventory.storageLocations, it.locationId)} ${it.quantity}"
-                                        },
-                                )
-                            }
+                    LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { Text(stringResource(R.string.bom_confirm_summary, bom.parsed.projectName, bom.parsed.productionSets, bom.lines.size, excludedKeys.size, bom.lines.sumOf { it.requirement.requiredQuantity.toLong() })) }
+                        items(bom.lines, key = { it.requirement.identity.canonicalKey }) { line ->
+                            Text(
+                                "${line.componentSku ?: "未匹配"} × ${line.requirement.requiredQuantity}" +
+                                    line.allocationPlan.joinToString(prefix = "（", postfix = "）") {
+                                        "${displayLocationName(it.locationId, viewModel.uiState.inventory.storageLocations, it.locationId)} ${it.quantity}"
+                                    },
+                            )
                         }
                     }
                 } else {

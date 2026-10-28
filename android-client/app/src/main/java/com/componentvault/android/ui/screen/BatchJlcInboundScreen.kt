@@ -585,7 +585,7 @@ private fun BatchScannerSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.batch_scanner_settings)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.batch_scanner_interval))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
