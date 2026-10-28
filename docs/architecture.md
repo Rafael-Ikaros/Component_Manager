@@ -890,3 +890,7 @@ dev18 直接验收记录：真实 Windows 服务将共享预设发送到隔离 F
 `.github/workflows/ci.yml` 明确运行 `ComponentVault.WinUI.CoreTests`、`Tests/JlcOrderImport`、`Tests/ReleaseNotesMarkdown`；`release.yml` 发布候选增加后两个独立测试，各项目测试职责不同；生产项目排除 `Tests/**`。Markdown 根目录 `README.md` 链接按仓库根目录解析，既有 `dockerhub.md` 等文档链接保持 docs 语义。
 
 Issue #25 已实现为 `server/app/admin/order_metadata.py` 与 Web 库存页 `OrderMetadataPanel`。预览使用 xlrd 读取 BIFF `.xls`；按精确 SKU 匹配认证账户库存，无原始文件持久化。应用接口仅接受分类、封装和参数字典，逐项短事务重读当前行、校验 `expected_updated_at`，复用现有幂等收据及同步写入。保留名称、数量、库位、分配、图片和未选备注；参数只替换选定键的中英文同义参数行。没有新增库存表或同步协议版本；原生客户端按现有增量同步取得修改，受管库存并发冲突语义不变。详见 [使用与边界](order-metadata-update.md)。
+
+## 0.7.8 稳定收束
+
+0.7.8 汇总 dev.1–24，并在两端启动时按本机更新通道检查一次，仅更高可用版本弹窗，失败或最新静默，复用现有下载流程。稳定发布更新 Docker 正式标签，API/Web 配套升级并保护整个数据目录。平板 BOM、标签、配套件工作区后续布局延期。完整范围与验收边界见 [0.7.8 正式说明](releases/0.7.8.md)。

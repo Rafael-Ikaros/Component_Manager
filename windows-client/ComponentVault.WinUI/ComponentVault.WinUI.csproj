@@ -15,10 +15,10 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <PublishProfile>win-x64.pubxml</PublishProfile>
-    <Version>0.7.7</Version>
-    <AssemblyVersion>0.7.7.0</AssemblyVersion>
-    <FileVersion>0.7.7.0</FileVersion>
-    <InformationalVersion>0.7.7</InformationalVersion>
+    <Version>0.7.8</Version>
+    <AssemblyVersion>0.7.8.0</AssemblyVersion>
+    <FileVersion>0.7.8.0</FileVersion>
+    <InformationalVersion>0.7.8</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

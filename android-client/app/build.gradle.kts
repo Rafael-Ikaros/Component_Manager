@@ -28,8 +28,8 @@ android {
         applicationId = "com.componentvault.android"
         minSdk = 28
         targetSdk = 35
-        versionCode = 30
-        versionName = "0.7.7"
+        versionCode = 31
+        versionName = "0.7.8"
         if (releaseVersionCode != null && releaseVersionName != null) {
             versionCode = releaseVersionCode
             versionName = releaseVersionName

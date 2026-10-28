@@ -15,8 +15,8 @@ Android 和 Windows 的“设置 → 关于”显示应用名称、作者 Rafael
 5. Android 下载完成后点击“安装更新”，首次使用按提示允许元件仓库安装应用，再在系统安装界面确认。Windows 仍通过浏览器下载便携 ZIP。
 
 已是最新、本地版本更高、没有 Release、限流、网络错误和缺少安装包会分别提示。
-没有更新时仍可打开发布页查看。检查只在点击时进行，不增加后台周期检查。
-发布说明作为纯文本显示，不执行其中的 HTML 或脚本。
+没有更新时仍可打开发布页查看。0.7.8 起两端每次启动按当前正式/Dev 通道检查一次，仅发现更高可用版本时弹窗；已是最新或检查失败保持静默。弹窗复用现有说明和下载入口，手动检查仍保留完整结果提示，不增加后台周期检查。
+Android 发布说明使用文本显示；Windows 使用 Markdown 渲染标题、列表及链接。发布说明不执行其中的 HTML 或脚本。
 
 通道选择保存在本机，不会修改库存或同步服务端。选择 Dev 不会立即安装，也不会换应用身份。
 切回正式版后，如果当前 dev 高于最新正式版，应用不会自动降级；可继续使用当前版本，
@@ -25,8 +25,8 @@ Android 和 Windows 的“设置 → 关于”显示应用名称、作者 Rafael
 
 ## 发布来源与文件名
 
-版本源固定为 [Rafael-ban/Component_Manager Releases](https://github.com/Rafael-ban/Component_Manager/releases)，
-正式通道 API 为 `https://api.github.com/repos/Rafael-ban/Component_Manager/releases/latest`；
+版本源固定为 [Rafael-Ikaros/Component_Manager Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases)，
+正式通道 API 为 `https://api.github.com/repos/Rafael-Ikaros/Component_Manager/releases/latest`；
 Dev 通道读取公开 Release 列表。
 读取 `tag_name`、`published_at`、`body`、`html_url` 和 `assets`。本项目使用
 `vMAJOR.MINOR.PATCH` 正式发布标签和 `vMAJOR.MINOR.PATCH-dev.N` 测试标签。

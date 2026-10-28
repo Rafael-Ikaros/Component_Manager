@@ -20,14 +20,14 @@
 - 最大 16 MiB、500 个唯一 SKU；超过时请拆分。原始订单不长期保存。关闭面板或离开页面会丢失本次预览，已成功更新的服务端数据保留。
 - 更新期间如果设备发生出入库或编辑，服务端版本检查会提示冲突。建议完成待同步更改后再批量更新。旧标量快照仍遵循既有整行 LWW，工具没有新增字段级冲突合并。
 
-## dev 部署
+## 部署（0.7.8 正式版起）
 
-本功能需要新 API 和 Web 一起部署；仅更新手机 APK 或 Web ZIP 不会给旧 API 增加接口。dev 发布不替换 Docker Hub 的 `latest` / `web-latest`。
+本功能需要新 API 和 Web 一起部署；仅更新手机 APK 或 Web ZIP 不会给旧 API 增加接口。0.7.8 正式发布提供 API `0.7.8` / `latest` 和 Web `web-0.7.8` / `web-latest`；先确认对应镜像已发布，再按 [Docker 部署教程](dockerhub.md)拉取并重建原项目，保留原 `/data`。早期 dev.21 发布时没有替换这些稳定标签。
 
-源码部署可在已备份并保留原 `/data` 映射、Compose 项目名称的部署目录中，获取 `v0.7.8-dev.21` 源码，重建 `api` 与 `admin-web`：
+源码部署可在已备份并保留原 `/data` 映射、Compose 项目名称的部署目录中，获取 `v0.7.8` 源码，重建 `api` 与 `admin-web`：
 
 ```shell
-docker compose build --build-arg APP_VERSION=0.7.8-dev.21 api admin-web
+docker compose build --build-arg APP_VERSION=0.7.8 api admin-web
 docker compose up -d api admin-web
 ```
 

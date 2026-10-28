@@ -1,5 +1,19 @@
 # Runbook
 
+## 0.7.8 正式版部署
+
+0.7.8 汇总前期 dev 的 BOM 预设同步、原图同步及订单资料更新。正式版配套发布 API `rafaelikaros/component_manager:0.7.8`（浮动标签 `latest`）和 Web `:web-0.7.8`（`web-latest`）。先核对发布流水线及 Docker Hub 对应标签，再升级原有项目；不要新建数据卷或清空配置。
+
+停写并备份整个 `/data`，包括各账户数据库、配置与 `.photos` 目录；客户端本地备份还需单独保留 BOM 预设 JSON。保持原 Compose 项目名和挂载，执行：
+
+```sh
+docker compose -f docker-compose.hub.yml --profile web pull
+docker compose -f docker-compose.hub.yml --profile web up -d
+docker compose -f docker-compose.hub.yml --profile web ps
+```
+
+仅使用 API 时省略 `--profile web`。旧 `.env` 若固定了镜像版本，应将 API、Web 成对改为新固定版本或 `latest` / `web-latest`。群晖与可选 Watchtower 操作见 [Docker Hub 指南](dockerhub.md)，新版 Web 的订单资料功能仍需启用 Web 库存操作。
+
 ## Docker Hub image deployment
 
 Use `docker-compose.hub.yml` to pull a published API image instead of building
@@ -7,7 +21,7 @@ the server locally. Copy `.env.example` to the root `.env`; an existing deployme
 may continue supplying its `API_TOKEN` there. The Compose defaults use the
 floating API `latest` and Web `web-latest` tags. Check their
 current versions on Docker Hub before pulling. Override both image variables
-to select another fixed, published release, such as `0.7.5` and `web-0.7.5`.
+to select a fixed, published release, such as `0.7.8` and `web-0.7.8`.
 The server image listens on port 8787 and stores SQLite under `/data`; preserve
 the Compose project name and `component_vault_data` volume when upgrading.
 The admin Web app remains a separate image. Start the optional profile with
@@ -847,6 +861,6 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/Relea
 
 ### 从订单更新已有资料（dev.21）
 
-API 生产依赖新增 xlrd（BIFF `.xls`）与 python-multipart，源码部署需重新安装 `server/requirements.txt`；开发测试另外使用 xlwt 生成合成 BIFF。服务端与管理台同时升级，原 `/data` 映射保留，无新增环境变量和 schema 迁移。dev 不更新 Docker Hub 稳定镜像，请按[订单资料更新教程](order-metadata-update.md#dev-部署)使用指定源码版本构建。
+API 生产依赖新增 xlrd（BIFF `.xls`）与 python-multipart，源码部署需重新安装 `server/requirements.txt`；开发测试另外使用 xlwt 生成合成 BIFF。服务端与管理台同时升级，原 `/data` 映射保留，无新增环境变量和 schema 迁移。该功能从 dev.21 开始验证，并纳入 0.7.8 正式镜像；使用已发布的配套稳定镜像或按[订单资料更新教程](order-metadata-update.md)构建源码。
 
 Web“库存 → 从订单更新资料”支持只读差异预览和字段确认；应用沿用 Web 库存写入开关。故障时区分不支持格式/文件损坏、未匹配 SKU、同 SKU 资料冲突、设备并发版本冲突。成功项不会因其他项失败而回滚；网络结果不明可使用原请求重试，不自动刷新版本覆盖。
