@@ -56,6 +56,7 @@ from .operations import (
     update_component,
 )
 from .spec_enrichment import EnrichmentJobs, candidates
+from .order_metadata import router as order_metadata_router
 from ..sync_observability import (
     append_resolution, list_audit, list_conflicts, list_devices,
 )
@@ -65,6 +66,7 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(require_token)],
 )
+router.include_router(order_metadata_router)
 
 
 @router.get("/dashboard", response_model=AdminDashboardResponse)

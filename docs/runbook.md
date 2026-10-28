@@ -843,3 +843,10 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/Relea
 只有改动相关部分时才需在本地运行对应项目。候选构建可通过 `Release Artifacts` 的 `workflow_dispatch` 设置 `source_ref` 为完整提交 SHA、`release_tag` 为拟验证的 dev 标签，并将 `publish_github_release` 设为 `false`；这样只生成验证附件，不创建公开 Release。桌面验收通过后再写具体版本的 CHANGELOG 标题触发发布；仅编辑 Unreleased 不发布。dev 不推送 Docker 稳定标签。
 
 订单复核、待验收项和服务端 Issue #25 的实现建议见 [2026-10-28 记录](issues-2026-10-28.md)。
+
+
+### 从订单更新已有资料（dev.21）
+
+API 生产依赖新增 xlrd（BIFF `.xls`）与 python-multipart，源码部署需重新安装 `server/requirements.txt`；开发测试另外使用 xlwt 生成合成 BIFF。服务端与管理台同时升级，原 `/data` 映射保留，无新增环境变量和 schema 迁移。dev 不更新 Docker Hub 稳定镜像，请按[订单资料更新教程](order-metadata-update.md#dev-部署)使用指定源码版本构建。
+
+Web“库存 → 从订单更新资料”支持只读差异预览和字段确认；应用沿用 Web 库存写入开关。故障时区分不支持格式/文件损坏、未匹配 SKU、同 SKU 资料冲突、设备并发版本冲突。成功项不会因其他项失败而回滚；网络结果不明可使用原请求重试，不自动刷新版本覆盖。

@@ -599,3 +599,21 @@ content 的字段为 `schema_version:1,project_name,production_sets,source_name,
 - `GET /admin-api/component-photos/{key}`：复用 Web 登录会话读取；列表/详情附带 `photo_key` 和 `photo_available`。不把令牌放入图片 URL。
 
 `/health`、`/auth/ping` 增加 `photo_protocol:1`。旧服务端不支持时保留本地图片并显示照片未同步。照片交换不改库存数量、库存游标或出入库流水；成功库存不因照片失败重放。每次从当前元件引用与两端文件可用情况推导剩余工作，支持无库存增量时恢复。
+
+
+## 订单资料更新（dev.21）
+
+认证、账户数据库隔离和 Web 会话 CSRF 规则沿用现有 `/admin-api/*`。没有改动 `/sync/push`、`/sync/pull` 格式；应用资料更新后增加既有同步版本。
+
+- `POST /admin-api/components/order-metadata/preview`：multipart 字段 `file`，BIFF `.xls`，最大 16 MiB、500 个唯一 C 料号；只读，Web 写入关闭时仍可预览。返回 `filename`、`rows` 和 `summary`；行包含 `component_id`、`sku`、保留的 `name`、`expected_updated_at`、`source_rows`、`messages`、`status` 以及 `changes`。
+- `status` 为 `ready / unchanged / unmatched / conflict`。`changes.category`、`changes.package_name` 为 `{before, after}`；`changes.parameters` 为新旧参数字典，只包含发生变化的明确参数键。冲突与未匹配项不提供可应用字段。
+- `POST /admin-api/components/order-metadata/apply`：JSON `{items: [...]}`，每项带 `component_id`、`sku`、`expected_updated_at`、`request_id`、`changes`。changes 只允许 `category`、`package_name`、`parameters`；额外字段被拒绝。分类值需含中文，空值不用于清除已有资料。应用需启用 `WEB_INVENTORY_ENABLED`。
+- 返回 `items` 与 `summary`，状态为 `updated / unchanged / conflict / failed`。每项独立提交，同请求 ID 与相同内容重放返回 `unchanged`，不再次增加同步版本；同 ID 改内容会冲突。失败项可复用原 ID 重试，版本冲突需重新预览。
+
+请求示例（值为专用测试示例）：
+
+```json
+{"items":[{"component_id":"fixture-component","sku":"C100","expected_updated_at":"2026-10-28T00:00:00Z","request_id":"order-metadata-example-1","changes":{"category":"贴片电阻","parameters":{"阻值":"10kΩ","精度":"±1%"}}}]}
+```
+
+名称、SKU、数量、最低库存、库位、分配、图片及非参数备注均不属于可更新字段；不新建元件，不创建出入库流水。详见[教程](order-metadata-update.md)。

@@ -13,6 +13,7 @@ import { useSearchParams } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ComponentPhoto } from "@/components/component-photo";
 import { InventoryActions } from "@/components/inventory-actions";
+import { OrderMetadataPanel } from "@/components/order-metadata-panel";
 import { SpecEnrichmentPanel } from "@/components/spec-enrichment-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,6 +118,8 @@ export function InventoryPage() {
           void detail.reload();
         }}
       />
+
+      <OrderMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
 
       <SpecEnrichmentPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
 

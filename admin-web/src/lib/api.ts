@@ -143,3 +143,14 @@ export async function openSession(apiBaseUrl: string, apiKey?: string): Promise<
       ? "服务端不支持会话登录，请更新 API 镜像。" : "无法建立登录会话。"));
   return payload as SessionResponse;
 }
+
+export async function previewOrderMetadata<T>(session: AdminSession, file: File, signal: AbortSignal): Promise<T> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch(`${normalizeBaseUrl(session.apiBaseUrl)}/admin-api/components/order-metadata/preview`, {
+    method: "POST", credentials: "include", headers: {"X-CSRF-Token": session.csrfToken}, body, signal,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new ApiError(response.status, typeof payload.detail === "string" ? currentServerTranslation(payload.detail) : statusMessage(response.status));
+  return payload as T;
+}

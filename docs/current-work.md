@@ -1,3 +1,11 @@
+# 2026-10-28 Issue #25 已实施，dev.21 发布验收
+
+- 服务端新增订单资料预览/apply，Web库存页选择字段；复用认证账户数据库、现有版本检查/幂等/同步写入，不改schema。BIFF读取使用xlrd，上传python-multipart，test-only xlwt；不自制Excel解析。
+- 后端6项定向用例通过（修正动态server_time断言后仅复测失败项，损坏OLE补捕获CompDocError单项复测）。前端3项及TypeScript/Vite构建通过。
+- 实际Chromium浏览器桌面/390px：上传合成xls、预览、取消C100封装、确认2项成功；来源购买数量999不写库存，仍20+20；名称、备注、图片标记、分配、零流水保持。Windows生产同步代码再拉取成功取得中文分类和参数，未选封装保留。
+- 所有写入在.tmp隔离库；原库存与server/data未触碰。手机当前运行其他应用，本轮不切换配置/不覆盖安装，Android实机同步未验收。
+- 代码和文档待提交，GitHub CI与dev.21公开发布以流水线结果为准；Docker稳定标签不变。服务端与Web需一起使用本版本源码构建，步骤见order-metadata-update.md。
+
 # 2026-10-28 Windows 订单复核修复与 Issue #25 方案
 
 - master 已快进 PR #24 的 6122294。订单 SKU 改变清旧资料；来源警告独立持久，查询与人工确认分离；兼容旧草稿，不修改业务数据库。
