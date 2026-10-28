@@ -1,4 +1,7 @@
-# 2026-10-28 平板第一阶段（dev.24 验收完成，准备发布）
+# 2026-10-28 平板第一阶段（dev.24 已发布）
+
+- 当前结论：[v0.7.8-dev.24](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.8-dev.24)公开预发布成功，prerelease=true/draft=false，Android/Windows ZIP/Web三附件齐全，Docker发布跳过。发布提交8ad302986e862fbef761983d2ac00f473f1fd69d的CI40700652274与Release From Changelog40700652428均成功。下列记录保留实现及验收过程。
+- 公开APK SHA256 6f5b8f545e118d451730e6ee9e3b30ebb7a095cba4f7fdacb4e3e12cf5e888d8，与API digest一致；已后台install-r保留数据覆盖，包版本读回dev.24/708024。为避免打断用户当前页面，公开包未再启动前台UI或重导出；实际UI与全表/原图比对在相同生产源码的最终签名候选上完成。显示读回2136×3200、DPI400、font1.0，无size/density override。设备测试临时文件已清理，原始证据仅留本机忽略目录，未提交；server/data未动。
 
 - 用户确认五页布局原型，按阶段先实施库存与设置。库存沿原业务回调采用紧凑行、详情摘要/横排操作及基本信息分组；Expanded净宽不足836dp时同一navigator单窗格切换，Medium独立详情。设置240dp分组与max640dp表单，净宽不足700dp逐页进入，完整同步诊断移入同步组。
 - 草稿与分组滚动使用保存状态，主界面/目的地使用SaveableStateHolder保留列表返回上下文；不变更schema、同步协议或库存写入。系统返回设置组或库存，避免退出。
