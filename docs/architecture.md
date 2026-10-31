@@ -857,7 +857,7 @@ CI 在原有回归组前单独运行 `MovementLabelResolutionTest`、`QuantitySt
 
 ## 项目用料与 BOM 预设同步
 
-Android / Windows 将导入 BOM 与临时配套统一到“项目用料”，入口为“导入 BOM”“已保存预设”“手动选料”。Android 由 `BomImportScreen` / `BomImportSession` 承载，Windows 由 `BomView` 承载；独立 `KittingScreen` / `KittingView` 及导航入口移除。这是客户端工作区整合，已通过本轮定向自动化与 Windows / 小米 9 隔离数据 UI 验收，代码 CI 已通过，进入 `0.7.9-dev.1` 预发布流程；不代表全量 QA 或 Android 原应用升级保留数据验证，证据见 [当前工作](current-work.md)。
+Android / Windows 将导入 BOM 与临时配套统一到“项目用料”，入口为“导入 BOM”“已保存预设”“手动选料”。Android 由 `BomImportScreen` / `BomImportSession` 承载，Windows 由 `BomView` 承载；独立 `KittingScreen` / `KittingView` 及导航入口移除。这是客户端工作区整合，已通过本轮定向自动化与 Windows / 小米 9 隔离数据 UI 验收，已在 [0.7.9-dev.1](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.1) 预发布中提供；不代表全量 QA 或 Android 原应用升级保留数据验证，证据见 [当前工作](current-work.md)。
 
 导入行和手动行共用既有 BOM 模型、库存匹配、跳过状态、每套数量、预设保存和复核流程。手动行使用稳定需求 ID；修改或保存清单保留导入来源行、位号及既有预设 ID。两端沿用下述预设内容格式、离线存储和同步接口，本轮不修改服务端、数据库 schema 或 API。范围不含地图；未来 PCB 输入只考虑用户自行导入的嘉立创可视化 BOM，当前没有该功能。
 

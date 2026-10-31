@@ -1,7 +1,7 @@
 {
   "product": "Component Vault",
   "design": "CV geometric mark with a component in the negative space",
-  "status": "integrated_for_dev",
+  "status": "published_in_dev",
   "selected_on": "2026-10-29",
   "source_file": "component-vault-logo-v2.png",
   "generation_prompt": "component-vault-logo-v2.prompt.txt",
@@ -16,7 +16,7 @@
     "transparent_alpha": true
   },
   "integration": {
-    "status": "integrated_pending_release",
+    "status": "published",
     "target_version": "0.7.9-dev.1",
     "web": {
       "verification": "Production build passed; browser visual check unavailable",
@@ -32,6 +32,7 @@
       "application_icon": "windows-client/ComponentVault.WinUI/Assets/ComponentVault.ico"
     },
     "production_icon_references_changed": true,
-    "release_channel": "dev_prerelease"
+    "release_channel": "dev_prerelease",
+    "release_url": "https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.1"
   }
 }
