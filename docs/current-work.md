@@ -1,4 +1,4 @@
-# 2026-11-01 Android 导入与库存交互（0.7.9-dev.2 候选）
+# 2026-11-01 Android 导入与库存交互（0.7.9-dev.2 已发布）
 
 - 按最终反馈，将“全部／低库存／筛选／分类／库位／排序”保留在同一条横向滚动栏，后三项可直接选择；综合面板支持草稿、取消、应用与重置。小米 9 独立测试包已验证横向触达库位/排序、按库位名称直接选择、按名称排序，未提交库存操作。
 - 原 dev.1 在小米 9 的库存列表底部到 IME 顶部有 253px 空白，对应仍保留的底部导航；隐藏导航布局后还剩 33px，即 12dp 的外部底边距。本轮仅在键盘实际遮住底部时释放导航与外部底边距，最终列表下边界与 IME 上沿均为 y=1411；收起键盘恢复导航。保留页面 imePadding，不修改全局窗口策略、设备 DPI、分辨率或字体。
@@ -6,7 +6,10 @@
 - 主 Tab 和设置分组使用 180ms 原生淡入；独立页面进入额外上移 8dp。只组合当前页面，保留 SaveableStateHolder 与系统动画时长缩放，不使用旧新页面并排的切换动画。
 - 新选定的 Ikaros 母版替换 Android launcher/adaptive、Windows EXE/窗口/包资源及 Web Logo/favicon，共 22 项资源；新增可重复执行的 Pillow 生成脚本。资源解码、尺寸、引用与重复生成 hash 一致；小米 9 桌面已看到独立测试包的新图标。Windows/Web 本轮尚无运行界面目视验收。
 - 直接相关 Android 测试分阶段共 16 项通过；后续按用户要求外露高级筛选，最终 2 项筛选与 1 项完整 shell IME 回归及 Debug 构建通过。筛选对齐首测因两类 Material 控件原生高度不同失败，改为居中对齐并检查垂直中心后复测通过。未扩大为全量 QA。
-- 原应用升级前完整 Excel 已导出到本地；原应用未清理数据，隔离测试包继续保留 C100/C101 各 20、零流水。公开 CI、dev 附件、公开 APK 覆盖安装及升级前后备份比对仍待本轮后续核对。Dev 不移动 Docker 正式标签；未触碰 `server/data/` 与用户附件。
+- [v0.7.9-dev.2](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.2) 已公开预发布，Android 签名 APK、Windows 自包含 ZIP、Web ZIP 齐全。发布源 `630de13db18752fbf4936ef6bb4905df182a40f7` 的 [CI 41223850574](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41223850574) 与 [Release 41223850640](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41223850640) 均成功；Docker 发布明确跳过，正式标签未移动。
+- 公开 APK SHA256 `1f9d2e17d8d9d3e943024ee0970d75ac4b54ddaade95d7a64a7e837e6ccd47fe` 匹配 GitHub asset digest；解包确认包含与新母版生成结果逐像素一致的 adaptive 前景。小米 9 实际 `adb install -r` 成功，版本读回 `0.7.9-dev.2 / 709002`，启动仍 26 项、810 件、30 流水。公开包再次验证单行筛选与搜索键盘：列表/IME 边界同为 y=1411。
+- 原应用升级前后实际导出完整 Excel，`components`、`storage_locations`、`allocations`、`stock_movements` 全部单元格一致（含表头行数 31/8/33/31），仅忽略 meta 导出信息；Excel 不包含 BOM 预设，不将此次比对扩大为预设备份证明。隔离测试最终 SQLite 为 C100/C101 各 20、零流水，独立测试包已卸载。未清理原应用数据，未修改设备显示参数。
+- 公开 Web ZIP SHA256 `c0307e0732c6b539f81f94c858b4f3b51648980b3c2ce4f33ddcca926145f875` 匹配 GitHub；包内 Logo、favicon ICO/PNG、apple-touch-icon 均与本轮源码资源一致。Windows 通过 CI 发布/启动检查，本轮未重新目视验收其窗口图标与 Web 浏览器效果。证据与备份只留本地 `.tmp`，未触碰 `server/data/` 与用户附件。
 
 # 2026-10-31 统一项目用料（0.7.9-dev.1 已发布）
 

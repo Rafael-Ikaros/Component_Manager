@@ -33,6 +33,6 @@
     "production_icon_resources_updated": true,
     "generator": "tools/branding/generate_icons.py",
     "targets": ["Android launcher", "Windows executable, window and package icons", "admin-web logo and favicons"],
-    "validation_boundary": "Generated resource dimensions and references checked; runtime appearance pending dev validation"
+    "validation_boundary": "22 generated resources decoded and dimension-checked; deterministic regeneration checked. Android isolated launcher visually checked; public dev.2 APK foreground pixels match. Public Web ZIP branding files match. Windows build/startup CI passed; Windows and browser appearance not rechecked this round."
   }
 }
