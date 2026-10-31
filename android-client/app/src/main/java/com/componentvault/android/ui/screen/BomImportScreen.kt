@@ -583,7 +583,8 @@ internal fun BomImportScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         if (selectedMode == BomImportMode.Bom) {
-                            stringResource(R.string.bom_preview_summary, fileName, projectName, productionSets)
+                            stringResource(R.string.bom_preview_summary,
+                                fileName.ifBlank { context.getString(R.string.materials_manual) }, projectName, productionSets)
                         } else {
                             stringResource(R.string.migration_preview_summary, fileName)
                         },

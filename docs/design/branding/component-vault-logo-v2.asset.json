@@ -1,7 +1,7 @@
 {
   "product": "Component Vault",
   "design": "CV geometric mark with a component in the negative space",
-  "status": "selected_for_next_dev",
+  "status": "integrated_for_dev",
   "selected_on": "2026-10-29",
   "source_file": "component-vault-logo-v2.png",
   "generation_prompt": "component-vault-logo-v2.prompt.txt",
@@ -16,24 +16,22 @@
     "transparent_alpha": true
   },
   "integration": {
-    "status": "pending_next_dev",
+    "status": "integrated_pending_release",
+    "target_version": "0.7.9-dev.1",
+    "web": {
+      "verification": "Production build passed; browser visual check unavailable",
+      "logo": "admin-web/public/component-vault-logo.png"
+    },
     "android": {
-      "current_reference": "android-client/app/src/main/AndroidManifest.xml",
-      "next_steps": [
-        "Create launcher adaptive foreground and background resources from this selected mark.",
-        "Set android:icon and android:roundIcon to application-owned resources.",
-        "Check launcher masking and legibility on device."
-      ]
+      "manifest": "android-client/app/src/main/AndroidManifest.xml",
+      "adaptive_icon": "android-client/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "verification": "MI 9 app information screen shows the selected CV logo; normal system mask intact"
     },
     "windows": {
-      "current_project": "windows-client/ComponentVault.WinUI/ComponentVault.WinUI.csproj",
-      "next_steps": [
-        "Export a multi-size ICO and set ApplicationIcon for the portable executable.",
-        "Check the actual window and taskbar icon; adapt window icon handling if required.",
-        "Derive the existing package PNG assets with separate wide and splash layouts."
-      ]
+      "verification": "Published executable starts and titlebar CV icon is visible; taskbar not visually checked",
+      "application_icon": "windows-client/ComponentVault.WinUI/Assets/ComponentVault.ico"
     },
-    "release_channel": "dev_prerelease",
-    "production_icon_references_changed": false
+    "production_icon_references_changed": true,
+    "release_channel": "dev_prerelease"
   }
 }

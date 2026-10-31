@@ -22,7 +22,7 @@ const DEFAULT_API_BASE_URL = import.meta.env.VITE_DEFAULT_API_BASE_URL
   || `${window.location.protocol}//${window.location.hostname}:8787`;
 
 export function LoginPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, session } = useAuth();
@@ -46,7 +46,10 @@ export function LoginPage() {
         <Card className="border-white/70 bg-white/85 backdrop-blur">
           <CardHeader>
             <div className="mb-2 flex justify-end"><LanguageSelect compact /></div>
-            <CardTitle className="text-3xl">{t("Component Vault 管理台")}</CardTitle>
+            <div className="flex items-center gap-3">
+              <img src="/component-vault-logo.png" alt={locale === "zh-CN" ? "Component Vault 标志" : "Component Vault logo"} width={48} height={48} className="h-12 w-12 shrink-0 object-contain" />
+              <CardTitle className="text-3xl">{t("Component Vault 管理台")}</CardTitle>
+            </div>
             <CardDescription className="max-w-xl text-base">
               {t("使用管理员或用户密钥连接自托管同步服务。每个账户拥有独立库存；服务端启用 Web 库存操作后，可以创建库位和元件并办理入出库。")}
             </CardDescription>

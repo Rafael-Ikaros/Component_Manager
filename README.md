@@ -1,5 +1,7 @@
 # Component Vault｜元器件库存管理
 
+<img src="docs/design/branding/component-vault-logo-v2.png" alt="Component Vault C/V 标志" width="96" />
+
 Component Vault 面向电子元器件的入库、出库、查找与盘点。Android 和 Windows 客户端以本机 SQLite 保存库存，可以离线使用；需要多设备共享时，再连接自托管服务同步。项目还提供独立的 Web 管理台，用于查看服务器库存和管理部署。
 
 ## 从这里开始

@@ -80,16 +80,21 @@ class ImportFlowUiTest {
     }
 
     @Test
-    fun bomWorkflowShowsOnlyFileStageBeforeAFileIsChosen() {
+    fun projectMaterialsOffersThreeSourcesBeforeShowingConfiguration() {
         compose.setContent {
             MaterialTheme {
                 BomImportScreen(InventoryViewModel(context), {}, BomImportMode.Bom)
             }
         }
 
-        compose.onNodeWithText(context.getString(R.string.bom_choose_file)).assertIsDisplayed()
-        compose.onNodeWithText("项目名").assertDoesNotExist()
-        compose.onNodeWithText(context.getString(R.string.bom_generate_preview)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.materials_import)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.materials_saved)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.materials_manual)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.bom_project_name)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.bom_match_inventory)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.materials_manual)).performClick()
+        compose.onNodeWithText(context.getString(R.string.bom_project_name)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.bom_match_inventory)).assertIsDisplayed()
     }
 
     @Test

@@ -16,7 +16,7 @@ const navigationItems = [
 ] as const;
 
 export function AppShell() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { identity, logout, session, logoutError } = useAuth();
 
   return (
@@ -28,7 +28,10 @@ export function AppShell() {
               {t("独立管理台")}
             </Badge>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">Component Vault</h1>
+              <div className="flex items-center gap-2">
+                <img src="/component-vault-logo.png" alt={locale === "zh-CN" ? "Component Vault 标志" : "Component Vault logo"} width={36} height={36} className="h-9 w-9 shrink-0 object-contain" />
+                <h1 className="text-xl font-semibold tracking-tight">Component Vault</h1>
+              </div>
               <p className="text-sm text-muted-foreground">
                 {t("库存默认只读，服务端启用后可操作；同时支持 MQTT 配置。")}
               </p>

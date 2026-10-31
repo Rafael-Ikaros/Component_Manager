@@ -1,5 +1,7 @@
 # Architecture Notes
 
+应用品牌母版位于 `docs/design/branding/component-vault-logo-v2.png`。Android 使用应用自有 mipmap 与自适应前景/背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。
+
 > 标签界面：Android 的单元件标签与批量打印统一进入 `BluetoothLabelPrintScreen`，原独立预览页及诊断弹窗已移除。可编辑 `LabelDesign` 与原元件 `ComponentLabelSeed` 分开保存；前者决定显示文字和纸面位置，后者决定二维码身份。队列 v3 按张保存设计快照和元件/自由标签来源，兼容读取旧 v1/v2 元件队列。自由标签没有库存身份，元件二维码仍从 ComponentLabelSeed 生成。预览、导出和打印共用 M1 纸面渲染器，底层分帧与走纸协议保持不变。开发版功能以对应 Release 说明为准。
 
 ## 客户端库存编辑与恢复
