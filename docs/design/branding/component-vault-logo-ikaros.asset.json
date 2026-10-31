@@ -1,0 +1,34 @@
+{
+  "product": "Component Vault",
+  "design": "Chibi Ikaros holding an electronic-parts storage box, with localized dark side-lock tips and a clean two-arc frame",
+  "status": "selected_for_next_dev",
+  "selected_on": "2026-11-01",
+  "selected_candidate": "v17, second image (outer tied tails remain pink)",
+  "source_file": "component-vault-logo-ikaros.png",
+  "generation_prompt": "component-vault-logo-ikaros.prompt.txt",
+  "generation": {
+    "tool": "image_gen",
+    "mode": "built-in",
+    "operation": "iterative edit"
+  },
+  "raster": {
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGB",
+    "transparent_alpha": false,
+    "background": "white"
+  },
+  "approved_details": [
+    "White ear devices with black parallel bands",
+    "Pink hair with dark gradient limited to the two front face-framing lock tips",
+    "Outer ribbon-bound tails remain pink",
+    "Both hands holding the blue component box with the white IC emblem",
+    "Two clean open circular arcs; no waveform or contact-pad decorations"
+  ],
+  "supersedes_selected_master": "component-vault-logo-v2.png",
+  "integration": {
+    "status": "pending_dev_integration",
+    "readme_logo_updated": true,
+    "production_icon_references_changed": false
+  }
+}

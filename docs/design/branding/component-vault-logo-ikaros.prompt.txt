@@ -1,0 +1,39 @@
+Mode: built-in image_gen edit
+
+PASS 1 — Hair-tip gradient and frame redesign
+
+Use case: precise-object-edit.
+IMAGE 1 is the EDIT TARGET: the current chibi Ikaros Component Vault emblem.
+IMAGE 2 is a crop of the current artwork, identifying the side hair near the cheeks and collar.
+IMAGE 3 is the user's Q-version reference for the correct dark gradient at the ends of those side locks.
+Make exactly TWO design corrections: the localized hair-tip ombre and a quieter new border. Keep the character identity and holding pose intact.
+
+1. LOCALIZED DARK GRADIENT ON THE TWO FACE-FRAMING LOCKS:
+The two long FRONT side locks descending along her cheeks toward her collar have tips that gradually darken, as in Image 3. Add a smooth transition from the existing pink through muted reddish brown into deep brown / near-black at just the final pointed ends. Keep this subtle and natural; the near-black color is confined to the tips. These are the two face-framing locks IN FRONT of her shoulders, flanking her chin and collar, not the farther-out ribbon-bound tails hanging behind the box. Keep the current lock shapes and lengths.
+The user's latest reference intentionally clarifies that these two tips DO have a dark gradient. Do not keep them entirely pink. Do not draw an abrupt black stripe, random black highlights through the fringe, or large black hair panels.
+Keep all other hair pink, including the fringe, crown and outer tied tails. Preserve the existing head shape, fringe arrangement, ribbons and small top tuft.
+Use Image 3 only for that hair-color transition, not its face, eyes, costume, proportions or illustration style.
+
+2. REDESIGN THE SURROUNDING FRAME:
+Completely REMOVE the ECG/waveform symbol on the left and the two contact-pad/dot symbols on the right.
+Replace the old segmented ring and those symbols with TWO clean balanced dark-navy circular arcs, one on each side. Each arc sweeps smoothly from near the upper sides of the head, around the outside of the wings, and ends BEHIND a lower side of the component box. Together the arcs suggest a calm open protective round frame. Leave a deliberate clear opening above the hair tuft. Draw the frame behind the character, never across the face, hair, wings, hands or box.
+Use a quiet line weight slightly lighter than the character's principal outer contour. Smooth round ends, comfortable white clearance and no decorative extra gaps. No dots, circuit symbols, waveform, text, stars, technical marks, or replacement glyphs. The frame is simply an elegant compositional enclosure, not another object.
+
+PRESERVE:
+The predominantly WHITE ear devices with thin BLACK PARALLEL bands; the green eyes and facial expression; the clothes and collar; both wings; both hands holding the blue inventory box; the white chip emblem and all contents in the box; all other colors, layout, scale and clean chibi badge rendering.
+Keep the same plain white opaque square canvas. Do not add lettering or other changes.
+Return ONE revised emblem only.
+
+PASS 2 — Limit the dark gradient to the two front face-framing locks
+
+Use case: precise-object-edit.
+Edit target: the newly revised chibi Ikaros component-box emblem with TWO clean navy border arcs and dark brown gradient ends on the front side locks.
+One final localized correction only: restore the OUTER ribbon-bound long side tails to pink.
+
+There are two different hair groups:
+A. FRONT face-framing locks ending next to the collar, in front of her shoulders. KEEP their new pink-to-brown-to-near-black tip gradients exactly as they are.
+B. The OUTER long tied tails, starting at the ribbon bows beside the ears and hanging farther outward behind the wings, hands and box. These have accidentally also developed brown/black tips. Return these OUTER tied tails to their original all-pink/rose hair palette down to the ends. In approximate image coordinates, this affects the lower outer strands near x=25% and x=75%, y=68–87% of the canvas. Retain the navy outside contour and natural rose-pink shading. No brown or black filled areas within these outer tails.
+The front locks near the collar are distinct from those outer tails: keep their brown tips visible.
+
+Preserve EVERYTHING ELSE: the two clean border arcs without engineering symbols, the white ear devices and black parallel bands, face and green eyes, expression, pink fringe and crown, ribbons, clothing/collar, wings, both hands, blue component box, white chip logo, box contents, layout, dimensions and white opaque background. Do not redraw or restyle the emblem.
+Return ONE corrected emblem only.
