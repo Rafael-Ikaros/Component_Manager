@@ -1,0 +1,22 @@
+<resources>
+    <string name="materials_edit_failed">Unable to update the list. Use positive quantities within the integer range and keep the list under 5000 rows.</string>
+    <string name="materials_import">Import BOM</string>
+    <string name="materials_saved">Saved presets</string>
+    <string name="materials_manual">Select materials manually</string>
+    <string name="materials_no_presets">No saved presets yet.</string>
+    <string name="materials_draft_hint">This list keeps your source rows, selections and skipped items. Review current stock before release.</string>
+    <string name="materials_reparse">Reparse original file</string>
+    <string name="materials_settings">Edit project and build quantity</string>
+    <string name="materials_source_expand">View source rows and designators</string>
+    <string name="materials_source_collapse">Hide source rows and designators</string>
+    <string name="materials_source_row">%1$s · Row %2$d · Original quantity per set %3$d</string>
+    <string name="materials_per_set">Quantity per set</string>
+    <string name="materials_apply_quantity">Apply quantity</string>
+    <string name="materials_search">Search inventory and add material</string>
+    <string name="materials_search_hint">SKU, name, package, brand or parameters</string>
+    <string name="materials_search_empty">No matching inventory components.</string>
+    <string name="materials_search_result">%1$s · %2$s · Stock %3$d</string>
+    <string name="materials_replace_title">Replace current material list?</string>
+    <string name="materials_replace_message">Parsing another source replaces manual additions, quantity edits, matches and skipped items in the current list. Saved presets stay unchanged. Cancel to keep the current list. Inventory has not been deducted.</string>
+    <string name="materials_replace_confirm">Continue</string>
+</resources>

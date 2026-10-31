@@ -29,7 +29,7 @@
 - Android 设置和库存内容消费外层安全区域后处理 IME inset，避免键盘把整页平移到屏外；主导航切换清除输入焦点。库存筛选以当前列表栏的宽度换行，双栏设备不依赖横向滑动寻找库位或排序。
 - 库存筛选、结果操作、多选区与元件行共用一个LazyColumn；键盘展开或短窗口时可把头部滚出以完整查看元件，不固定占满列表高度。搜索值仍来自原ViewModel，滚回顶部可继续调整筛选，不增加库存提交入口。
 - 平板库存行和详情呈现独立在 `InventoryTabletParts.kt`，复用原左滑动作和业务回调；Expanded 窗口在扣除导航、页边距后的净宽达到836dp时显示420dp列表与详情，否则沿同一 Adaptive navigator 单窗格切换，Medium走独立详情路线。主界面及各主导航目的地使用 SaveableStateHolder 保留列表/设置上下文。设置净宽达到700dp时采用240dp分组导航及最大640dp表单，较窄时逐页进入；输入草稿与分组滚动使用 Compose 保存状态，不自动保存业务配置或触发同步。
-- 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。BOM/迁移预览的说明、行和末尾操作共用一个 LazyColumn，配套件在自身列表处理 IME，标签模板尺寸页由底部操作栏避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。
+- 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。项目用料/迁移预览的说明、行和末尾操作共用一个 LazyColumn，标签模板尺寸页由底部操作栏避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。
 - `InventoryWorkbookService` 管理备份预览、恢复和恢复失败时的图片清理；`BomReleaseCommitter` 和 `ComponentHubImporter` 管理各自提交。`InventorySqlOps` 只提供接受现有连接的分配/队列辅助，不另开事务。数据库文件、schema v5、升级备份和历史数据格式保持不变。
 
 Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享库存状态。完整编辑器在应用根节点使用同一组合位置，紧凑全屏与宽屏对话框切换不另建草稿状态。完整编辑器的文字、数量、库位以及导入来源使用 Compose 保存状态；待提交扫码批次通过 `SavedStateHandle` 保存用户输入，重建时重新读取当前库存，恢复到复核状态，不自动执行库存写入。取消或成功后清理草稿，提交失败保留供修正。已采纳的本地图片随编辑会话恢复；明确取消（包括系统返回）才删除会话新建图片，保存成功保留采用的图片。系统保存状态恢复不等同于长期草稿备份，不保证强制停止或设备重启恢复；提交期间中断应先核对记录，避免手动重复入库/出库。
@@ -628,7 +628,7 @@ Android 与 Windows 的 BOM 入口采用文件识别、库存匹配、确认出�
 跳过集合属于当前预览状态，原始解析数据保留以便恢复；跳过行不进入聚合扣料计划。
 最终出库继续使用原有库存事务与幂等标记；dev18 的预设交换另用独立账户表与接口，不改变库存协议。
 可选项目预设以客户端本地 JSON 保存解析后的单套清单和匹配/跳过选择，支持删除。
-重新使用时创建新批次并从当前数据库生成库存计划；预设不保存库存快照，dev18 起通过独立预设接口同步，详见下方“BOM 预设同步与配套件”。
+重新使用时创建新批次并从当前数据库生成库存计划；预设不保存库存快照，dev18 起通过独立预设接口同步，详见下方“项目用料与 BOM 预设同步”。
 
 Both native clients provide bounded CSV/XLSX readers, exact-SKU and
 model/package matching, preview, explicit confirmation and transactional stock
@@ -853,7 +853,11 @@ CI 在原有回归组前单独运行 `MovementLabelResolutionTest`、`QuantitySt
 - 库位管理的打印操作直接打开原有自由二维码标签编辑器；元素选框只在编辑画布显示，不加到实际标签渲染。蓝牙传输和走纸协议保持不变。
 - 库位筛选考虑正库存分配；库存为零时保留主库位归属供补货查询。加载库位时清理已失效的“上次导入库位”引用，保留用户配置的默认仓位。
 
-## BOM 预设同步与配套件
+## 项目用料与 BOM 预设同步
+
+Android / Windows 将导入 BOM 与临时配套统一到“项目用料”，入口为“导入 BOM”“已保存预设”“手动选料”。Android 由 `BomImportScreen` / `BomImportSession` 承载，Windows 由 `BomView` 承载；独立 `KittingScreen` / `KittingView` 及导航入口移除。这是客户端工作区整合，已通过本轮定向自动化与 Windows / 小米 9 隔离数据 UI 验收，待 CI 与 `0.7.9-dev.1` 预发布；不代表全量 QA 或 Android 原应用升级保留数据验证，证据见 [当前工作](current-work.md)。
+
+导入行和手动行共用既有 BOM 模型、库存匹配、跳过状态、每套数量、预设保存和复核流程。手动行使用稳定需求 ID；修改或保存清单保留导入来源行、位号及既有预设 ID。两端沿用下述预设内容格式、离线存储和同步接口，本轮不修改服务端、数据库 schema 或 API。范围不含地图；未来 PCB 输入只考虑用户自行导入的嘉立创可视化 BOM，当前没有该功能。
 
 原生客户端 `BomPresetStore` 使用 `{version:2,presets:[...]}` 原子文件，旧格式成功解码后先备份再迁移。公共 content `schema_version:1` 保留稳定预设/需求 ID、工作表与源行、每套用量、套数、人工选择和跳过项。`selection=null` 表示自动匹配，空字符串表示明确不匹配，非空字符串为库存 component ID。Android 合并源行与 Windows 独立源行转换时，按需求行用量计算一次，不能按 source_rows 再累加。
 
@@ -861,7 +865,7 @@ CI 在原有回归组前单独运行 `MovementLabelResolutionTest`、`QuantitySt
 
 `GET /admin-api/bom-presets` 仅返回当前账户，管理台 `/bom-presets` 只读。预设交换不会写库存数量、流水或库存 revision。账户数据删除沿用既有独立数据库清理。
 
-Android `KittingScreen` / Windows `KittingView` 在本地保留当前会话草稿，复用已有 BOM planner/原子提交器和 releaseId 去重。未确认只做匹配与库位计划，不预占库存；确认时重新校验数量、版本和分配。应用结束后的草稿持久恢复未实现。预设不包含图片，不改变现有 Excel 库存备份范围。
+统一项目用料在本地保留当前会话草稿，复用已有 BOM planner/原子提交器和 releaseId 去重。导入、加载预设、手动编辑和复核都不预占或扣减库存；明确确认时重新校验数量、版本和分配，再进行原子扣料。应用结束后的草稿持久恢复未实现。预设不包含图片，不改变现有 Excel 库存备份范围。
 
 
 dev18 直接验收记录：真实 Windows 服务将共享预设发送到隔离 FastAPI，Android 手机同步并保留人工选择和跳过项，再由 Windows 拉取核对。手机明确确认一次仅扣减 6 和 2，重试没有额外扣减；Windows 删除预设后手机列表清空，库存仍为 14/18。Web 浏览器确认只读列表、详情、每套 3 × 2 = 6、明确未匹配、跳过及中英文切换。该记录覆盖本次路径，不代表全部设备或异常场景回归。

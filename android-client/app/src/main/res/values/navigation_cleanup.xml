@@ -4,8 +4,8 @@
     <string name="import_menu_single_hint">Scan a label, enter a C number, or search the catalog</string>
     <string name="import_menu_batch">Batch JLC inbound</string>
     <string name="import_menu_batch_hint">Collect packages, resolve details, then confirm stock</string>
-    <string name="import_menu_bom">Project BOM</string>
-    <string name="import_menu_bom_hint">Match project requirements to stock and prepare a controlled release</string>
+    <string name="import_menu_bom">Project materials</string>
+    <string name="import_menu_bom_hint">Import a BOM, open a saved preset or select stock, then review before release</string>
     <string name="import_menu_manual">Enter a component manually</string>
     <string name="import_menu_manual_hint">For parts without a supported barcode or catalog entry</string>
     <string name="settings_inventory_data">Inventory and data</string>

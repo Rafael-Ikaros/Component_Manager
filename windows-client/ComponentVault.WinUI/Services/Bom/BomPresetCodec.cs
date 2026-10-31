@@ -23,7 +23,7 @@ public static class BomPresetCodec
             var previous = metadata?.Lines.ElementAtOrDefault(index);
             var sources = previous?.SourceRows ?? [new BomPresetSourceRow(sheet.Name, row.RowNumber, row.Quantity ?? 0,
                 new Dictionary<string, string>(StringComparer.Ordinal) { ["reference"] = row.Reference ?? "" })];
-            return new BomPresetLine(previous?.Id ?? $"row-{row.RowNumber}", row.Sku, row.Name, row.SupplierPartNumber,
+            return new BomPresetLine(row.PresetLineId ?? previous?.Id ?? $"row-{row.RowNumber}", row.Sku, row.Name, row.SupplierPartNumber,
                 row.PackageName, row.Quantity ?? 0, preset.SelectedComponents.GetValueOrDefault(row.RowNumber),
                 preset.SkippedRows.Contains(row.RowNumber), sources);
         }).ToArray();
@@ -41,7 +41,7 @@ public static class BomPresetCodec
         var rowNumbers = originalNumbers.All(number => number > 0) && originalNumbers.Distinct().Count() == content.Lines.Count ? originalNumbers : Enumerable.Range(1, content.Lines.Count).ToArray();
         var rows = content.Lines.Select((line, index) => new BomSourceRow(rowNumbers[index], line.Sku, line.Model,
             line.PackageName, line.QuantityPerSet, line.Name,
-            string.Join(", ", line.SourceRows.SelectMany(source => source.Fields).Where(pair => new[] { "reference", "designator", "位号" }.Contains(pair.Key, StringComparer.OrdinalIgnoreCase)).Select(pair => pair.Value).Where(value => !string.IsNullOrWhiteSpace(value))))).ToArray();
+            string.Join(", ", line.SourceRows.SelectMany(source => source.Fields).Where(pair => new[] { "reference", "designator", "位号" }.Contains(pair.Key, StringComparer.OrdinalIgnoreCase)).Select(pair => pair.Value).Where(value => !string.IsNullOrWhiteSpace(value))), line.Id)).ToArray();
         return new(record.Name, new(content.SourceName, content.SelectedSheet.Name, rows, content.Warnings, content),
             content.ProjectName, content.ProductionSets,
             content.Lines.Select((line, index) => (line, index)).Where(pair => pair.line.Selection is not null)

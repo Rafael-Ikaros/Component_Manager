@@ -941,7 +941,7 @@ class InventoryViewModel(
         }
     }
 
-    internal fun kittingComponents(): List<ComponentRecord> = allComponentsCache.filterNot { it.deleted }
+    internal fun projectMaterialComponents(): List<ComponentRecord> = allComponentsCache.filterNot { it.deleted }
 
     fun commitBomRelease(
         preview: BomReleasePreview,

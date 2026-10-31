@@ -25,7 +25,8 @@ public sealed record BomSourceRow(
     string? PackageName,
     int? Quantity,
     string? Name = null,
-    string? Reference = null
+    string? Reference = null,
+    string? PresetLineId = null
 );
 
 public sealed record BomDocument(

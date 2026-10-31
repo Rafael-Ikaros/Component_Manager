@@ -68,6 +68,35 @@ public sealed class BomPresetInteropTests : IDisposable
     }
 
     [Fact]
+    public void UnifiedMaterialsKeepOriginalRowsSelectionsAndSkipsWhenAddingManualMaterial()
+    {
+        var sourceRow = new BomPresetSourceRow("Sheet1", 17, 2, new() { ["reference"] = "R1,R2", ["original"] = "source value" });
+        var sheet = new BomPresetSheet("Sheet1", 0, false);
+        var record = new BomPresetRecord("project", "Board", "2026-10-31T00:00:00Z", false,
+            new(1, "Project", 3, "board.xlsx", "original-hash", [sheet], sheet, [],
+                [new("row-18", "R", "Resistor", "10k", "0603", 2, "selected-id", true, [sourceRow])]));
+        var loaded = BomPresetCodec.Decode(record);
+        var newLineId = Guid.NewGuid().ToString("N");
+        var document = loaded.Document with { Rows = loaded.Document.Rows.Append(new BomSourceRow(18, "C", "100n", "0603", 1, "Capacitor", PresetLineId: newLineId)).ToArray() };
+        var selected = new Dictionary<int, string>(loaded.SelectedComponents) { [18] = "manual-id" };
+        var edited = loaded with { Document = document, SelectedComponents = selected };
+
+        var encoded = BomPresetCodec.Encode(edited, record.Id, record.UpdatedAt);
+        var original = encoded.Content!.Lines[0];
+        Assert.Equal("row-18", original.Id);
+        Assert.Equal(newLineId, encoded.Content.Lines[1].Id);
+        Assert.Equal(sourceRow, Assert.Single(original.SourceRows));
+        Assert.True(original.Excluded);
+        Assert.Equal("selected-id", original.Selection);
+        Assert.Equal("manual-id", encoded.Content.Lines[1].Selection);
+        var reloaded = BomPresetCodec.Decode(encoded);
+        Assert.Equal(newLineId, BomPresetCodec.Encode(reloaded, record.Id, record.UpdatedAt).Content!.Lines[1].Id);
+        Assert.Equal(new[] { 17, 18 }, reloaded.Document.Rows.Select(row => row.RowNumber));
+        Assert.Contains(17, reloaded.SkippedRows);
+        Assert.Equal("R1,R2", reloaded.Document.Rows[0].Reference);
+    }
+
+    [Fact]
     public void CorruptLegacyFileIsNotOverwrittenOrSilentlyDropped()
     {
         Directory.CreateDirectory(_root);

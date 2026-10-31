@@ -26,10 +26,10 @@
                 Spacing="4">
                 <TextBlock
                     Style="{StaticResource PageTitleTextStyle}"
-                    Text="项目 BOM" />
+                    Text="项目用料" />
                 <TextBlock
                     Style="{StaticResource PageSubtitleTextStyle}"
-                    Text="导入清单、核对匹配，再一次性确认扣料。库存不足时不会执行部分扣减。" />
+                    Text="导入 BOM、加载已保存预设或手动选料，统一核对用量和库位后确认出库。" />
             </StackPanel>
             <Button
                 Grid.Column="1"
@@ -79,7 +79,8 @@
                     <TextBlock
                         VerticalAlignment="Center"
                         FontWeight="SemiBold"
-                        Text="项目与文件" />
+                        Text="项目与用料来源" />
+                    <Button Click="OnManualStartClicked" Content="手动选料" />
                 </StackPanel>
                 <TextBox
                     x:Name="ProjectNameBox"
@@ -91,7 +92,7 @@
                     x:Name="BatchQuantityBox"
                     Grid.Row="1"
                     Grid.Column="1"
-                    Header="生产批数"
+                    Header="套数"
                     Minimum="1"
                     Value="1"
                     SpinButtonPlacementMode="Compact"
@@ -102,7 +103,7 @@
                     MinWidth="132"
                     VerticalAlignment="Bottom"
                     Click="OnChooseFileClicked"
-                    Content="选择 BOM 文件"
+                    Content="导入 BOM"
                     Style="{StaticResource AccentButtonStyle}" />
                 <Expander
                     x:Name="MappingExpander"
@@ -130,7 +131,7 @@
                     <ComboBox
                         x:Name="PresetBox"
                         MinWidth="240"
-                        PlaceholderText="选择已保存的 BOM 预设"
+                        PlaceholderText="已保存预设"
                         SelectionChanged="OnPresetSelectionChanged" />
                     <Button
                         x:Name="LoadPresetButton"
@@ -183,29 +184,34 @@
                     x:Name="SummaryText"
                     Grid.Row="1"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="尚未选择文件。"
+                    Text="请选择导入 BOM、已保存预设或手动选料开始。"
                     TextWrapping="Wrap" />
-                <StackPanel
+                <CommandBar
                     Grid.Row="2"
-                    Orientation="Horizontal"
-                    Spacing="8">
-                    <Button
+                    HorizontalContentAlignment="Left"
+                    DefaultLabelPosition="Right">
+                    <AppBarButton x:Name="AddMaterialButton" Click="OnAddMaterialClicked" Label="添加用料" Icon="Add" IsEnabled="False" />
+                    <AppBarButton x:Name="EditQuantityButton" Click="OnEditQuantityClicked" Label="修改每套用量" Icon="Edit" IsEnabled="False" />
+                    <CommandBar.SecondaryCommands>
+                    <AppBarButton x:Name="SourceRowButton" Click="OnSourceRowClicked" Label="查看来源" IsEnabled="False" />
+                    <AppBarButton
                         x:Name="ResolveButton"
                         Click="OnResolveClicked"
-                        Content="为选中行选择库存"
+                        Label="为选中行选择库存"
                         IsEnabled="False" />
-                    <Button
+                    <AppBarButton
                         x:Name="SkipButton"
                         Click="OnSkipClicked"
-                        Content="跳过选中行"
+                        Label="跳过选中行"
                         IsEnabled="False" />
-                    <Button
+                    <AppBarButton
                         x:Name="RestoreButton"
                         Click="OnRestoreClicked"
-                        Content="恢复选中行"
+                        Label="恢复选中行"
                         IsEnabled="False"
                         Visibility="Collapsed" />
-                </StackPanel>
+                    </CommandBar.SecondaryCommands>
+                </CommandBar>
                 <ListView
                     x:Name="PreviewList"
                     Grid.Row="3"
@@ -217,6 +223,7 @@
             Grid.Row="3"
             RowSpacing="8">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -239,7 +246,8 @@
                     FontWeight="SemiBold"
                     Text="确认出库" />
             </StackPanel>
-            <Grid Grid.Row="1" ColumnSpacing="12">
+            <ScrollViewer Grid.Row="1" MaxHeight="130" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="PlanText" TextWrapping="Wrap" /></ScrollViewer>
+            <Grid Grid.Row="2" ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />

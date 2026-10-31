@@ -112,12 +112,11 @@
                         <SymbolIcon Symbol="Sort" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem x:Name="BomItem" Content="项目 BOM" Tag="Bom">
+                <NavigationViewItem x:Name="BomItem" Content="项目用料" Tag="Bom">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="OpenFile" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem x:Name="KittingItem" Content="配套件" Tag="Kitting"><NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon></NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>

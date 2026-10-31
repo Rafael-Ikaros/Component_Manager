@@ -4,8 +4,8 @@
     <string name="import_menu_single_hint">扫描标签、输入 C 编号或搜索立创商城</string>
     <string name="import_menu_batch">批量嘉立创入库</string>
     <string name="import_menu_batch_hint">连续收集包装，统一解析后确认入库</string>
-    <string name="import_menu_bom">项目 BOM</string>
-    <string name="import_menu_bom_hint">匹配项目用料与库存，并准备受控批量出库</string>
+    <string name="import_menu_bom">项目用料</string>
+    <string name="import_menu_bom_hint">导入 BOM、打开已保存预设或手动选料，复核后出库</string>
     <string name="import_menu_manual">手动录入</string>
     <string name="import_menu_manual_hint">适用于没有可用条码或商城资料的元件</string>
     <string name="settings_inventory_data">库存与数据</string>

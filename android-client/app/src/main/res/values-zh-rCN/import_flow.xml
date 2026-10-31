@@ -4,7 +4,7 @@
     <string name="import_menu_migration">数据迁移</string>
     <string name="import_menu_migration_hint">预览 Component Hub JSON 导出，核对冲突后再导入确认记录</string>
     <string name="bom_task_prompt">本次要处理什么？</string>
-    <string name="bom_task_bom">项目 BOM</string>
+    <string name="bom_task_bom">项目用料</string>
     <string name="bom_task_bom_description">打开 CSV 或 XLSX 用料表，匹配本地库存，并在出库前核对扣减计划。</string>
     <string name="bom_task_migration">数据迁移</string>
     <string name="bom_task_migration_description">打开 Component Hub JSON 导出，预览记录与冲突后再确认迁移。</string>

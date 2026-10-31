@@ -8,6 +8,10 @@ import com.componentvault.android.data.bom.BomRequirement
 import com.componentvault.android.data.bom.BomRequirementIdentity
 import com.componentvault.android.data.bom.BomReleasePreview
 import com.componentvault.android.data.bom.BomSheet
+import com.componentvault.android.data.bom.BomPreset
+import com.componentvault.android.data.bom.BomPresetCodec
+import com.componentvault.android.data.bom.BomSourceRow
+import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.ComponentDraft
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
@@ -93,5 +97,40 @@ class BomImportSessionTest {
             excludedKeys = setOf(requirements.last().identity.canonicalKey),
         )
         assertEquals(listOf("R-1"), bomProcurementEligible(withoutExcluded).map { it.sku })
+    }
+
+    @Test fun manualMaterialsSharePortablePresetAndKeepImportedSourcesAndSkippedChoices() {
+        val source = BomSourceRow("BOM", 7, 2, mapOf("Designator" to "R1,R2", "Value" to "10k"))
+        val imported = BomRequirement(BomRequirementIdentity("source:7"), "R-1", "Resistor", null, "0603", 2, 6, listOf(source))
+        val sheet = BomSheet("BOM", 0)
+        val preset = BomPreset("existing", "Board", BomParseResult("Board", 3, listOf(sheet), sheet,
+            listOf(imported), "source-hash", "original.csv"), mapOf("source:7" to ""), setOf("source:7"))
+        val component = ComponentRecord("component", "C-1", "Capacitor", "Passive", "0603", "A", "", 20, 0, "now", false)
+        val draft = preset.addMaterial(component)
+        val manualKey = draft.parsed.requirements.last().identity.canonicalKey
+        val changed = draft.changeMaterialQuantity(manualKey, 4)
+        val restored = BomPresetCodec.decode(BomPresetCodec.encode(listOf(changed))).single()
+        assertEquals(imported, restored.parsed.requirements.first())
+        assertEquals("original.csv", restored.parsed.sourceName)
+        assertEquals("source-hash", restored.parsed.fileSha256)
+        assertEquals(setOf("source:7"), restored.excludedKeys)
+        assertEquals(mapOf("source:7" to "", manualKey to "component"), restored.selections)
+        assertEquals(4, restored.parsed.requirements.last().quantityPerSet)
+        assertEquals(12, restored.parsed.requirements.last().requiredQuantity)
+        assertEquals(2, imported.sourceRows.single().quantityPerSet)
+    }
+
+    @Test fun manualMaterialPreviewDoesNotDeductStock() = runBlocking {
+        val saved = repository.saveComponent(ComponentDraft(sku = "R-1", name = "Resistor", category = "Passive", packageName = "0603", location = "A", description = "", quantity = 8, minStock = 0))
+        assertTrue(saved.isSuccess, saved.message)
+        val original = repository.previewBomRelease(BomParseResult("Board", 1, listOf(BomSheet("BOM", 0)), BomSheet("BOM", 0),
+            listOf(BomRequirement(BomRequirementIdentity("row"), "R-1", null, null, null, 2, 2, emptyList())), ""))
+        val componentId = requireNotNull(original.matchingLines.single().componentId)
+        val component = ComponentRecord(componentId, "R-1", "Resistor", "Passive", "0603", "A", "", 8, 0, "now", false)
+        val draft = emptyProjectMaterials().addMaterial(component)
+        val preview = repository.previewBomRelease(draft.parsed, draft.selections)
+        assertEquals(8, preview.lines.single().availableQuantity)
+        val again = repository.previewBomRelease(original.parsed)
+        assertEquals(8, again.lines.single().availableQuantity)
     }
 }

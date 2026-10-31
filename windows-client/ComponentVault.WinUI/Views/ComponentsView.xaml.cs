@@ -524,10 +524,10 @@ public sealed partial class ComponentsView : Page
 				}
 		}
 
-		private void OnKittingClicked (object sender, RoutedEventArgs e)
+		private void OnProjectMaterialsClicked (object sender, RoutedEventArgs e)
 		{
 				if (Application.Current is App { Window: MainWindow window })
-						window.NavigateTo("Kitting");
+						window.NavigateTo("Bom");
 		}
 		private void OnBatchJlcInboundClicked (object sender, RoutedEventArgs e)
 		{

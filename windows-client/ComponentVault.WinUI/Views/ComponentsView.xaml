@@ -59,9 +59,9 @@
 						Icon="Upload"
 						Label="导入元器件" />
 					<AppBarButton
-						Click="OnKittingClicked"
+						Click="OnProjectMaterialsClicked"
 						Icon="AllApps"
-						Label="配套件" />
+						Label="项目用料" />
 					<AppBarButton Click="OnManageLocationsClicked" Label="管理库位">
 						<AppBarButton.Icon>
 							<FontIcon Glyph="&#xE707;" />

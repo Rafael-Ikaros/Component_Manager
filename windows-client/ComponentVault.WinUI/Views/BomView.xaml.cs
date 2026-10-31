@@ -32,6 +32,7 @@ public sealed partial class BomView : Page
     public BomView()
     {
         InitializeComponent();
+        NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
         Loaded += async (_, _) =>
         {
             try { RefreshPresets(); }
@@ -59,6 +60,7 @@ public sealed partial class BomView : Page
     private async void OnLoadPresetClicked(object sender, RoutedEventArgs e)
     {
         if (PresetBox.SelectedItem is not BomPreset selectedPreset) return;
+        if (!await ConfirmReplaceDraftAsync()) return;
         try
         {
             var preset = _presetStore.LoadAll().First(item => item.Id == selectedPreset.Id);
@@ -143,6 +145,7 @@ public sealed partial class BomView : Page
         InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(((App)Application.Current).Window));
         var file = await picker.PickSingleFileAsync();
         if (file is null) return;
+        if (!await ConfirmReplaceDraftAsync()) return;
         try
         {
             _filePath = file.Path;
@@ -198,6 +201,10 @@ public sealed partial class BomView : Page
         ExportButton.IsEnabled = _preview is not null;
         ConfirmButton.IsEnabled = _preview.CanConfirm && !_confirmed;
         SavePresetButton.IsEnabled = !_confirmed;
+        AddMaterialButton.IsEnabled = !_confirmed;
+        ProjectNameBox.IsEnabled = BatchQuantityBox.IsEnabled = !_confirmed;
+        PlanText.Text = string.Join("\n", _preview.Lines.Select(line => $"{PreviewIdentity(line)} · 每套 {line.UnitQuantity} × {batches} 套 = {line.RequiredQuantity} · 库存 {line.AvailableQuantity}\n库位：{AllocationPlan(line)}"));
+        if (_preview.Issues.Count > 0) PlanText.Text += "\n" + string.Join("\n", _preview.Issues.Select(issue => issue.Message));
         UpdateSelectionButtons();
     }
 
@@ -229,6 +236,8 @@ public sealed partial class BomView : Page
         ResolveButton.IsEnabled = row is not null && !_confirmed && !_skippedRows.Contains(row.Value);
         SkipButton.IsEnabled = row is not null && !_confirmed && !_skippedRows.Contains(row.Value);
         RestoreButton.IsEnabled = row is not null && !_confirmed && _skippedRows.Contains(row.Value);
+        EditQuantityButton.IsEnabled = row is not null && !_confirmed;
+        SourceRowButton.IsEnabled = row is not null;
         SkipButton.Visibility = row is not null && _skippedRows.Contains(row.Value) ? Visibility.Collapsed : Visibility.Visible;
         RestoreButton.Visibility = row is not null && _skippedRows.Contains(row.Value) ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -314,7 +323,7 @@ public sealed partial class BomView : Page
     {
         RefreshPreview();
         if (_confirmed || _preview is not { CanConfirm: true } preview || _document is null) return;
-        var dialog = new ContentDialog { Title = "最终确认出库", Content = $"项目：{preview.ProjectName}\n生产批数：{preview.BatchQuantity}\n出库库存项：{preview.Lines.Count}\n明确跳过：{_skippedRows.Count} 行\n本次会一次性扣减全部匹配项。", PrimaryButtonText = "确认出库", CloseButtonText = "返回检查", DefaultButton = ContentDialogButton.Close, XamlRoot = XamlRoot };
+        var dialog = new ContentDialog { Title = "最终确认出库", Content = new ScrollViewer { MaxHeight = 420, Content = new TextBlock { Text = $"项目：{preview.ProjectName}\n套数：{preview.BatchQuantity}\n出库库存项：{preview.Lines.Count}\n明确跳过：{_skippedRows.Count} 行\n{PlanText.Text}\n本次会一次性扣减全部匹配项。", TextWrapping = TextWrapping.Wrap } }, PrimaryButtonText = "确认出库", CloseButtonText = "返回检查", DefaultButton = ContentDialogButton.Close, XamlRoot = XamlRoot };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(_document)));
         var result = ViewModel.ConfirmBomConsumption(new(_releaseId, _batchId, preview.ProjectName, preview.BatchQuantity, hash, preview.Lines));
@@ -324,6 +333,75 @@ public sealed partial class BomView : Page
     }
 
     private void OnInputsChanged(object sender, TextChangedEventArgs e) => RefreshPreview();
+
+    private async Task<bool> ConfirmReplaceDraftAsync()
+    {
+        if (_document is null || _document.Rows.Count == 0 || _confirmed) return true;
+        return await new ContentDialog { Title = "替换当前用料清单？", Content = "当前尚未确认出库，继续将替换本次选料、匹配与跳过状态。库存尚未扣减。", PrimaryButtonText = "替换清单", CloseButtonText = "保留当前清单", DefaultButton = ContentDialogButton.Close, XamlRoot = XamlRoot }.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    private async void OnManualStartClicked(object sender, RoutedEventArgs e)
+    {
+        if (!await ConfirmReplaceDraftAsync()) return;
+        _document = null;
+        _loadedPreset = null;
+        _inspection = null;
+        _mapping = null;
+        _filePath = null;
+        _selections.Clear();
+        _skippedRows.Clear();
+        ProjectNameBox.Text = "项目用料";
+        BatchQuantityBox.Value = 1;
+        _document = new("手动选料", null, [], []);
+        MappingExpander.IsEnabled = MappingExpander.IsExpanded = false;
+        ResetBatchIdentity();
+        RefreshPreview();
+        OnAddMaterialClicked(sender, e);
+    }
+
+    private static bool PositiveInt(double value) => double.IsFinite(value) && value >= 1 && value <= int.MaxValue && value == Math.Truncate(value);
+
+    private async void OnAddMaterialClicked(object sender, RoutedEventArgs e)
+    {
+        if (_document is null || _confirmed) return;
+        BomMatchCandidate? choice = null;
+        var search = new AutoSuggestBox { Header = "库存项", PlaceholderText = "搜索 SKU、型号、封装或名称", MinWidth = 400 };
+        search.TextChanged += (_, args) => { if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) { choice = null; search.ItemsSource = _planner.SearchInventory(ViewModel.AvailableComponents, search.Text); } };
+        search.SuggestionChosen += (_, args) => choice = args.SelectedItem as BomMatchCandidate;
+        var quantity = new NumberBox { Header = "每套用量", Value = 1, Minimum = 1, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Inline };
+        var panel = new StackPanel { Spacing = 12 }; panel.Children.Add(search); panel.Children.Add(quantity);
+        panel.Children.Add(new TextBlock { Text = "重复选择同一库存项会保留为独立用料行，出库时合计用量。", TextWrapping = TextWrapping.Wrap });
+        var dialog = new ContentDialog { Title = "添加用料", Content = panel, PrimaryButtonText = "添加", CloseButtonText = "取消", XamlRoot = XamlRoot };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (choice is null || !PositiveInt(quantity.Value)) { await ShowMessageAsync("无法添加", "请选择库存项并填写正整数用量。"); return; }
+        var number = _document.Rows.Count == 0 ? 1 : _document.Rows.Max(row => row.RowNumber) + 1;
+        _document = _document with { Rows = _document.Rows.Append(new BomSourceRow(number, choice.Sku, choice.Model, choice.PackageName, (int)quantity.Value, choice.Name, PresetLineId: Guid.NewGuid().ToString("N"))).ToArray() };
+        _selections[number] = choice.ComponentId;
+        RefreshPreview();
+    }
+
+    private async void OnEditQuantityClicked(object sender, RoutedEventArgs e)
+    {
+        if (_document is null || _confirmed || (PreviewList.SelectedItem as BomRowItem)?.RowNumber is not { } number) return;
+        var source = _document.Rows.First(row => row.RowNumber == number);
+        var quantity = new NumberBox { Header = "每套用量", Value = source.Quantity ?? double.NaN, Minimum = 1, MinWidth = 360 };
+        var dialog = new ContentDialog { Title = $"第 {number} 行用量", Content = quantity, PrimaryButtonText = "应用", CloseButtonText = "取消", XamlRoot = XamlRoot };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (!PositiveInt(quantity.Value)) { await ShowMessageAsync("无效用量", "请填写正整数用量。"); return; }
+        _document = _document with { Rows = _document.Rows.Select(row => row.RowNumber == number ? row with { Quantity = (int)quantity.Value } : row).ToArray() };
+        RefreshPreview();
+    }
+
+    private async void OnSourceRowClicked(object sender, RoutedEventArgs e)
+    {
+        if (_document is null || (PreviewList.SelectedItem as BomRowItem)?.RowNumber is not { } number) return;
+        var index = _document.Rows.ToList().FindIndex(row => row.RowNumber == number);
+        var row = _document.Rows[index];
+        var original = _document.PresetContent?.Lines.ElementAtOrDefault(index)?.SourceRows;
+        var text = $"来源：{_document.SourceName}\n工作表：{_document.WorksheetName}\n清单行：{number}\nSKU：{row.Sku}\n型号：{row.SupplierPartNumber}\n名称：{row.Name}\n封装：{row.PackageName}\n位号：{row.Reference}";
+        if (original is not null) text += "\n\n" + string.Join("\n\n", original.Select(source => $"{source.SheetName} · 原始第 {source.RowNumber} 行 · 数量 {source.QuantityPerSet}\n" + string.Join("\n", source.Fields.Select(field => $"{field.Key}：{field.Value}"))));
+        await new ContentDialog { Title = "用料来源", Content = new ScrollViewer { MaxHeight = 420, Content = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true } }, CloseButtonText = "关闭", XamlRoot = XamlRoot }.ShowAsync();
+    }
 
     private void OnBatchQuantityChanged(NumberBox sender, NumberBoxValueChangedEventArgs args) => RefreshPreview();
 
@@ -357,9 +435,13 @@ public sealed partial class BomView : Page
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {
-            _mapping = new(((ColumnChoice?)sku.SelectedItem)?.Index, ((ColumnChoice?)model.SelectedItem)?.Index, ((ColumnChoice?)package.SelectedItem)?.Index, ((ColumnChoice?)quantity.SelectedItem)?.Index, ((ColumnChoice?)name.SelectedItem)?.Index, ((ColumnChoice?)reference.SelectedItem)?.Index);
-            _mapping.Validate(_inspection.Headers.Count, _inspection.Headers);
-            _document = _reader.Read(_filePath, _inspection.WorksheetName, _mapping);
+            var mapping = new BomColumnMapping(((ColumnChoice?)sku.SelectedItem)?.Index, ((ColumnChoice?)model.SelectedItem)?.Index, ((ColumnChoice?)package.SelectedItem)?.Index, ((ColumnChoice?)quantity.SelectedItem)?.Index, ((ColumnChoice?)name.SelectedItem)?.Index, ((ColumnChoice?)reference.SelectedItem)?.Index);
+            mapping.Validate(_inspection.Headers.Count, _inspection.Headers);
+            var confirm = new ContentDialog { Title = "重新读取并替换完整清单？", Content = "重新映射会从原文件重建清单，替换后来手动添加的行、用量修改、库存匹配和跳过状态。取消可保留当前完整清单。", PrimaryButtonText = "重新读取并替换", CloseButtonText = "保留当前清单", DefaultButton = ContentDialogButton.Close, XamlRoot = XamlRoot };
+            if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+            var document = _reader.Read(_filePath, _inspection.WorksheetName, mapping);
+            _mapping = mapping;
+            _document = document;
             _selections.Clear(); _skippedRows.Clear(); ResetBatchIdentity(); UpdateMappingSummary(); RefreshPreview();
         }
         catch (Exception exception) { await ShowMessageAsync("列映射无效", exception.Message); }

@@ -97,7 +97,6 @@ fun ComponentVaultApp(
     var movementEditorInitialType by rememberSaveable { mutableStateOf<String?>(null) }
     var movementEditorAllowManualSelection by rememberSaveable { mutableStateOf(true) }
     var importSurfaceVisible by rememberSaveable { mutableStateOf(false) }
-    var kittingVisible by rememberSaveable { mutableStateOf(false) }
     var bomImportVisible by rememberSaveable { mutableStateOf(false) }
     var bomImportInitialMode by rememberSaveable { mutableStateOf<BomImportMode?>(null) }
     var storageLocationsVisible by rememberSaveable { mutableStateOf(false) }
@@ -450,8 +449,6 @@ fun ComponentVaultApp(
                 )
             }
 
-            kittingVisible -> KittingScreen(viewModel, onDismiss = { kittingVisible = false })
-
             bomImportVisible -> {
                 BomImportScreen(
                     viewModel = viewModel,
@@ -776,7 +773,6 @@ fun ComponentVaultApp(
                     bomImportInitialMode = BomImportMode.Bom
                     bomImportVisible = true
                 },
-                onKitting = { showAddEntrySheet = false; kittingVisible = true },
                 onImportMigration = {
                     showAddEntrySheet = false
                     bomImportInitialMode = BomImportMode.Migration
@@ -847,7 +843,6 @@ internal fun AddComponentEntrySheet(
     onImportBom: () -> Unit,
     onImportMigration: () -> Unit,
     onBatchJlc: () -> Unit,
-    onKitting: () -> Unit = {},
 ) {
     BackHandler(onBack = onDismiss)
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -859,7 +854,6 @@ internal fun AddComponentEntrySheet(
             )
             ImportMenuRow(R.string.import_menu_single, R.string.import_menu_single_hint, onImportComponent)
             ImportMenuRow(R.string.import_menu_batch, R.string.import_menu_batch_hint, onBatchJlc)
-            ListItem(headlineContent = { Text("配套件") }, supportingContent = { Text("逐项选料或从 BOM 预设带入，复核后一次扣减") }, modifier = Modifier.fillMaxWidth().clickable(onClick = onKitting))
             ImportMenuRow(R.string.import_menu_bom, R.string.import_menu_bom_hint, onImportBom)
             ImportMenuRow(R.string.import_menu_migration, R.string.import_menu_migration_hint, onImportMigration)
             ImportMenuRow(R.string.import_menu_manual, R.string.import_menu_manual_hint, onAddComponent)

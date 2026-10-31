@@ -131,6 +131,21 @@ internal fun BomImportScreen(
     var exitPending by session.exitPending
     var procurementOffer by session.procurementOffer
     var selectedMode by session.selectedMode
+    var materialQuery by session.materialQuery
+    var showSavedPresets by session.showSavedPresets
+    var replaceSourceAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun newMaterialDraft() = emptyProjectMaterials(context.getString(R.string.bom_task_bom), context.getString(R.string.materials_manual))
+
+    fun replaceSource(action: () -> Unit) {
+        if (fileBytes != null || activePreset != null) replaceSourceAction = action else action()
+    }
+
+    fun editableDraft(): BomPreset {
+        val draft = activePreset ?: newMaterialDraft()
+        return draft.copy(parsed = preview?.parsed ?: draft.parsed,
+            selections = selections, excludedKeys = excludedKeys)
+    }
 
     fun resetFile() {
         session.invalidatePending()
@@ -234,6 +249,7 @@ internal fun BomImportScreen(
         excludedKeys = preset.excludedKeys
         expandedSearches = emptySet()
         showAllLines = false
+        showSavedPresets = false
         releaseId = UUID.randomUUID().toString()
         batchId = UUID.randomUUID().toString()
         releaseApplied = false
@@ -404,7 +420,21 @@ internal fun BomImportScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (selectedMode == BomImportMode.Bom && fileBytes == null && activePreset == null && presets.isNotEmpty()) {
+                if (selectedMode == BomImportMode.Bom && fileBytes == null && activePreset == null) {
+                    item {
+                        Button(onClick = { picker.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "application/vnd.ms-excel", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.materials_import)) }
+                        OutlinedButton(onClick = { showSavedPresets = !showSavedPresets }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.materials_saved)) }
+                        OutlinedButton(onClick = {
+                            val draft = newMaterialDraft()
+                            activePreset = draft
+                            projectName = draft.parsed.projectName
+                            productionSets = "1"
+                            showAllLines = true
+                        }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.materials_manual)) }
+                    }
+                    if (showSavedPresets && presets.isEmpty()) item { Text(stringResource(R.string.materials_no_presets)) }
+                }
+                if (selectedMode == BomImportMode.Bom && fileBytes == null && activePreset == null && showSavedPresets && presets.isNotEmpty()) {
                     item { Text(stringResource(R.string.bom_saved_projects), style = MaterialTheme.typography.titleMedium) }
                     items(presets, key = { "preset:${it.id}" }) { preset ->
                         Card(Modifier.fillMaxWidth()) {
@@ -419,10 +449,11 @@ internal fun BomImportScreen(
                         }
                     }
                 }
-                item {
+                if (selectedMode != BomImportMode.Bom || fileBytes != null || activePreset != null) item {
                     Button(
                         enabled = !busy,
                         onClick = {
+                            replaceSource {
                             picker.launch(if (selectedMode == BomImportMode.Bom) {
                                 arrayOf(
                                     "text/csv", "text/comma-separated-values", "application/csv",
@@ -430,9 +461,18 @@ internal fun BomImportScreen(
                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 )
                             } else arrayOf("application/json"))
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (fileName.isBlank()) stringResource(R.string.bom_choose_file) else "${stringResource(R.string.bom_choose_file)} · $fileName") }
+                    ) { Text(if (fileName.isBlank() && selectedMode == BomImportMode.Bom) stringResource(R.string.materials_import) else if (fileName.isBlank()) stringResource(R.string.bom_choose_file) else "${stringResource(R.string.bom_choose_file)} · $fileName") }
+                }
+                if (selectedMode == BomImportMode.Bom && activePreset != null) item {
+                    ProjectMaterialPicker(viewModel, materialQuery, { materialQuery = it }, !busy && !releaseApplied) { component ->
+                        runCatching { editableDraft().addMaterial(component) }.onSuccess {
+                            activePreset = it; selections = it.selections; materialQuery = ""; showAllLines = true
+                            requestPreview()
+                        }.onFailure { message = context.getString(R.string.materials_edit_failed); messageIsError = true }
+                    }
                 }
                 if (selectedMode == BomImportMode.Bom && (fileBytes != null || activePreset != null)) {
                     item {
@@ -455,9 +495,20 @@ internal fun BomImportScreen(
                     }
                 }
                 if (activePreset != null) item {
-                    Text(stringResource(R.string.bom_preset_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.materials_draft_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (fileBytes != null) TextButton(enabled = !busy, onClick = {
+                        replaceSource {
+                            session.invalidatePending()
+                            activePreset = null
+                            preview = null
+                            selections = emptyMap()
+                            excludedKeys = emptySet()
+                            searchQueries = emptyMap()
+                            expandedSearches = emptySet()
+                        }
+                    }) { Text(stringResource(R.string.materials_reparse)) }
                 }
-                if (sheets.size > 1) item {
+                if (sheets.size > 1 && activePreset == null) item {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(sheets.filterNot { it.hidden }, key = { it.name }) { sheet ->
                             FilterChip(
@@ -478,7 +529,7 @@ internal fun BomImportScreen(
                         }
                     }
                 }
-                if (selectedMode == BomImportMode.Bom && inspection != null) item {
+                if (selectedMode == BomImportMode.Bom && inspection != null && activePreset == null) item {
                     val table = inspection!!
                     val mapping = columnMapping ?: table.automaticMapping
                     val ready = mapping.quantity != null && (mapping.sku != null || mapping.model != null || mapping.name != null)
@@ -560,6 +611,14 @@ internal fun BomImportScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item { previewHeader() }
+                if (!releaseApplied) item {
+                    ProjectMaterialPicker(viewModel, materialQuery, { materialQuery = it }, !busy) { component ->
+                        runCatching { editableDraft().addMaterial(component) }.onSuccess {
+                            activePreset = it; selections = it.selections; materialQuery = ""; showAllLines = true
+                            requestPreview()
+                        }.onFailure { message = context.getString(R.string.materials_edit_failed); messageIsError = true }
+                    }
+                }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(stringResource(R.string.bom_match_counts, readyCount, problemLines.size, skippedRequirements.size), style = MaterialTheme.typography.titleMedium)
@@ -576,6 +635,10 @@ internal fun BomImportScreen(
                     TextButton(enabled = !busy && !releaseApplied, onClick = { presetToSave = current }) {
                         Text(stringResource(R.string.bom_save_preset))
                     }
+                    TextButton(enabled = !busy && !releaseApplied, onClick = {
+                        activePreset = editableDraft()
+                        preview = null
+                    }) { Text(stringResource(R.string.materials_settings)) }
                 }
                 item {
                     BomProcurementSummary(
@@ -610,7 +673,25 @@ internal fun BomImportScreen(
                                     ?.let { header -> line.requirement.sourceRows.flatMap { it.fields[header].orEmpty().split(',', ';') }.filter(String::isNotBlank).distinct().joinToString("、").takeIf(String::isNotBlank) },
                             )
                             if (details.isNotEmpty()) Text(details.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (line.requirement.sourceRows.isNotEmpty()) {
+                                var sourceExpanded by remember(requirementKey) { mutableStateOf(false) }
+                                TextButton(onClick = { sourceExpanded = !sourceExpanded }) { Text(stringResource(if (sourceExpanded) R.string.materials_source_collapse else R.string.materials_source_expand)) }
+                                if (sourceExpanded) line.requirement.sourceRows.forEach { source ->
+                                    Text(stringResource(R.string.materials_source_row, source.sheetName, source.rowNumber, source.quantityPerSet), style = MaterialTheme.typography.labelLarge)
+                                    Text(source.fields.entries.joinToString("\n") { "${it.key}：${it.value}" }, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                             Text(stringResource(R.string.bom_line_quantity, line.requirement.quantityPerSet, line.requirement.requiredQuantity, line.availableQuantity))
+                            if (!releaseApplied) {
+                                var quantity by remember(requirementKey, line.requirement.quantityPerSet) { mutableStateOf(line.requirement.quantityPerSet.toString()) }
+                                QuantityInputField(quantity, { quantity = it }, label = stringResource(R.string.materials_per_set), enabled = !busy, modifier = Modifier.fillMaxWidth())
+                                TextButton(enabled = !busy && quantity.toIntOrNull()?.let { it > 0 } == true, onClick = {
+                                    runCatching { editableDraft().changeMaterialQuantity(requirementKey, quantity.toInt()) }.onSuccess {
+                                        activePreset = it
+                                        requestPreview()
+                                    }.onFailure { message = context.getString(R.string.materials_edit_failed); messageIsError = true }
+                                }) { Text(stringResource(R.string.materials_apply_quantity)) }
+                            }
                             if (line.componentId != null && line.componentId in shortageIds) {
                                 Text(stringResource(R.string.bom_stock_shortage), color = MaterialTheme.colorScheme.error)
                             }
@@ -915,8 +996,17 @@ internal fun BomImportScreen(
             dismissButton = { TextButton(enabled = !busy, onClick = { confirmKind = null }) { Text("取消") } },
         )
     }
+    replaceSourceAction?.let { action ->
+        AlertDialog(
+            onDismissRequest = { replaceSourceAction = null },
+            title = { Text(stringResource(R.string.materials_replace_title)) },
+            text = { Text(stringResource(R.string.materials_replace_message)) },
+            confirmButton = { TextButton(onClick = { replaceSourceAction = null; action() }) { Text(stringResource(R.string.materials_replace_confirm)) } },
+            dismissButton = { TextButton(onClick = { replaceSourceAction = null }) { Text(stringResource(R.string.bom_clear_match_cancel)) } },
+        )
+    }
     presetToSave?.let { current ->
-        val presetName = activePreset?.name ?: current.parsed.projectName
+        val presetName = presets.firstOrNull { it.id == activePreset?.id }?.name ?: current.parsed.projectName
         val replacesExisting = presets.any { it.name.equals(presetName, ignoreCase = true) }
         AlertDialog(
             onDismissRequest = { presetToSave = null },
@@ -973,6 +1063,31 @@ internal fun BomImportScreen(
             },
             dismissButton = { TextButton(onClick = { presetToDelete = null }) { Text("取消") } },
         )
+    }
+}
+
+@Composable
+private fun ProjectMaterialPicker(
+    viewModel: InventoryViewModel,
+    query: String,
+    onQuery: (String) -> Unit,
+    enabled: Boolean,
+    onAdd: (com.componentvault.android.model.ComponentRecord) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedTextField(query, onQuery, label = { Text(stringResource(R.string.materials_search)) },
+            placeholder = { Text(stringResource(R.string.materials_search_hint)) }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+        if (query.isNotBlank()) {
+            val matches = viewModel.projectMaterialComponents().filter {
+                InventorySearch.matches(it, query)
+            }.take(30)
+            if (matches.isEmpty()) Text(stringResource(R.string.materials_search_empty))
+            matches.forEach { component ->
+                TextButton(onClick = { onAdd(component) }, enabled = enabled) {
+                    Text(stringResource(R.string.materials_search_result, component.sku, component.name, component.quantity))
+                }
+            }
+        }
     }
 }
 

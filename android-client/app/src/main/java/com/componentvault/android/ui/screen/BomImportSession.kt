@@ -47,6 +47,8 @@ internal class BomImportSession : ViewModel() {
     val exitPending = mutableStateOf(false)
     val procurementOffer = mutableStateOf<BomProcurementOffer?>(null)
     val selectedMode = mutableStateOf<BomImportMode?>(null)
+    val materialQuery = mutableStateOf("")
+    val showSavedPresets = mutableStateOf(false)
     var entryMode: BomImportMode? = null
     var retainOnExit = false
     var initialized = false
@@ -109,6 +111,8 @@ internal class BomImportSession : ViewModel() {
         exitPending.value = false
         procurementOffer.value = null
         selectedMode.value = null
+        materialQuery.value = ""
+        showSavedPresets.value = false
         entryMode = null
         retainOnExit = false
         initialized = false

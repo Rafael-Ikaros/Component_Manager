@@ -1,0 +1,22 @@
+<resources>
+    <string name="materials_edit_failed">无法更新清单。数量须为整数范围内的正数，清单最多支持 5000 行。</string>
+    <string name="materials_import">导入 BOM</string>
+    <string name="materials_saved">已保存预设</string>
+    <string name="materials_manual">手动选料</string>
+    <string name="materials_no_presets">暂无已保存预设。</string>
+    <string name="materials_draft_hint">清单保留原始行、匹配与跳过项。请在出库前复核当前库存。</string>
+    <string name="materials_reparse">重新解析原始文件</string>
+    <string name="materials_settings">调整项目和套数</string>
+    <string name="materials_source_expand">查看原始行与位号</string>
+    <string name="materials_source_collapse">收起原始行与位号</string>
+    <string name="materials_source_row">%1$s · 第 %2$d 行 · 原始每套 %3$d</string>
+    <string name="materials_per_set">每套数量</string>
+    <string name="materials_apply_quantity">应用数量</string>
+    <string name="materials_search">搜索库存并添加用料</string>
+    <string name="materials_search_hint">SKU、名称、封装、品牌或参数</string>
+    <string name="materials_search_empty">没有匹配的库存元件。</string>
+    <string name="materials_search_result">%1$s · %2$s · 库存 %3$d</string>
+    <string name="materials_replace_title">替换当前用料清单？</string>
+    <string name="materials_replace_message">重新解析来源将替换当前清单的手动添加项、数量修改、匹配与跳过项。已保存预设不变。取消可保留当前清单，库存尚未扣减。</string>
+    <string name="materials_replace_confirm">继续</string>
+</resources>
