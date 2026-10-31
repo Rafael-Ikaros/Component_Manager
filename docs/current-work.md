@@ -1,4 +1,4 @@
-# 2026-11-01 国内 EDA 资料与参考价（dev.4 候选，待发布）
+# 2026-11-01 国内 EDA 资料与参考价（0.7.9-dev.4 已发布）
 
 - 按最终决定，Android / Windows 中文仅查询国内嘉立创 EDA，英文才使用国际查询；移除日常查询中的跨区域回退与补价，不增加 Cookie 配置。国内公开端点来自官网编辑器实际请求，已用 C70565、C393939 核对中文分类、封装、参数、图片与人民币阶梯价格。
 - 新增独立参考价展示，包含币种、适用起订量、来源和查询时间；缺少适用数量时明确标为未知，聚合报价不当作单价。沿用 description 五项固定备注前缀跨端传输，不改名称、数据库 schema 或同步协议。
@@ -6,7 +6,10 @@
 - 隔离服务端真实联网及浏览器验收通过：3 项库存中 2 项识别、1 项跳过；预览无业务写入。C70565 更新四组字段，C393939 只更新分类。应用后逐字段核对名称、图片标记、自由备注、数量、最低库存、库位、分配及流水均保留；非所选字段原文不变。没有使用或提交 server/data/ 与用户附件。
 - 直接相关后端 21 项与模式隔离补充 1 项测试通过，Web 参数显示 4 项测试和生产构建通过。Android 初轮相关 28 项、最终语言路由 13 项、价格显示 2 项均通过并构建独立候选；Windows 生产源码直接 harness 最终 10 项通过，WinUI / CoreTests 编译成功。Windows 本机标准 testhost 连接失败，不将直接 harness 或编译称为标准测试通过；后续以 GitHub CI 核对。
 - 小米 9 最终独立候选实际连接隔离服务端，同步完成后 3 项活动库存共 22 件；名称、分类、封装、参数、价格、图片/备注标记、数量、库位及活动分配与服务端逐字段一致，零流水。详情中文价格可见，英文切换后参考价文字随应用语言变化。实际查询 C70565 获取 YXC(扬兴晶振) X322512MOB4SI、无源晶振与 SMD3225-4P，随后取消，没有保存或修改库存。原应用仍未覆盖，未修改设备显示参数。
-- 功能提交 `0bc0f6df5d2519e3bcf8614492b5294fc202d405` 的 [CI 41230588248](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41230588248) 全绿，Windows 标准核心测试、自包含发布和启动检查通过。Windows 桌面价格区本轮未目视验收。Dev 不移动 Docker 正式标签；服务端候选需按对应源码构建，正式镜像不会提前包含本功能。正在准备 dev.4 发布。
+- 功能提交 `0bc0f6df5d2519e3bcf8614492b5294fc202d405` 的 [CI 41230588248](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41230588248) 全绿，Windows 标准核心测试、自包含发布和启动检查通过。Windows 桌面价格区本轮未目视验收。
+- [v0.7.9-dev.4](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.4) 已公开预发布，Android APK、Windows 自包含 ZIP、Web ZIP 齐全。发布源 `031af6e4f64d59b69ccf917a5248abb4f659e669` 的 [CI 41231042957](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41231042957) 和 [Release 41231043045](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41231043045) 均成功，Docker 发布明确跳过；正式标签未移动。服务端 dev 功能需按对应源码构建，API 与 Web 配套更新，见批量更新指南。
+- 公开 APK SHA256 `d95232438e81961ca8966c09f13c5669737e1108b8ee9edbfb8c060c2a58781a` 与 GitHub asset digest 一致。小米 9 实际 `adb install -r` 成功，读回 `0.7.9-dev.4 / 709004`，冷启动后仍 26 项、810 件、30 流水，原列表样本图片正常显示。未清理原应用数据；本轮未重做所有业务表及图片文件的全量备份比对，不把计数核对扩大为全量 QA。
+- 独立测试应用、临时 ADB 反向端口与设备测试文件已清理，充电常亮恢复原值 0；未改 DPI、分辨率、字体。隔离 API / Web 进程和浏览器页已关闭，原始证据只留本机忽略目录。
 
 # 2026-11-01 精简库存筛选栏（0.7.9-dev.3 已发布）
 
