@@ -29,21 +29,23 @@ class LcscCatalogCacheTest {
     @Test fun scopedCacheRoundTripsDescriptionParametersAndDatasheet() {
         val repository = InventoryRepository(context)
         val metadata = ComponentOfficialMetadata(
-            source = "lcsc_domestic_web",
+            source = "lceda_public_library",
             sku = "C70565",
             name = "X3225",
             description = "中文长描述",
             model = "X3225",
             parameters = linkedMapOf("频率" to "12MHz", "负载电容" to "12pF"),
             datasheetUrl = "https://atta.szlcsc.com/public.pdf",
+            referencePrice = com.componentvault.android.model.ReferencePriceSnapshot.create("0.1250", "USD", 5, "https://www.lcsc.com/product-detail/C70565.html", "2026-11-01T00:00:00Z"),
         )
 
-        repository.cacheLookup(metadata, "lcsc_domestic_web")
-        val cached = repository.readCachedLookup("C70565", "", "lcsc_domestic_web")
+        repository.cacheLookup(metadata, "lceda_public_library")
+        val cached = repository.readCachedLookup("C70565", "", "lceda_public_library")
 
         assertEquals(metadata.description, cached?.description)
         assertEquals(metadata.parameters, cached?.parameters)
         assertEquals(metadata.datasheetUrl, cached?.datasheetUrl)
+        assertEquals(metadata.referencePrice, cached?.referencePrice)
     }
 
     @Test fun initializationRemovesLegacyMalformedAndExpiredKeysButKeepsValidScopedEntry() {

@@ -58,8 +58,7 @@ class InventoryRepository(
     private val workbookService = InventoryWorkbookService(databaseHelper, inventoryImageStore)
     private val bomReleaseCommitter = BomReleaseCommitter(databaseHelper)
     private val componentHubImporter = ComponentHubImporter(databaseHelper)
-    internal fun retryDomesticCatalogNow() = catalogService.retryDomesticCatalogNow()
-    internal fun searchDomesticCatalog(keyword: String) = catalogService.searchDomesticCatalog(keyword)
+    internal fun searchPublicCatalog(keyword: String, language: AppLanguage) = catalogService.searchPublicCatalog(keyword, language)
     private val preferences: SharedPreferences = appContext.getSharedPreferences(
         PREFS_NAME,
         Context.MODE_PRIVATE,
@@ -269,6 +268,7 @@ class InventoryRepository(
 
     internal fun cacheLookup(metadata: ComponentOfficialMetadata, cacheScope: String? = null) =
         catalogService.cacheLookup(metadata, cacheScope)
+
 
     internal fun clearLookupCache() = catalogService.clearLookupCache()
 

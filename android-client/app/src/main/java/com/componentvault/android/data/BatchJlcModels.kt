@@ -33,6 +33,10 @@ internal fun ComponentOfficialMetadata.toBatchDescription(): String = buildList 
     model?.trim()?.takeIf(String::isNotBlank)?.let { add("型号：$it") }
     (brand ?: vendor)?.trim()?.takeIf(String::isNotBlank)?.let { add("品牌：$it") }
     source?.trim()?.takeIf(String::isNotBlank)?.let { add("识别来源：$it") }
+    if (source in setOf("lceda_public_library", "easyeda_public_library")) {
+        add("资料来源：嘉立创EDA/EasyEDA官方库")
+        add("元件库链接：https://lceda.cn/ · https://easyeda.com")
+    }
     vendor?.trim()?.takeIf(String::isNotBlank)?.let { add("识别厂商：$it") }
     modelFamily?.trim()?.takeIf(String::isNotBlank)?.let { add("识别型号族：$it") }
     matchedBy?.trim()?.takeIf(String::isNotBlank)?.let { add("官方查询：匹配方式 ${it.uppercase()}") }
@@ -47,6 +51,7 @@ internal fun ComponentOfficialMetadata.toBatchDescription(): String = buildList 
         if (safeKey.isNotBlank() && safeValue.isNotBlank()) add("参数：$safeKey：$safeValue")
     }
     ruleVersion?.trim()?.takeIf(String::isNotBlank)?.let { add("识别规则版本：$it") }
+    addAll(com.componentvault.android.model.ReferencePriceNotes.merge(emptyList(), referencePrice))
 }.distinct().joinToString("\n")
 
 internal object BatchJlcDraftCodec {

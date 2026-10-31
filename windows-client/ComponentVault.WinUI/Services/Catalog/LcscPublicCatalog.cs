@@ -11,7 +11,7 @@ public sealed record LcscProductMetadata(
     string Sku, string Name, string? Model, string? Brand, string? PackageName,
     string Category, string? CategoryPath, string OfficialUrl, string? ImageUrl,
     string? DatasheetUrl = null, IReadOnlyDictionary<string, string>? Parameters = null,
-    string? Description = null, string? Source = null, string? LookupNotice = null
+    string? Description = null, string? Source = null, string? LookupNotice = null, ReferencePriceSnapshot? ReferencePrice = null
 );
 
 public sealed class LcscDomesticBlockedException : IOException
@@ -57,7 +57,7 @@ public static partial class LcscPublicCatalog
     };
     private static readonly HashSet<string> TrustedImageHosts = new(StringComparer.OrdinalIgnoreCase)
     {
-        "assets.lcsc.com", "www.lcsc.com", "img.szlcsc.com", "image.szlcsc.com", "static.szlcsc.com",
+        "assets.lcsc.com", "www.lcsc.com", "img.szlcsc.com", "image.szlcsc.com", "static.szlcsc.com", "alimg.szlcsc.com",
     };
 
     public static string? NormalizeSku(string? value) =>
@@ -210,7 +210,8 @@ public static partial class LcscPublicCatalog
                     var categoryPath = Text(product, "category");
                     var parameters = AdditionalProperties(product);
                     return new(expected, name, model, brand, AdditionalPackage(product), NormalizeCategory(categoryPath), categoryPath, ProductUri(expected)!.AbsoluteUri, ProductImage(product),
-                        Parameters: parameters, Description: description is not null && !description.Equals(name, StringComparison.OrdinalIgnoreCase) ? description : null);
+                        Parameters: parameters, Description: description is not null && !description.Equals(name, StringComparison.OrdinalIgnoreCase) ? description : null,
+                        ReferencePrice: ReferencePriceSnapshot.FromProduct(product, ProductUri(expected)!.AbsoluteUri));
                 }
             }
             catch (JsonException) { }
@@ -303,9 +304,16 @@ public sealed class LcscPublicLookup
         _domesticGate = getPage is null && now is null ? SessionDomesticGate : new LcscDomesticCooldownGate(now);
     }
 
+    public static void ClearDomesticCooldown() => SessionDomesticGate.Clear();
+
     public void RetryDomesticNow() => _domesticGate.Clear();
 
     public async Task<IReadOnlyList<LcscProductMetadata>> SearchChinaAsync(string keyword, CancellationToken cancellationToken = default)
+    {
+        return (await SearchPreferredAsync(keyword, cancellationToken)).Items;
+    }
+
+    private async Task<IReadOnlyList<LcscProductMetadata>> LegacySearchChinaAsync(string keyword, CancellationToken cancellationToken)
     {
         if (_domesticGate.Current() is { } coolingReason) throw new LcscDomesticCoolingDownException(coolingReason);
         var uri = LcscPublicCatalog.ChinaSearchUri(keyword) ?? throw new ArgumentException("Search keyword is empty.", nameof(keyword));
@@ -325,11 +333,12 @@ public sealed class LcscPublicLookup
     public async Task<LcscCatalogSearchResult> SearchPreferredAsync(string keyword, CancellationToken cancellationToken = default)
     {
         var preferred = LcscCatalogRoutePolicy.PreferredSource(_culture());
-        var items = await SearchChinaAsync(keyword, cancellationToken);
-        var notice = preferred == LcscCatalogSource.International
-            ? "International LCSC public product pages do not provide keyword search; using LCSC China search for this query."
-            : null;
-        return new LcscCatalogSearchResult(items, LcscCatalogSource.Domestic, notice);
+        var international = preferred == LcscCatalogSource.International;
+        var items = international ? await SearchInternationalEdaAsync(keyword, cancellationToken) : await SearchEdaAsync(keyword, cancellationToken);
+        var notice = international
+            ? "Source: EasyEDA international catalog https://easyeda.com/"
+            : "资料来源：嘉立创EDA国内库 / EasyEDA 官方库 https://lceda.cn/ · https://easyeda.com/";
+        return new LcscCatalogSearchResult(items, preferred, notice);
     }
 
     public async Task<LcscProductMetadata?> LookupAsync(string sku, CancellationToken cancellationToken = default)
@@ -341,7 +350,7 @@ public sealed class LcscPublicLookup
         CancellationToken cancellationToken = default)
     {
         var normalized = LcscPublicCatalog.NormalizeSku(sku);
-        var preferred = preferredSource ?? LcscCatalogRoutePolicy.PreferredSource(_culture());
+        var preferred = preferredSource == LcscCatalogSource.Domestic ? LcscCatalogSource.Eda : preferredSource ?? LcscCatalogRoutePolicy.PreferredSource(_culture());
         if (normalized is null) return new LcscCatalogLookupResult(null, preferred, null, []);
         var attempts = new List<LcscCatalogAttempt>();
         foreach (var source in LcscCatalogRoutePolicy.Order(preferred))
@@ -355,14 +364,16 @@ public sealed class LcscPublicLookup
             {
                 LcscProductMetadata? metadata = source == LcscCatalogSource.Domestic
                     ? LcscPublicCatalog.ExactChinaMatch(normalized, await SearchChinaAsync(normalized, cancellationToken))
-                    : await LookupInternationalAsync(normalized, cancellationToken);
+                    : source == LcscCatalogSource.Eda
+                        ? await LookupEdaAsync(normalized, cancellationToken)
+                        : await LookupInternationalAsync(normalized, cancellationToken);
                 if (metadata is not null)
                 {
                     var result = new LcscCatalogLookupResult(metadata, preferred, source, attempts);
                     var annotated = metadata with
                     {
-                        Source = source == LcscCatalogSource.Domestic ? "lcsc_domestic_web" : "lcsc_public_web",
-                        LookupNotice = result.UserMessage,
+                        Source = source switch { LcscCatalogSource.Domestic => "lcsc_domestic_web", LcscCatalogSource.Eda => "lceda_public_library", _ => "lcsc_public_web" },
+                        LookupNotice = result.UserMessage + (source == LcscCatalogSource.Eda ? " 资料来源：嘉立创EDA国内库 / EasyEDA 官方库 https://lceda.cn/ · https://easyeda.com/" : ""),
                     };
                     return result with { Metadata = annotated };
                 }
@@ -375,6 +386,39 @@ public sealed class LcscPublicLookup
             }
         }
         return new LcscCatalogLookupResult(null, preferred, null, attempts);
+    }
+
+    private async Task<IReadOnlyList<LcscProductMetadata>> SearchInternationalEdaAsync(string keyword, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(keyword)) throw new ArgumentException("Search keyword is empty.", nameof(keyword));
+        AppDiagnostics.Record(DiagnosticEvent.CatalogInternational, DiagnosticOutcome.Started);
+        var items = LcscPublicCatalog.ParseInternationalEdaSearch(await _getPage(new Uri($"https://pro.easyeda.com/api/eda/product/search?keyword={Uri.EscapeDataString(keyword.Trim())}"), DiagnosticEvent.CatalogInternational, token));
+        foreach (var item in items) LcscPublicCatalog.CacheImage(item.Sku, item.ImageUrl);
+        AppDiagnostics.Record(DiagnosticEvent.CatalogInternational, DiagnosticOutcome.Success);
+        return items;
+    }
+
+    public async Task<IReadOnlyList<LcscProductMetadata>> SearchEdaAsync(string keyword, CancellationToken token = default)
+    {
+        if (string.IsNullOrWhiteSpace(keyword)) throw new ArgumentException("Search keyword is empty.", nameof(keyword));
+        AppDiagnostics.Record(DiagnosticEvent.CatalogEda, DiagnosticOutcome.Started);
+        var items = LcscPublicCatalog.ParseEdaSearch(await _getPage(new Uri($"https://pro.lceda.cn/api/eda/product/search?keyword={Uri.EscapeDataString(keyword.Trim())}&currPage=1&pageSize=20"), DiagnosticEvent.CatalogEda, token));
+        foreach (var item in items) LcscPublicCatalog.CacheImage(item.Sku, item.ImageUrl);
+        AppDiagnostics.Record(DiagnosticEvent.CatalogEda, DiagnosticOutcome.Success);
+        return items;
+    }
+
+    private async Task<LcscProductMetadata?> LookupEdaAsync(string sku, CancellationToken token)
+    {
+        var key = $"eda:{sku}";
+        if (ExactCache.TryGetValue(key, out var cached) && DateTimeOffset.UtcNow - cached.At < (cached.Value is null ? TimeSpan.FromSeconds(30) : TimeSpan.FromDays(7))) return cached.Value;
+        AppDiagnostics.Record(DiagnosticEvent.CatalogEda, DiagnosticOutcome.Started);
+        var result = LcscPublicCatalog.ParseEda(sku, await _getPage(new Uri($"https://pro.lceda.cn/api/eda/product/search?keyword={sku}&currPage=1&pageSize=20"), DiagnosticEvent.CatalogEda, token));
+        AppDiagnostics.Record(DiagnosticEvent.CatalogEda, result is null ? DiagnosticOutcome.Parser : DiagnosticOutcome.Success);
+        LcscPublicCatalog.CacheImage(sku, result?.ImageUrl);
+        ExactCache[key] = (DateTimeOffset.UtcNow, result);
+        if (ExactCache.Count > 64) ExactCache.TryRemove(ExactCache.OrderBy(pair => pair.Value.At).First().Key, out _);
+        return result;
     }
 
     private async Task<LcscProductMetadata?> LookupInternationalAsync(string normalized, CancellationToken cancellationToken)

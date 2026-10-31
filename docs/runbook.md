@@ -864,3 +864,11 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/Relea
 API 生产依赖新增 xlrd（BIFF `.xls`）与 python-multipart，源码部署需重新安装 `server/requirements.txt`；开发测试另外使用 xlwt 生成合成 BIFF。服务端与管理台同时升级，原 `/data` 映射保留，无新增环境变量和 schema 迁移。该功能从 dev.21 开始验证，并纳入 0.7.8 正式镜像；使用已发布的配套稳定镜像或按[订单资料更新教程](order-metadata-update.md)构建源码。
 
 Web“库存 → 从订单更新资料”支持只读差异预览和字段确认；应用沿用 Web 库存写入开关。故障时区分不支持格式/文件损坏、未匹配 SKU、同 SKU 资料冲突、设备并发版本冲突。成功项不会因其他项失败而回滚；网络结果不明可使用原请求重试，不自动刷新版本覆盖。
+
+### 国内 EDA 批量资料更新（开发版）
+
+API 与 Web 配套更新后，在“库存 → 国内资料批量更新”扫描当前账户库存。
+分析不写入；应用沿用 `WEB_INVENTORY_ENABLED` 或已保存的 Web 库存操作开关。
+无需 Cookie、新环境变量或数据库 schema 迁移。先同步各设备，逐页预览并选择字段，应用后再同步回设备。
+任务预览只存在本次服务进程，重启后重新分析；网络失败可重试，版本冲突需重新预览。
+dev 不移动 Docker 正式标签；需要试用新服务端时，按[资料更新教程](parameter-enrichment.md)从对应 dev 标签构建 API 与 Web，保留原数据挂载和 Compose 项目名。

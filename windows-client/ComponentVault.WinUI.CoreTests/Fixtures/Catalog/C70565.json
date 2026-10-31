@@ -1,0 +1,171 @@
+{
+  "code": 200,
+  "result": {
+    "productList": [
+      {
+        "code": "C70565",
+        "model": "X322512MOB4SI",
+        "name": "YSX321SL 12MHZ 4P 3225 12PF ±10PPM -40~85℃ (±20PPM)",
+        "brandName": "YXC(扬兴晶振)",
+        "standard": "SMD3225-4P",
+        "catalogName": "无源晶振",
+        "image": "https://alimg.szlcsc.com/upload/public/product/middle/20221230/C1E91AF623A437A6F0FCCFA788A5AA82.jpg<$>https://alimg.szlcsc.com/upload/public/product/middle/20221230/95A360F5190AFD2248B8C792CD06EB4C.jpg<$>https://alimg.szlcsc.com/upload/public/product/middle/20221230/9BF7C3D5F951EAC3696A0BB72776FED7.jpg<$>https://alimg.szlcsc.com/upload/public/brand/product/certificate/20240102/F02288A17C3668E053B70B5D5DDC09B1.jpg",
+        "pdfFileUrl": "/upload/public/pdf/source/20250928/BA09DC4959912CC648B409782DBA9F72.pdf",
+        "priceList": [
+          {
+            "startNumber": 5,
+            "endNumber": 45,
+            "price": 0.5803
+          },
+          {
+            "startNumber": 50,
+            "endNumber": 145,
+            "price": 0.4639
+          },
+          {
+            "startNumber": 150,
+            "endNumber": 495,
+            "price": 0.4041
+          },
+          {
+            "startNumber": 500,
+            "endNumber": 2995,
+            "price": 0.3548
+          },
+          {
+            "startNumber": 3000,
+            "endNumber": 5995,
+            "price": 0.3052
+          },
+          {
+            "startNumber": 6000,
+            "endNumber": -5,
+            "price": 0.2936
+          }
+        ],
+        "device_info": {
+          "attributes": {
+            "LCSC Part Name": "YSX321SL 12MHZ 4P 3225 12PF ±10PPM -40~85℃ (±20PPM)",
+            "Supplier Part": "C70565",
+            "Manufacturer": "YXC(扬兴晶振)",
+            "Manufacturer Part": "X322512MOB4SI",
+            "Supplier Footprint": "SMD3225-4P",
+            "JLCPCB Part Class": "Extended Part",
+            "Datasheet": "https://item.szlcsc.com/datasheet/X322512MOB4SI/71663.html",
+            "Supplier": "LCSC",
+            "Add into BOM": "yes",
+            "Convert to PCB": "yes",
+            "Symbol": "ccf669ede7b3436c9a8f2403625a490f",
+            "Designator": "X?",
+            "Footprint": "7ad2c95bfc5a4739a91ef8a01dcb9dc1",
+            "3D Model": "ff2dfd5650294453a14147960efe1838",
+            "3D Model Title": "CRYSTAL-SMD_4P-L3.2-W2.5-BL",
+            "3D Model Transform": "125.984,98.425,0,0,0,0,0,0,0",
+            "Type": "贴片晶振",
+            "Value": "12MHz",
+            "Normal temperature Frequency Tolerance": "±10ppm",
+            "Load Capacitance": "12pF",
+            "Frequency Stability": "±20ppm",
+            "Equivalent Series Resistance(ESR)": "80Ω",
+            "Operating Temperature": "-40℃~+85℃",
+            "Name": "={Value}"
+          },
+          "tags": {
+            "parent_tag": {
+              "uuid": "80a920eecc2c4ec68f598063a982bb64",
+              "name": "Crystals, Oscillators, Resonators",
+              "name_cn": "振荡器/谐振器"
+            },
+            "child_tag": {
+              "uuid": "daa181499b6e405e8f1ca7c74cbeac73",
+              "name": "Crystals",
+              "name_cn": "无源晶振"
+            }
+          }
+        }
+      },
+      {
+        "code": "C5280578",
+        "model": "XL2EL89COI-111YLC-12M",
+        "name": "YSX321SL 12MHZ 4P 3225 12PF ±10PPM -40~85℃ (±20PPM)",
+        "brandName": "YXC(扬兴晶振)",
+        "standard": "SMD3225-4P",
+        "catalogName": "无源晶振",
+        "image": "https://alimg.szlcsc.com/upload/public/product/middle/20230105/C3012E42698B50E6DAE56848D46C5556.jpg<$>https://alimg.szlcsc.com/upload/public/product/middle/20230105/3737CF32384B49F4311E67249CD80803.jpg<$>https://alimg.szlcsc.com/upload/public/product/middle/20230105/9C892967180D0857C83D3DDEEAC9C17E.jpg<$>https://alimg.szlcsc.com/upload/public/brand/product/certificate/20240102/F02288A17C3668E053B70B5D5DDC09B1.jpg",
+        "pdfFileUrl": "/upload/public/pdf/source/20250928/BA09DC4959912CC648B409782DBA9F72.pdf",
+        "priceList": [
+          {
+            "startNumber": 5,
+            "endNumber": 45,
+            "price": 0.5339
+          },
+          {
+            "startNumber": 50,
+            "endNumber": 145,
+            "price": 0.4331
+          },
+          {
+            "startNumber": 150,
+            "endNumber": 495,
+            "price": 0.3827
+          },
+          {
+            "startNumber": 500,
+            "endNumber": 2995,
+            "price": 0.3449
+          },
+          {
+            "startNumber": 3000,
+            "endNumber": 5995,
+            "price": 0.273
+          },
+          {
+            "startNumber": 6000,
+            "endNumber": -5,
+            "price": 0.2579
+          }
+        ],
+        "device_info": {
+          "attributes": {
+            "LCSC Part Name": "YSX321SL 12MHZ 4P 3225 12PF ±10PPM -40~85℃ (±20PPM)",
+            "Supplier Part": "C5280578",
+            "Manufacturer": "YXC(扬兴晶振)",
+            "Manufacturer Part": "XL2EL89COI-111YLC-12M",
+            "Supplier Footprint": "SMD3225-4P",
+            "JLCPCB Part Class": "Extended Part",
+            "Datasheet": "https://item.szlcsc.com/datasheet/XL2EL89COI-111YLC-12M/6016760.html",
+            "Supplier": "LCSC",
+            "Add into BOM": "yes",
+            "Convert to PCB": "yes",
+            "Symbol": "14a6a599c36b4b2b931321024831ccb6",
+            "Designator": "X?",
+            "Footprint": "66a3e9c8e9c74bc8b300d416dbf83abe",
+            "3D Model": "4495b492a02c4f389e505ec8ae3aaf1b",
+            "3D Model Title": "CRYSTAL-SMD_4P-L3.2-W2.5-BL-1",
+            "3D Model Transform": "125.984,98.425,0,0,0,0,0,0,0",
+            "Type": "贴片晶振",
+            "Value": "12MHz",
+            "Normal temperature Frequency Tolerance": "±10ppm",
+            "Load Capacitance": "12pF",
+            "Frequency Stability": "±20ppm",
+            "Equivalent Series Resistance(ESR)": "80Ω",
+            "Operating Temperature": "-40℃~+85℃",
+            "Name": "={Value}"
+          },
+          "tags": {
+            "parent_tag": {
+              "uuid": "80a920eecc2c4ec68f598063a982bb64",
+              "name": "Crystals, Oscillators, Resonators",
+              "name_cn": "振荡器/谐振器"
+            },
+            "child_tag": {
+              "uuid": "daa181499b6e405e8f1ca7c74cbeac73",
+              "name": "Crystals",
+              "name_cn": "无源晶振"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

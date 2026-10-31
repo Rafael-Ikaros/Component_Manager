@@ -2,6 +2,8 @@
 <resources>
     <string name="catalog_source_domestic">LCSC China</string>
     <string name="catalog_source_international">international LCSC</string>
+    <string name="catalog_source_eda">JLCEDA China library</string>
+    <string name="catalog_reference_price">Reference price</string>
     <string name="catalog_failure_blocked">site verification blocked the request</string>
     <string name="catalog_failure_unreachable">network or site unavailable</string>
     <string name="catalog_failure_no_match">no exact match</string>
@@ -9,7 +11,8 @@
     <string name="catalog_lookup_source_success">Exact metadata loaded from %1$s.</string>
     <string name="catalog_lookup_cache_success">Using cached exact metadata from %1$s.</string>
     <string name="catalog_lookup_fallback_success">Preferred source %1$s failed (%2$s); using %3$s.</string>
-    <string name="catalog_lookup_all_failed">%1$s; %2$s. Complete the fields manually or try again later.</string>
-    <string name="catalog_keyword_domestic_only">International LCSC does not provide keyword search; this query uses LCSC China.</string>
-    <string name="catalog_keyword_failed">LCSC China keyword search failed. Try again later or open the search in a browser.</string>
+    <string name="catalog_lookup_all_failed">%1$s. Complete the fields manually or try again later.</string>
+    <string name="catalog_keyword_domestic_only">Keyword search uses the international EasyEDA component library.</string>
+    <string name="catalog_keyword_failed">International library search failed. Try again later or open the official website in a browser.</string>
+    <string name="catalog_retry_eda">Retry library lookup</string>
 </resources>

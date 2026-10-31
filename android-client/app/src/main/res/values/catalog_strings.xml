@@ -2,6 +2,8 @@
 <resources>
     <string name="catalog_source_domestic">国内立创</string>
     <string name="catalog_source_international">国际 LCSC</string>
+    <string name="catalog_source_eda">嘉立创EDA国内库</string>
+    <string name="catalog_reference_price">参考价格</string>
     <string name="catalog_failure_blocked">站点验证阻断</string>
     <string name="catalog_failure_unreachable">网络或站点不可达</string>
     <string name="catalog_failure_no_match">未找到精确匹配</string>
@@ -9,7 +11,8 @@
     <string name="catalog_lookup_source_success">已从%1$s取得精确资料。</string>
     <string name="catalog_lookup_cache_success">已使用缓存的%1$s精确资料。</string>
     <string name="catalog_lookup_fallback_success">首选%1$s查询失败（%2$s），已改用%3$s。</string>
-    <string name="catalog_lookup_all_failed">%1$s；%2$s。请手动补齐资料或稍后重试。</string>
-    <string name="catalog_keyword_domestic_only">关键词搜索仅由国内立创提供。</string>
-    <string name="catalog_keyword_failed">国内立创关键词搜索失败，请稍后重试或在浏览器中打开搜索。</string>
+    <string name="catalog_lookup_all_failed">%1$s。请手动补齐资料或稍后重试。</string>
+    <string name="catalog_keyword_domestic_only">关键词搜索由嘉立创EDA元件库提供。</string>
+    <string name="catalog_keyword_failed">嘉立创EDA元件库搜索失败，请稍后重试或在浏览器中打开官网。</string>
+    <string name="catalog_retry_eda">重试元件库查询</string>
 </resources>

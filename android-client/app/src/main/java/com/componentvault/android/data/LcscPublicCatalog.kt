@@ -1,6 +1,7 @@
 package com.componentvault.android.data
 
 import com.componentvault.android.model.ComponentOfficialMetadata
+import com.componentvault.android.model.ReferencePriceSnapshot
 import com.componentvault.android.model.trustedProductImageUrl
 import org.json.JSONArray
 import org.json.JSONObject
@@ -11,7 +12,7 @@ import java.net.URL
 import java.util.Locale
 import java.util.concurrent.CancellationException
 
-/** Reads public product metadata only; never imports marketplace stock or prices. */
+/** Reads public metadata and explicitly denominated reference prices; never imports marketplace stock. */
 internal object LcscPublicCatalog {
     private val skuPattern = Regex("C[0-9]{1,10}")
     private val scriptPattern = Regex(
@@ -79,6 +80,7 @@ internal object LcscPublicCatalog {
                 matchedBy = "sku",
                 confidence = "exact",
                 parameters = parameters,
+                referencePrice = referencePrice(product, requireNotNull(productUrl(expectedSku))),
             )
         }
         return null
@@ -93,6 +95,22 @@ internal object LcscPublicCatalog {
                     (0 until types.length()).any { types.optString(it) == "Product" }
                 ) yield(value)
                 yieldAll(products(value.opt("@graph")))
+            }
+        }
+    }
+
+    private fun referencePrice(product: JSONObject, url: String): ReferencePriceSnapshot? {
+        val value = product.opt("offers")
+        val offers = when (value) {
+            is JSONObject -> listOf(value)
+            is JSONArray -> (0 until value.length()).mapNotNull { value.optJSONObject(it) }
+            else -> emptyList()
+        }
+        return offers.firstNotNullOfOrNull { offer ->
+            if (offer.optString("@type") == "AggregateOffer") null else {
+                val quantity = offer.optJSONObject("eligibleQuantity")?.opt("minValue")?.toString()?.toBigDecimalOrNull()
+                    ?.let { runCatching { it.intValueExact() }.getOrNull() }?.takeIf { it > 0 }
+                ReferencePriceSnapshot.create(offer.opt("price")?.toString(), offer.text("priceCurrency"), quantity, url, java.time.Instant.now().toString())
             }
         }
     }
@@ -184,33 +202,21 @@ internal class LcscPublicLookup(
     }
 }
 
-/** Exact C-number lookup prefers the Chinese catalog and falls back to the public international page. */
+/** Language-selected public source, with no cross-region fallback or quote supplementation. */
 internal class LcscCombinedLookup(
-    domesticFetch: ((String) -> String)? = null,
     private val international: LcscPublicLookup = LcscPublicLookup(),
-    domesticGate: LcscDomesticCooldownGate? = null,
+    private val edaLookup: (String) -> ComponentOfficialMetadata? = EasyEdaCatalog::lookup,
+    private val edaSearch: (String) -> List<LcscDomesticProduct> = EasyEdaCatalog::search,
+    private val internationalSearch: (String) -> List<LcscDomesticProduct> = EasyEdaCatalog::searchInternational,
 ) {
-    private val domesticFetch: (String) -> String = domesticFetch ?: LcscDomesticCatalog::fetchSearchPage
-    private val domesticGate: LcscDomesticCooldownGate = domesticGate
-        ?: if (domesticFetch == null) LcscDomesticSessionGate else LcscDomesticCooldownGate()
-    fun retryDomesticNow() = domesticGate.clear()
-    fun searchDomestic(keyword: String): List<LcscDomesticProduct> {
-        domesticGate.current()?.let { throw LcscDomesticCoolingDownException(it) }
-        return try {
-            LcscDomesticCatalog.parseSearchPage(domesticFetch(keyword))
-        } catch (error: Exception) {
-            if (error is CancellationException) throw error
-            when (error) {
-                is LcscDomesticBlockedException -> domesticGate.record(LcscDomesticGateReason.Blocked)
-                is LcscDomesticRateLimitedException -> domesticGate.record(LcscDomesticGateReason.RateLimited, error.retryAfterSeconds)
-                is IOException -> if (error !is LcscDomesticResponseException) domesticGate.record(LcscDomesticGateReason.Network)
-            }
-            throw error
+    fun searchPublicCatalog(keyword: String, language: com.componentvault.android.model.AppLanguage): List<LcscDomesticProduct> =
+        when (language) {
+            com.componentvault.android.model.AppLanguage.ZhCn -> edaSearch(keyword)
+            com.componentvault.android.model.AppLanguage.English -> internationalSearch(keyword)
         }
-    }
     fun lookup(
         sku: String,
-        preferredSource: LcscCatalogSource = LcscCatalogSource.Domestic,
+        preferredSource: LcscCatalogSource = LcscCatalogSource.Eda,
     ): ComponentOfficialMetadata? = lookupWithRoute(sku, preferredSource).metadata
 
     fun lookupWithRoute(
@@ -221,20 +227,14 @@ internal class LcscCombinedLookup(
             ?: return LcscCatalogLookupResult(null, preferredSource, null, emptyList())
         val attempts = mutableListOf<LcscCatalogAttempt>()
         for (source in LcscCatalogRoutePolicy.order(preferredSource)) {
-            if (source == LcscCatalogSource.Domestic && domesticGate.current() != null) {
-                attempts += LcscCatalogAttempt(source, LcscCatalogFailureKind.CoolingDown)
-                continue
-            }
             try {
                 val metadata = when (source) {
-                    LcscCatalogSource.Domestic -> LcscDomesticCatalog.exactMatch(
-                        normalized,
-                        searchDomestic(normalized),
-                    )?.metadata?.copy(matchedBy = "sku", confidence = "exact")
+                    LcscCatalogSource.Domestic -> edaLookup(normalized)
                     LcscCatalogSource.International -> international.lookup(normalized)
+                    LcscCatalogSource.Eda -> edaLookup(normalized)
                 }
                 AppDiagnostics.record(
-                    if (source == LcscCatalogSource.Domestic) "lookup_domestic" else "lookup_international",
+                    "lookup_${source.name.lowercase(Locale.ROOT)}",
                     "matched" to (metadata != null),
                     "preferred" to (source == preferredSource),
                 )
@@ -247,7 +247,7 @@ internal class LcscCombinedLookup(
                 val failure = LcscCatalogRoutePolicy.classify(error)
                 attempts += LcscCatalogAttempt(source, failure)
                 AppDiagnostics.record(
-                    if (source == LcscCatalogSource.Domestic) "lookup_domestic" else "lookup_international",
+                    "lookup_${source.name.lowercase(Locale.ROOT)}",
                     "matched" to false,
                     "failure" to failure,
                     "type" to error.javaClass,

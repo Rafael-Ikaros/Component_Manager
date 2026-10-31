@@ -39,8 +39,7 @@ internal class InventoryImportCatalog(
     private val localPartRecognitionEngine by lazy { LocalPartRecognitionEngine(appContext) }
     private val publicCatalogLookup = LcscCombinedLookup()
 
-    internal fun retryDomesticCatalogNow() = publicCatalogLookup.retryDomesticNow()
-    internal fun searchDomesticCatalog(keyword: String) = publicCatalogLookup.searchDomestic(keyword)
+    internal fun searchPublicCatalog(keyword: String, language: AppLanguage) = publicCatalogLookup.searchPublicCatalog(keyword, language)
 
     suspend fun loadImportLearningSummary(): ImportLearningSummary = withContext(Dispatchers.IO) {
         databaseHelper.readableDatabase.use { db ->
@@ -144,8 +143,11 @@ internal class InventoryImportCatalog(
                     message = text(
                         R.string.catalog_lookup_cache_success,
                         text(
-                            if (it.source == LcscCatalogSource.Domestic.wireName) R.string.catalog_source_domestic
-                            else R.string.catalog_source_international,
+                            when (it.source) {
+                                LcscCatalogSource.Domestic.wireName -> R.string.catalog_source_domestic
+                                LcscCatalogSource.Eda.wireName -> R.string.catalog_source_eda
+                                else -> R.string.catalog_source_international
+                            },
                         ),
                     ),
                 )
@@ -332,8 +334,11 @@ internal class InventoryImportCatalog(
 
     private fun catalogLookupMessage(result: LcscCatalogLookupResult): String {
         fun sourceName(source: LcscCatalogSource): String = text(
-            if (source == LcscCatalogSource.Domestic) R.string.catalog_source_domestic
-            else R.string.catalog_source_international,
+            when (source) {
+                LcscCatalogSource.Domestic -> R.string.catalog_source_domestic
+                LcscCatalogSource.Eda -> R.string.catalog_source_eda
+                LcscCatalogSource.International -> R.string.catalog_source_international
+            },
         )
         fun failureName(failure: LcscCatalogFailureKind): String = text(
             when (failure) {
@@ -362,7 +367,7 @@ internal class InventoryImportCatalog(
             val failure = result.attempts.getOrNull(index)?.failure ?: LcscCatalogFailureKind.NoMatch
             "${sourceName(source)}：${failureName(failure)}"
         }
-        return appContext.getString(R.string.catalog_lookup_all_failed, failures[0], failures[1])
+        return appContext.getString(R.string.catalog_lookup_all_failed, failures.joinToString("；"))
     }
 
     internal fun readCachedLookup(
@@ -413,6 +418,13 @@ internal class InventoryImportCatalog(
                     }
                 }.orEmpty(),
                 datasheetUrl = payload.optString("datasheet_url").blankToNull(),
+                referencePrice = payload.optJSONObject("reference_price")?.let { price ->
+                    com.componentvault.android.model.ReferencePriceSnapshot.create(
+                        price.optString("unit_price"), price.optString("currency"),
+                        price.optInt("minimum_quantity", 0).takeIf { it > 0 },
+                        price.optString("source_url"), price.optString("queried_at"),
+                    )
+                },
             )
         }
 
@@ -439,6 +451,15 @@ internal class InventoryImportCatalog(
             put("rule_version", metadata.ruleVersion)
             put("parameters", JSONObject(metadata.parameters))
             put("datasheet_url", metadata.datasheetUrl)
+            metadata.referencePrice?.let { price ->
+                put("reference_price", JSONObject().apply {
+                    put("unit_price", price.unitPrice)
+                    put("currency", price.currency)
+                    price.minimumQuantity?.let { put("minimum_quantity", it) }
+                    put("source_url", price.sourceUrl)
+                    put("queried_at", price.queriedAt)
+                })
+            }
             put("fetched_at", System.currentTimeMillis())
         }.toString()
 
@@ -461,7 +482,7 @@ internal class InventoryImportCatalog(
     internal fun cleanupLookupCache() {
         val now = System.currentTimeMillis()
         val scopedKey = Regex(
-            "^${Regex.escape(LOOKUP_CACHE_PREFIX)}(?:lcsc_domestic_web|lcsc_public_web|$SERVER_LOOKUP_CACHE_SCOPE):(sku|mpn):.+$",
+            "^${Regex.escape(LOOKUP_CACHE_PREFIX)}(?:lcsc_domestic_web|lcsc_public_web|lceda_public_library|easyeda_public_library|$SERVER_LOOKUP_CACHE_SCOPE):(sku|mpn):.+$",
         )
         val editor = preferences.edit()
         var changed = false

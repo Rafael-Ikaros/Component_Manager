@@ -418,12 +418,10 @@ internal fun BatchJlcInboundScreen(
             if (message.isNotBlank()) item { Text(message, color = MaterialTheme.colorScheme.primary) }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.catalog_browser_session_notice), style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = {
-                        repository.retryDomesticCatalogNow()
                         val retryScope = if (page == BatchPage.Capture) ProcessScope.Captured else ProcessScope.Pending
                         processJob = scope.launch { processRows(retryScope, generation) }
-                    }, enabled = !processing && !committing) { Text(stringResource(R.string.catalog_retry_domestic)) }
+                    }, enabled = !processing && !committing) { Text(stringResource(R.string.catalog_retry_eda)) }
                     draft.rows.asSequence().mapNotNull { LcscPublicCatalog.domesticSearchUrl(it.sku) }.firstOrNull()?.let { url ->
                         TextButton(onClick = { uriHandler.openUri(url) }) {
                             Text(stringResource(R.string.catalog_open_domestic_browser))

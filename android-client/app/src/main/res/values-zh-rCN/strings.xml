@@ -453,9 +453,9 @@
     <string name="import_part_number_invalid">请输入完整立创编号，例如 C70565。</string>
     <string name="import_ocr_secondary_hint">优先扫码或输入 C 编号。没有二维码时再用文字识别，并核对识别结果。</string>
     <string name="importer_open_domestic_product">打开中文版立创商城</string>
-    <string name="import_catalog_search_label">立创商城中文目录</string>
+    <string name="import_catalog_search_label">嘉立创EDA国内元件库</string>
     <string name="import_catalog_search_placeholder">C70565，或输入 STM32 等关键词</string>
-    <string name="import_catalog_search_action">搜索立创商城中文目录</string>
+    <string name="import_catalog_search_action">搜索嘉立创EDA国内库</string>
     <string name="import_catalog_searching">正在搜索目录…</string>
     <string name="import_catalog_empty">没有找到匹配的商品。</string>
     <string name="import_catalog_choose">找到 %1$d 个候选，请选择一个回填表单。</string>
@@ -465,7 +465,7 @@
     <string name="import_catalog_use_candidate">使用此商品</string>
     <string name="import_catalog_open_datasheet">打开数据手册</string>
     <string name="import_catalog_image_source">商品图片来源</string>
-    <string name="import_domestic_selected">已选择立创商城商品，请核对回填字段后再保存。</string>
+    <string name="import_domestic_selected">已选择嘉立创EDA国内库元件，请核对回填字段后再保存。</string>
     <string name="movement_type_transfer">调拨</string>
     <string name="locations_title">库位管理</string>
     <string name="locations_add">新增库位</string>

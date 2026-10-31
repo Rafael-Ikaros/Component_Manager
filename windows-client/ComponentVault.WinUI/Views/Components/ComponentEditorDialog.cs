@@ -92,8 +92,7 @@ public sealed class ComponentEditorDialog(
         panel.Children.Add(CreateSectionHeader("基本信息", "名称、SKU、分类与封装。"));
         var lookupButton = new Button { Content = AppStrings.Get("Components_Catalog_ExactLookup") };
         var chinaSearchButton = new Button { Content = AppStrings.Get("Components_Catalog_OpenSearch") };
-        var retryDomesticButton = new Button { Content = "重试国内查询 / Retry China lookup" };
-        var skuActions = CreateActionRow(lookupButton, chinaSearchButton, retryDomesticButton);
+        var skuActions = CreateActionRow(lookupButton, chinaSearchButton);
         var skuPanel = new StackPanel { Spacing = 6 };
         skuPanel.Children.Add(skuBox);
         skuPanel.Children.Add(skuActions);
@@ -154,22 +153,6 @@ public sealed class ComponentEditorDialog(
         panel.Children.Add(CreateField("描述 / 备注", descriptionBox));
         panel.Children.Add(errorText);
 
-        retryDomesticButton.Click += async (_, _) =>
-        {
-            _catalogLookup.RetryDomesticNow();
-            var normalized = LcscPublicCatalog.NormalizeSku(skuBox.Text);
-            if (normalized is null) { errorText.Text = "请输入有效立创 C 编号后重试。 Enter a valid LCSC C-number before retrying."; return; }
-            retryDomesticButton.IsEnabled = false;
-            try
-            {
-                var lookup = await _catalogLookup.LookupDetailedAsync(normalized, LcscCatalogSource.Domestic);
-                if (lookup.Metadata is { } metadata) FillFromCatalog(metadata);
-                errorText.Text = lookup.UserMessage;
-            }
-            catch (Exception exception) { errorText.Text = exception.Message; }
-            finally { retryDomesticButton.IsEnabled = true; }
-        };
-
         lookupButton.Click += async (_, _) =>
         {
             var normalized = LcscPublicCatalog.NormalizeSku(skuBox.Text);
@@ -179,7 +162,7 @@ public sealed class ComponentEditorDialog(
                 return;
             }
             lookupButton.IsEnabled = false;
-            errorText.Text = "正在读取 LCSC 公共商品页…";
+            errorText.Text = "正在查询所选语言对应的元件资料…";
             try
             {
                 var lookup = await _catalogLookup.LookupDetailedAsync(normalized);
@@ -192,7 +175,7 @@ public sealed class ComponentEditorDialog(
                 if (metadata is null)
                 {
                     errorText.Text = string.IsNullOrWhiteSpace(lookup.UserMessage)
-                        ? "国内立创和国际 LCSC 均未返回精确匹配。"
+                        ? "当前语言对应的资料源未返回精确匹配，请重试或手动填写。"
                         : lookup.UserMessage;
                     return;
                 }
@@ -247,7 +230,7 @@ public sealed class ComponentEditorDialog(
             }
             catch (LcscDomesticRateLimitedException) { errorText.Text = "国内立创请求过于频繁，已短暂限流。 China lookup is rate limited; retry after the cooldown."; }
             catch (LcscDomesticCoolingDownException) { errorText.Text = "国内查询暂时暂停，可使用“重试国内查询”立即重试。 China lookup is paused; use Retry China lookup to retry now."; }
-            catch (Exception) { errorText.Text = "国内立创关键词搜索失败，请稍后重试或在浏览器中打开搜索。"; }
+            catch (Exception) { errorText.Text = "当前语言对应的元件库查询失败，请稍后重试或在浏览器中打开商城。"; }
             finally { searchButton.IsEnabled = true; }
         };
         candidateList.SelectionChanged += (_, _) =>
@@ -390,7 +373,7 @@ public sealed class ComponentEditorDialog(
         AddUnique(notes, metadata.DatasheetUrl is null ? null : $"数据手册：{metadata.DatasheetUrl}");
         if (metadata.Parameters is not null)
             foreach (var parameter in metadata.Parameters) AddUnique(notes, $"参数·{parameter.Key}：{parameter.Value}");
-        return string.Join("\n", notes);
+        return ReferencePriceSnapshot.Merge(string.Join("\n", notes), metadata.ReferencePrice);
     }
 
     private static void ApplyMetadata(

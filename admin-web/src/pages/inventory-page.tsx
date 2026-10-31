@@ -15,6 +15,7 @@ import { ComponentPhoto } from "@/components/component-photo";
 import { InventoryActions } from "@/components/inventory-actions";
 import { OrderMetadataPanel } from "@/components/order-metadata-panel";
 import { SpecEnrichmentPanel } from "@/components/spec-enrichment-panel";
+import { CatalogMetadataPanel } from "@/components/catalog-metadata-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -122,6 +123,7 @@ export function InventoryPage() {
       <OrderMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
 
       <SpecEnrichmentPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
+      <CatalogMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
 
       <Card className="bg-white/90">
         <CardContent className="pt-6">

@@ -617,3 +617,18 @@ content 的字段为 `schema_version:1,project_name,production_sets,source_name,
 ```
 
 名称、SKU、数量、最低库存、库位、分配、图片及非参数备注均不属于可更新字段；不新建元件，不创建出入库流水。详见[教程](order-metadata-update.md)。
+
+## 国内 EDA 批量资料更新
+
+`/admin-api/components/catalog-metadata/jobs` 使用现有账户认证与 Web 会话 CSRF 规则。
+`POST` 创建只读分析，`GET /active` 恢复活动任务，`GET /{id}` 获取进度；
+`GET /{id}/rows?page=1` 每页 50 项，`POST /{id}/cancel`、`retry`、`clear` 管理任务。
+仅查询当前认证账户库存中的完整 C 料号，网络请求期间不持库存事务；预览不写库存。
+
+`POST /{id}/apply` 接受 `{"items":[{"component_id":"example-id","fields":["category","reference_price"],"request_id":"example-request-1"}]}`，每次最多 50 项。
+可选组为 `category`、`package_name`、`parameters`、`reference_price`；候选值与版本来自服务端预览，不能由客户端任意提交替代值。
+应用需启用 Web 库存操作，逐元件检查版本并以短事务写入、保存幂等回执；冲突不覆盖。
+名称、图片、自由备注、数量、库位、分配与流水保持不变。参数组是整组替换，价格缺失不清旧价。
+
+价格沿用元件 description 中的五类可读行：`参考单价：`、`参考币种：`、`参考起订量：`、`价格来源：`、`价格查询时间：`，无需修改同步 schema。
+预览只存内存，服务重启后重新分析；写入成功的资料由原 `/sync/pull` 传回同账户原生客户端。详见[使用步骤](parameter-enrichment.md)。

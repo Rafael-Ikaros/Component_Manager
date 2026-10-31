@@ -61,8 +61,8 @@
   <data name="Components_Dialog_OperationFailureTitle" xml:space="preserve"><value>Operation failed</value></data>
   <data name="Components_Catalog_ExactLookup" xml:space="preserve"><value>Fill by exact C number</value></data>
   <data name="Components_Catalog_OpenSearch" xml:space="preserve"><value>Open China catalog in browser</value></data>
-  <data name="Components_Catalog_SectionTitle" xml:space="preserve"><value>LCSC China catalog</value></data>
-  <data name="Components_Catalog_SectionDescription" xml:space="preserve"><value>Search candidates, inspect parameters, then choose what to fill. Supplier stock is never imported.</value></data>
+  <data name="Components_Catalog_SectionTitle" xml:space="preserve"><value>EasyEDA international catalog</value></data>
+  <data name="Components_Catalog_SectionDescription" xml:space="preserve"><value>Search candidates, inspect parameters, then choose what to fill. Source: EasyEDA International Official Library https://lceda.cn/ · https://easyeda.com/.</value></data>
   <data name="Components_Catalog_KeywordPlaceholder" xml:space="preserve"><value>Model, brand, parameter, or C number</value></data>
   <data name="Components_Catalog_Search" xml:space="preserve"><value>Search candidates</value></data>
   <data name="Components_Catalog_FillSelected" xml:space="preserve"><value>Fill selected candidate</value></data>
@@ -73,7 +73,7 @@
   <data name="Components_Catalog_VerificationRequired" xml:space="preserve"><value>The China catalog requires browser verification. Use “Open China catalog in browser”; this app will not bypass verification.</value></data>
   <data name="Components_Catalog_QueryFailedPattern" xml:space="preserve"><value>Catalog query failed: {0}</value></data>
   <data name="Components_Catalog_KeywordRequired" xml:space="preserve"><value>Enter a search keyword.</value></data>
-  <data name="Components_Catalog_Searching" xml:space="preserve"><value>Searching the LCSC China catalog…</value></data>
+  <data name="Components_Catalog_Searching" xml:space="preserve"><value>Searching the EasyEDA international catalog…</value></data>
   <data name="Components_Catalog_NoResults" xml:space="preserve"><value>No usable candidates were found. Try a C number, full model, or shorter keyword.</value></data>
   <data name="Components_Catalog_ResultCountPattern" xml:space="preserve"><value>Found {0} candidates. Select one to inspect its parameters before filling.</value></data>
   <data name="Movements_Dialog_Title" xml:space="preserve"><value>Record stock movement</value></data>

@@ -7,7 +7,9 @@ const englishLabels: Record<string, string> = {
 };
 
 export function displayParameterLabel(label: string, locale: string): string {
-  return locale === "zh-CN" ? label : englishLabels[label] ?? label;
+  const normalized = label.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
+  const canonical = labels[normalized] ?? label;
+  return locale === "zh-CN" ? canonical : englishLabels[canonical] ?? label;
 }
 
 const labels: Record<string, string> = {

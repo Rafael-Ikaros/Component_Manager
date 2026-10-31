@@ -68,6 +68,7 @@ public sealed class InventoryViewModel : ObservableObject
         : "当前筛选条件下没有结果，尝试清空搜索或切换筛选。";
     public bool CanEditSelectedComponent => SelectedComponent is not null;
     public bool CanDeleteSelectedComponent => SelectedComponent is not null;
+    public string SelectedComponentReferencePrice => ComponentVault.WinUI.Services.Catalog.ReferencePriceSnapshot.Read(SelectedComponent?.Description)?.Display ?? "尚无商城参考价";
     public string SelectedComponentName => SelectedComponent?.Name ?? "尚未选择元器件";
     public string SelectedComponentSubtitle => SelectedComponent is null
         ? "请先从左侧列表中选择一项，以查看封装、仓位和补货风险。"
@@ -302,6 +303,7 @@ public sealed class InventoryViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedComponentStockDeltaText));
         OnPropertyChanged(nameof(SelectedComponentLocation));
         OnPropertyChanged(nameof(SelectedComponentUpdatedAt));
+        OnPropertyChanged(nameof(SelectedComponentReferencePrice));
         OnPropertyChanged(nameof(SelectedComponentDescription));
         OnPropertyChanged(nameof(SelectedComponentStatusTitle));
         OnPropertyChanged(nameof(SelectedComponentStatusMessage));

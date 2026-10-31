@@ -42,7 +42,6 @@ import com.componentvault.android.data.CategoryLearningStore
 import com.componentvault.android.data.AppDiagnostics
 import com.componentvault.android.data.InventoryRepository
 import com.componentvault.android.data.ImportLookupRequestGate
-import com.componentvault.android.data.LcscDomesticBlockedException
 import com.componentvault.android.data.LcscDomesticCatalog
 import com.componentvault.android.data.LcscDomesticProduct
 import com.componentvault.android.data.LcscPublicCatalog
@@ -540,10 +539,10 @@ internal fun JlcImportSurface(
                         domesticSearchJob = coroutineScope.launch {
                             runCatching {
                                 withContext(Dispatchers.IO) {
-                                    repository.searchDomesticCatalog(keyword)
+                                    repository.searchPublicCatalog(keyword, appPreferences.appLanguage)
                                 }
                             }.onSuccess { results ->
-                                AppDiagnostics.record("lookup_domestic", "success" to true, "count" to results.size)
+                                AppDiagnostics.record("lookup_eda", "success" to true, "count" to results.size)
                                 if (keyword != partNumberInput.trim()) return@onSuccess
                                 domesticSearchInProgress = false
                                 val normalized = LcscPublicCatalog.normalizeSku(keyword)
@@ -562,15 +561,10 @@ internal fun JlcImportSurface(
                                 }
                             }.onFailure { error ->
                                 if (error is CancellationException || keyword != partNumberInput.trim()) return@onFailure
-                                AppDiagnostics.record("lookup_domestic", "success" to false, "type" to error.javaClass)
+                                AppDiagnostics.record("lookup_eda", "success" to false, "type" to error.javaClass)
                                 domesticSearchInProgress = false
                                 domesticSearchIsError = true
-                                domesticSearchMessage = when (error) {
-                                    is LcscDomesticBlockedException -> context.getString(com.componentvault.android.R.string.import_catalog_blocked)
-                                    is com.componentvault.android.data.LcscDomesticRateLimitedException -> context.getString(com.componentvault.android.R.string.catalog_failure_rate_limited)
-                                    is com.componentvault.android.data.LcscDomesticCoolingDownException -> context.getString(com.componentvault.android.R.string.catalog_failure_cooling_down)
-                                    else -> context.getString(com.componentvault.android.R.string.catalog_keyword_failed)
-                                }
+                                domesticSearchMessage = context.getString(com.componentvault.android.R.string.catalog_keyword_failed)
                                 LcscPublicCatalog.normalizeSku(keyword)?.let(::applyInternationalFallback)
                             }
                         }
@@ -604,13 +598,7 @@ internal fun JlcImportSurface(
                     )
                 }
                 if (domesticSearchIsError) {
-                    Text(
-                        text = androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.catalog_browser_session_notice),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     TextButton(onClick = {
-                        repository.retryDomesticCatalogNow()
                         val keyword = partNumberInput.trim()
                         if (keyword.isNotEmpty()) {
                             domesticSearchInProgress = true
@@ -618,7 +606,7 @@ internal fun JlcImportSurface(
                             domesticSearchMessage = context.getString(com.componentvault.android.R.string.import_catalog_searching)
                             domesticSearchJob?.cancel()
                             domesticSearchJob = coroutineScope.launch {
-                                runCatching { withContext(Dispatchers.IO) { repository.searchDomesticCatalog(keyword) } }
+                                runCatching { withContext(Dispatchers.IO) { repository.searchPublicCatalog(keyword, appPreferences.appLanguage) } }
                                     .onSuccess { results ->
                                         domesticSearchInProgress = false
                                         domesticResults = results
@@ -635,8 +623,12 @@ internal fun JlcImportSurface(
                                     }
                             }
                         }
-                    }) { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.catalog_retry_domestic)) }
-                    LcscDomesticCatalog.searchUrl(partNumberInput)?.let { searchUrl ->
+                    }) { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.catalog_retry_eda)) }
+                    (if (appPreferences.appLanguage == com.componentvault.android.model.AppLanguage.ZhCn)
+                        LcscDomesticCatalog.searchUrl(partNumberInput)
+                    else partNumberInput.trim().takeIf { it.isNotEmpty() }?.let {
+                        "https://www.lcsc.com/search?q=${java.net.URLEncoder.encode(it, Charsets.UTF_8.name())}"
+                    })?.let { searchUrl ->
                         TextButton(onClick = { uriHandler.openUri(searchUrl) }) {
                             Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_open_browser))
                         }

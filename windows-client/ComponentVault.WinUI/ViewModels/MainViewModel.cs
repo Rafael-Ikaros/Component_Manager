@@ -121,6 +121,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string SelectedComponentStockDeltaText => Inventory.SelectedComponentStockDeltaText;
     public string SelectedComponentLocation => Inventory.SelectedComponentLocation;
     public string SelectedComponentUpdatedAt => Inventory.SelectedComponentUpdatedAt;
+    public string SelectedComponentReferencePrice => Inventory.SelectedComponentReferencePrice;
     public string SelectedComponentDescription => Inventory.SelectedComponentDescription;
     public string SelectedComponentStatusTitle => Inventory.SelectedComponentStatusTitle;
     public string SelectedComponentStatusMessage => Inventory.SelectedComponentStatusMessage;

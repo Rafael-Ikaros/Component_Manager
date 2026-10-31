@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace ComponentVault.WinUI.Services.Catalog;
 
-public enum LcscCatalogSource { Domestic, International }
+public enum LcscCatalogSource { Domestic, International, Eda }
 public enum LcscCatalogFailureKind { Blocked, RateLimited, CoolingDown, Unreachable, NoMatch, InvalidResponse }
 public enum LcscDomesticGateReason { Blocked, Network, RateLimited }
 public sealed record LcscDomesticHttpFailure(LcscCatalogFailureKind Kind, int Status, int? RetryAfterSeconds = null);
@@ -39,7 +39,7 @@ public sealed record LcscCatalogLookupResult(
         {
             var english = PreferredSource == LcscCatalogSource.International;
             string Source(LcscCatalogSource source) => source == LcscCatalogSource.Domestic
-                ? (english ? "LCSC China" : "国内立创") : (english ? "international LCSC" : "国际 LCSC");
+                ? (english ? "LCSC China" : "国内立创") : source == LcscCatalogSource.Eda ? "嘉立创EDA国内库" : (english ? "international LCSC" : "国际 LCSC");
             string Failure(LcscCatalogFailureKind failure) => failure switch
             {
                 LcscCatalogFailureKind.Blocked => english ? "site verification blocked the request" : "站点验证阻断",
@@ -78,12 +78,12 @@ public static class LcscCatalogRoutePolicy
     }
     public static LcscCatalogSource PreferredSource(CultureInfo culture) =>
         culture.TwoLetterISOLanguageName.Equals("zh", StringComparison.OrdinalIgnoreCase)
-            ? LcscCatalogSource.Domestic : LcscCatalogSource.International;
+            ? LcscCatalogSource.Eda : LcscCatalogSource.International;
 
     public static IReadOnlyList<LcscCatalogSource> Order(LcscCatalogSource preferred) =>
-        preferred == LcscCatalogSource.Domestic
-            ? [LcscCatalogSource.Domestic, LcscCatalogSource.International]
-            : [LcscCatalogSource.International, LcscCatalogSource.Domestic];
+        preferred != LcscCatalogSource.International
+            ? [LcscCatalogSource.Eda]
+            : [LcscCatalogSource.International];
 
     public static LcscCatalogFailureKind Classify(Exception exception) => exception switch
     {

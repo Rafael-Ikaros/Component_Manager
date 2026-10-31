@@ -728,6 +728,8 @@ internal fun InventoryDetailPane(
     onRecordMovement: (String) -> Unit,
 ) {
     val strings = vaultStrings()
+    val priceLanguage = if (LocalConfiguration.current.locales[0].language.equals("zh", ignoreCase = true))
+        com.componentvault.android.model.AppLanguage.ZhCn else com.componentvault.android.model.AppLanguage.English
 
     LazyColumn(
         modifier = modifier.testTag("inventory_detail_list"),
@@ -913,6 +915,15 @@ internal fun InventoryDetailPane(
                             value = allocation.quantity.toString(),
                         )
                     }
+                }
+            }
+        }
+        com.componentvault.android.model.ReferencePriceNotes.display(
+            component.description, priceLanguage, { formatShortLocalTimestamp(it) },
+        )?.let { price ->
+            item {
+                SectionPane(title = androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.catalog_reference_price)) {
+                    Text(price, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

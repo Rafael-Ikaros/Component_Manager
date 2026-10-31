@@ -7,6 +7,7 @@ import java.util.Locale
 internal enum class LcscCatalogSource(val wireName: String) {
     Domestic("lcsc_domestic_web"),
     International("lcsc_public_web"),
+    Eda("lceda_public_library"),
 }
 
 internal enum class LcscCatalogFailureKind {
@@ -69,20 +70,20 @@ internal data class LcscCatalogLookupResult(
 
 internal object LcscCatalogRoutePolicy {
     fun preferredSource(language: AppLanguage): LcscCatalogSource = when (language) {
-        AppLanguage.ZhCn -> LcscCatalogSource.Domestic
+        AppLanguage.ZhCn -> LcscCatalogSource.Eda
         AppLanguage.English -> LcscCatalogSource.International
     }
 
     fun preferredSource(locale: Locale): LcscCatalogSource =
         if (locale.language.equals("zh", ignoreCase = true)) {
-            LcscCatalogSource.Domestic
+            LcscCatalogSource.Eda
         } else {
             LcscCatalogSource.International
         }
 
     fun order(preferred: LcscCatalogSource): List<LcscCatalogSource> = when (preferred) {
-        LcscCatalogSource.Domestic -> listOf(LcscCatalogSource.Domestic, LcscCatalogSource.International)
-        LcscCatalogSource.International -> listOf(LcscCatalogSource.International, LcscCatalogSource.Domestic)
+        LcscCatalogSource.Domestic, LcscCatalogSource.Eda -> listOf(LcscCatalogSource.Eda)
+        LcscCatalogSource.International -> listOf(LcscCatalogSource.International)
     }
 
     fun shouldPersist(result: LcscCatalogLookupResult): Boolean =

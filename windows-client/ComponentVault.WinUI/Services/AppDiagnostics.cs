@@ -2,7 +2,7 @@ using System.Text;
 
 namespace ComponentVault.WinUI.Services;
 
-public enum DiagnosticEvent { CatalogDomestic, CatalogInternational, Network }
+public enum DiagnosticEvent { CatalogDomestic, CatalogInternational, CatalogEda, Network }
 public enum DiagnosticOutcome { Started, Success, Dns, Tls, Timeout, Http, Parser, Blocked, Failed }
 
 public static class AppDiagnostics

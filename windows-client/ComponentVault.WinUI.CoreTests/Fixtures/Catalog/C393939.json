@@ -1,0 +1,96 @@
+{
+  "code": 200,
+  "result": {
+    "productList": [
+      {
+        "code": "C393939",
+        "model": "TYPE-C16PIN",
+        "name": "Type-C 母 卧贴",
+        "brandName": "SHOU HAN(首韩)",
+        "standard": "SMD",
+        "catalogName": "USB连接器",
+        "image": "https://alimg.szlcsc.com/upload/public/product/middle/20250623/99A419AAC00DA73DFF9E6286C601438A.jpg<$>https://alimg.szlcsc.com/upload/public/product/middle/20250623/36F54735A50176880FBBEB42D570057D.jpg<$>https://alimg.szlcsc.com/upload/public/product/middle/20250623/DBF6AC59C21C5314EED036DDDB0DDC46.jpg<$>https://alimg.szlcsc.com/upload/public/brand/product/certificate/20210107/8AC591009D389ECDA535EC039DCBE730.jpg",
+        "pdfFileUrl": "/upload/public/pdf/source/20250731/8439C4BBC0428DF1202FA32A264DFCF9.pdf",
+        "priceList": [
+          {
+            "startNumber": 10,
+            "endNumber": 90,
+            "price": 0.4218
+          },
+          {
+            "startNumber": 100,
+            "endNumber": 290,
+            "price": 0.3378
+          },
+          {
+            "startNumber": 300,
+            "endNumber": 990,
+            "price": 0.2946
+          },
+          {
+            "startNumber": 1000,
+            "endNumber": 4990,
+            "price": 0.2509
+          },
+          {
+            "startNumber": 5000,
+            "endNumber": 9990,
+            "price": 0.2385
+          },
+          {
+            "startNumber": 10000,
+            "endNumber": -10,
+            "price": 0.23
+          }
+        ],
+        "device_info": {
+          "attributes": {
+            "LCSC Part Name": "Type-C 母 卧贴",
+            "Supplier Part": "C393939",
+            "Manufacturer": "SHOU HAN(首韩)",
+            "Manufacturer Part": "TYPE-C16PIN",
+            "Supplier Footprint": "SMD",
+            "JLCPCB Part Class": "Extended Part",
+            "Datasheet": "https://item.szlcsc.com/datasheet/TYPE-C16PIN/372551.html",
+            "Supplier": "LCSC",
+            "Add into BOM": "yes",
+            "Convert to PCB": "yes",
+            "Symbol": "1ff09c7c4e7a4980b99e980c286104de",
+            "Designator": "USB?",
+            "Footprint": "2f683582c1da45eeabb7fe70a9f9f8d4",
+            "3D Model": "d6783d3a2268456b863f42d3286191d0",
+            "3D Model Title": "USB-C-SMD_TYPE-C16PIN",
+            "3D Model Transform": "351.9678,311.023,0,180,0,0,0,-41.85,-39.37",
+            "Connector Type": "Type-C",
+            "Protocol Standard": "-",
+            "Gender": "母",
+            "Mounting Type": "卧贴",
+            "Number of Contacts": "16P",
+            "Number of Ports": "1",
+            "Current Rating-Power": "3A",
+            "Voltage Rating": "5V",
+            "Connect-Disconnect Life": "1万次",
+            "Supplementary Features": "-",
+            "Center Height": "-",
+            "Length": "7.35mm",
+            "Detection color": "黑色",
+            "Operating Temperature": "-25℃~+85℃",
+            "Name": "={Manufacturer Part}"
+          },
+          "tags": {
+            "parent_tag": {
+              "uuid": "043194d937cd4f4eb260b865952c4572",
+              "name": "Connectors",
+              "name_cn": "连接器"
+            },
+            "child_tag": {
+              "uuid": "c63acb9a9c364dccb2c6a171f2a23a34",
+              "name": "USB Connectors",
+              "name_cn": "USB连接器"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

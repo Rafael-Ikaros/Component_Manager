@@ -471,9 +471,9 @@
     <string name="import_part_number_invalid">Enter a complete LCSC part number, for example C70565.</string>
     <string name="import_ocr_secondary_hint">Scan the QR code or enter the C-number first. Use text recognition when no code is available, then verify the extracted fields.</string>
     <string name="importer_open_domestic_product">Open Chinese LCSC store</string>
-    <string name="import_catalog_search_label">Chinese LCSC catalog</string>
+    <string name="import_catalog_search_label">International EasyEDA component library</string>
     <string name="import_catalog_search_placeholder">C70565 or a keyword such as STM32</string>
-    <string name="import_catalog_search_action">Search Chinese LCSC catalog</string>
+    <string name="import_catalog_search_action">Search international library</string>
     <string name="import_catalog_searching">Searching catalog…</string>
     <string name="import_catalog_empty">No matching products found.</string>
     <string name="import_catalog_choose">Found %1$d candidates. Choose one to fill the form.</string>
@@ -483,7 +483,7 @@
     <string name="import_catalog_use_candidate">Use this product</string>
     <string name="import_catalog_open_datasheet">Open datasheet</string>
     <string name="import_catalog_image_source">Product image source</string>
-    <string name="import_domestic_selected">Chinese LCSC product selected. Review the filled fields before saving.</string>
+    <string name="import_domestic_selected">International library component selected. Review the filled fields before saving.</string>
     <string name="movement_type_transfer">Transfer</string>
     <string name="locations_title">Storage locations</string>
     <string name="locations_add">Add storage location</string>

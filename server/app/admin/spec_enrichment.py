@@ -118,9 +118,15 @@ class EnrichmentJob:
     cancel: Event = field(default_factory=Event)
     lock: Lock = field(default_factory=Lock)
     thread: Thread | None = None
+    preview: bool = False
 
     def snapshot(self) -> dict[str, object]:
         with self.lock:
+            if self.preview:
+                return {"id": self.id, "mode": "catalog_preview", "state": self.state,
+                        "total": len(self.items), "processed": self.processed,
+                        "ready": sum(item["status"] == "ready" for item in self.items),
+                        "skipped": self.skipped, "failed": self.failed}
             details = [item.copy() for item in self.items if item["status"] == "failed"]
             details.extend(item.copy() for item in self.items if item["status"] == "skipped")
             return {
@@ -129,6 +135,7 @@ class EnrichmentJob:
                 "skipped": self.skipped, "failed": self.failed,
                 "items": details[:50],
                 "omitted_items": max(0, self.failed + self.skipped - 50),
+                "mode": "catalog_preview" if self.preview else "spec_enrichment",
             }
 
     def mark(self, index: int, status: str, reason: str = "") -> None:
@@ -174,11 +181,12 @@ class EnrichmentJobs:
                 return job
             return None
 
-    def active(self, account: Account) -> EnrichmentJob | None:
+    def active(self, account: Account, *, preview: bool = False) -> EnrichmentJob | None:
         with self._lock:
             return next((job for job in self._jobs.values()
                          if job.account_id == account.account_id
                          and job.database_path == account.database_path
+                         and job.preview == preview
                          and job.state in {"queued", "running"}), None)
 
     def clear(self, job_id: str, account: Account) -> bool:
@@ -198,17 +206,21 @@ class EnrichmentJobs:
                 if (job is not finished
                     and job.account_id == finished.account_id
                     and job.database_path == finished.database_path
+                    and job.preview == finished.preview
                     and job.state in {"completed", "cancelled"}):
                     del self._jobs[job_id]
 
     def start(
         self, account: Account, settings: Settings,
         items: list[dict[str, str]],
+        *, preview: bool = False,
     ) -> EnrichmentJob:
         job = EnrichmentJob(
             id=str(uuid4()), account_id=account.account_id,
             database_path=account.database_path,
-            items=[{**item, "status": "pending", "reason": ""} for item in items],
+            items=[{**item, "status": item.get("status", "pending") if preview and item.get("status") in {"ready", "unchanged", "skipped"} else "pending",
+                    "reason": item.get("reason", "") if preview else ""} for item in items],
+            preview=preview,
         )
         with self._lock:
             if (account.account_id, account.database_path) in self._blocked_accounts:
@@ -230,6 +242,10 @@ class EnrichmentJobs:
             job.state = "running"
         account_settings = settings if account.role == "admin" else replace(settings, mqtt_enabled=False)
         try:
+            if job.preview:
+                from .catalog_metadata import scan_preview
+                scan_preview(job)
+                return
             connection = _connect(job.database_path, existing_only=account.role == "user")
             try:
                 for index, item in enumerate(job.items):

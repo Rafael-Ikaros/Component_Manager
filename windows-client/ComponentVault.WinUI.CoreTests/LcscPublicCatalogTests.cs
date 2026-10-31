@@ -33,7 +33,7 @@ public sealed class LcscPublicCatalogTests
     }
 
     [Fact]
-    public async Task LookupDetailedAsync_ChineseBlockedFallsBackWithVisibleReason()
+    public async Task LookupDetailedAsync_ChineseEdaFailureDoesNotFallback()
     {
         var lookup = new LcscPublicLookup(
             (uri, _, _) => Task.FromResult(uri.Host == "so.szlcsc.com" ? "<script>var _xvasu='challenge';</script>" : InternationalRoutePage),
@@ -41,26 +41,22 @@ public sealed class LcscPublicCatalogTests
 
         var result = await lookup.LookupDetailedAsync("C88002");
 
-        Assert.Equal(LcscCatalogSource.International, result.ResolvedSource);
-        Assert.True(result.UsedFallback);
-        Assert.Equal(LcscCatalogFailureKind.Blocked, Assert.Single(result.Attempts).Failure);
-        Assert.Contains("站点验证阻断", result.UserMessage);
-        Assert.Contains("国际 LCSC", result.UserMessage);
-        Assert.Equal(result.UserMessage, result.Metadata?.LookupNotice);
+        Assert.Null(result.ResolvedSource);
+        Assert.Null(result.Metadata);
+        Assert.False(result.UsedFallback);
+        Assert.Equal(LcscCatalogSource.Eda, Assert.Single(result.Attempts).Source);
+        Assert.Equal(LcscCatalogFailureKind.InvalidResponse, result.Attempts[0].Failure);
+        Assert.Contains("站点响应格式异常", result.UserMessage);
+        Assert.DoesNotContain("国际 LCSC", result.UserMessage);
     }
 
     [Fact]
-    public async Task SearchPreferredAsync_ExplainsInternationalKeywordSearchLimitation()
+    public async Task SearchPreferredAsync_UsesInternationalEdaForEnglishKeywords()
     {
-        var lookup = new LcscPublicLookup(
-            (_, _, _) => Task.FromResult(DomesticRoutePage),
-            () => System.Globalization.CultureInfo.GetCultureInfo("en-US"));
-
+        var lookup = new LcscPublicLookup((uri, _, _) => { Assert.Equal("pro.easyeda.com", uri.Host); return Task.FromResult("{\"code\":0,\"result\":{\"productList\":[]}}"); }, () => System.Globalization.CultureInfo.GetCultureInfo("en-US"));
         var result = await lookup.SearchPreferredAsync("resistor");
-
-        Assert.Equal(LcscCatalogSource.Domestic, result.Source);
-        Assert.NotNull(result.Notice);
-        Assert.Contains("do not provide keyword search", result.Notice);
+        Assert.Equal(LcscCatalogSource.International, result.Source);
+        Assert.Contains("EDA", result.Notice!);
     }
 
     [Fact]
@@ -289,38 +285,12 @@ public sealed class LcscPublicCatalogTests
     }
 
     [Fact]
-    public async Task LookupDetailedAsync_BlockedSkuSkipsDomesticForNextSkuUntilExpiry()
+    public async Task LookupDetailedAsync_NeverRequestsDomesticWafEndpoint()
     {
-        var calls = 0; var now = DateTimeOffset.UnixEpoch;
-        var lookup = new LcscPublicLookup((uri, _, _) =>
-        {
-            if (uri.Host == "so.szlcsc.com") { calls++; return Task.FromResult("<script>_xvasu</script>"); }
-            return Task.FromResult("<html></html>");
-        }, () => System.Globalization.CultureInfo.GetCultureInfo("zh-CN"), () => now);
-        await lookup.LookupDetailedAsync("C1");
-        await lookup.LookupDetailedAsync("C2");
-        Assert.Equal(1, calls);
-        now = now.AddSeconds(120);
-        await lookup.LookupDetailedAsync("C3");
-        Assert.Equal(2, calls);
-    }
-
-    [Fact]
-    public async Task LookupDetailedAsync_UserCancellationDoesNotStartDomesticCooldown()
-    {
-        var calls = 0;
-        var lookup = new LcscPublicLookup((uri, _, token) =>
-        {
-            if (uri.Host == "so.szlcsc.com") calls++;
-            token.ThrowIfCancellationRequested();
-            return Task.FromResult(DomesticRoutePage);
-        }, () => System.Globalization.CultureInfo.GetCultureInfo("zh-CN"), () => DateTimeOffset.UnixEpoch);
-        using var cancelled = new CancellationTokenSource();
-        cancelled.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => lookup.LookupDetailedAsync("C1", cancellationToken: cancelled.Token));
-        var result = await lookup.LookupDetailedAsync("C88002");
-        Assert.Equal(2, calls);
-        Assert.Equal(LcscCatalogSource.Domestic, result.ResolvedSource);
+        var hosts = new List<string>();
+        var lookup = new LcscPublicLookup((uri, _, _) => { hosts.Add(uri.Host); return Task.FromResult(uri.Host == "pro.lceda.cn" ? "{\"code\":200,\"result\":{\"productList\":[]}}" : "<html></html>"); }, () => System.Globalization.CultureInfo.GetCultureInfo("zh-CN"));
+        await lookup.LookupDetailedAsync("C582276");
+        Assert.Equal(new[] { "pro.lceda.cn" }, hosts);
     }
 
     [Theory]

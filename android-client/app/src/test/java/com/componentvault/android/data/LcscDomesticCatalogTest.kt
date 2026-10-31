@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import com.componentvault.android.model.withOfficialMetadata
 import java.io.IOException
-import java.util.concurrent.CancellationException
 
 class LcscDomesticCatalogTest {
     private fun page(productCode: String = "C70565", productId: String = "123456") = """
@@ -92,29 +91,6 @@ class LcscDomesticCatalogTest {
         assertEquals(LcscDomesticHttpFailure.RateLimited(600), classifyDomesticHttpResponse(429, "busy", "999"))
     }
 
-    @Test fun blockedSkuSkipsDomesticForNextSkuAndCancellationDoesNotStartCooldown() {
-        var calls = 0
-        var now = 0L
-        val gate = LcscDomesticCooldownGate { now }
-        val lookup = LcscCombinedLookup(
-            domesticFetch = { calls++; "<script>var _xvasu='challenge';</script>" },
-            international = LcscPublicLookup(fetch = { "<html></html>" }),
-            domesticGate = gate,
-        )
-        lookup.lookup("C1")
-        lookup.lookup("C2")
-        assertEquals(1, calls)
-        assertFailsWith<LcscDomesticCoolingDownException> { lookup.searchDomestic("C2") }
-        now = 120_000
-        lookup.lookup("C3")
-        assertEquals(2, calls)
-
-        val cancelGate = LcscDomesticCooldownGate { 0L }
-        val cancelled = LcscCombinedLookup(domesticFetch = { throw CancellationException() }, domesticGate = cancelGate)
-        assertFailsWith<CancellationException> { cancelled.lookup("C4") }
-        assertNull(cancelGate.current())
-    }
-
     @Test fun missingNextDataAndSchemaDriftAreErrorsInsteadOfEmptyResults() {
         assertFailsWith<IOException> { LcscDomesticCatalog.parseSearchPage("<html></html>") }
         assertFailsWith<IOException> {
@@ -122,20 +98,4 @@ class LcscDomesticCatalogTest {
         }
     }
 
-    @Test fun combinedExactLookupPrefersDomesticAndFallsBackToInternational() {
-        val preferred = LcscCombinedLookup(
-            domesticFetch = { page() },
-            international = LcscPublicLookup(fetch = { error("international must not run") }),
-        ).lookup("C70565")
-        assertEquals("lcsc_domestic_web", preferred?.source)
-        assertEquals("exact", preferred?.confidence)
-
-        val fallback = LcscCombinedLookup(
-            domesticFetch = { "<script>var _xvasu='challenge';</script>" },
-            international = LcscPublicLookup(fetch = {
-                """<script type="application/ld+json">{"@type":"Product","sku":"C70565","mpn":"M1","description":"Fallback product","brand":"B"}</script>"""
-            }),
-        ).lookup("C70565")
-        assertEquals("lcsc_public_web", fallback?.source)
-    }
 }

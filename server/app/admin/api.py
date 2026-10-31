@@ -57,6 +57,7 @@ from .operations import (
 )
 from .spec_enrichment import EnrichmentJobs, candidates
 from .order_metadata import router as order_metadata_router
+from .catalog_metadata import router as catalog_metadata_router
 from ..sync_observability import (
     append_resolution, list_audit, list_conflicts, list_devices,
 )
@@ -67,6 +68,7 @@ router = APIRouter(
     dependencies=[Depends(require_token)],
 )
 router.include_router(order_metadata_router)
+router.include_router(catalog_metadata_router)
 
 
 @router.get("/dashboard", response_model=AdminDashboardResponse)
@@ -252,7 +254,7 @@ def get_spec_enrichment_job(
 ) -> dict[str, object]:
     manager: EnrichmentJobs = request.app.state.spec_enrichment_jobs
     job = manager.get(job_id, account)
-    if job is None:
+    if job is None or job.preview:
         raise HTTPException(status_code=404, detail="Enrichment job not found.")
     return job.snapshot()
 
@@ -267,7 +269,7 @@ def post_spec_enrichment_cancel(
     _require_web_inventory(settings)
     manager: EnrichmentJobs = request.app.state.spec_enrichment_jobs
     job = manager.get(job_id, account)
-    if job is None:
+    if job is None or job.preview:
         raise HTTPException(status_code=404, detail="Enrichment job not found.")
     job.cancel.set()
     return job.snapshot()
@@ -283,7 +285,7 @@ def post_spec_enrichment_retry(
     _require_web_inventory(settings)
     manager: EnrichmentJobs = request.app.state.spec_enrichment_jobs
     job = manager.get(job_id, account)
-    if job is None:
+    if job is None or job.preview:
         raise HTTPException(status_code=404, detail="Enrichment job not found.")
     snapshot = job.snapshot()
     if snapshot["state"] not in {"completed", "cancelled"}:
@@ -309,6 +311,9 @@ def post_spec_enrichment_clear(
 ) -> dict[str, bool]:
     _require_web_inventory(settings)
     manager: EnrichmentJobs = request.app.state.spec_enrichment_jobs
+    job = manager.get(job_id, account)
+    if job is None or job.preview:
+        raise HTTPException(status_code=404, detail="Enrichment job not found.")
     try:
         found = manager.clear(job_id, account)
     except ValueError as error:

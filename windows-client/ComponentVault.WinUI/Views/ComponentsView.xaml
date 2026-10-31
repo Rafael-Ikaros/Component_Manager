@@ -494,7 +494,9 @@
 							</ItemsControl>
 						</StackPanel>
 						<StackPanel Spacing="4">
-							<TextBlock FontWeight="SemiBold" Text="说明" />
+							<TextBlock FontWeight="SemiBold" Text="商城参考价" />
+                            <TextBlock Text="{Binding SelectedComponentReferencePrice}" TextWrapping="Wrap" />
+                            <TextBlock FontWeight="SemiBold" Text="说明" />
 							<TextBlock Text="{Binding SelectedComponentDescription}" TextWrapping="Wrap" />
 						</StackPanel>
 						<StackPanel Spacing="4">

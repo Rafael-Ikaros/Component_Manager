@@ -138,6 +138,7 @@ data class ComponentOfficialMetadata(
     val ruleVersion: String? = null,
     val parameters: Map<String, String> = emptyMap(),
     val datasheetUrl: String? = null,
+    val referencePrice: ReferencePriceSnapshot? = null,
 )
 
 data class ComponentRecognitionMetadata(
@@ -299,7 +300,7 @@ fun ComponentImportCandidate.withRecognitionMetadata(
 fun ComponentImportCandidate.withOfficialMetadata(
     metadata: ComponentOfficialMetadata,
 ): ComponentImportCandidate {
-    val metadataOrigin = if (metadata.source in setOf("lcsc_public_web", "lcsc_domestic_web")) {
+    val metadataOrigin = if (metadata.source in setOf("lcsc_public_web", "lcsc_domestic_web", "lceda_public_library", "easyeda_public_library")) {
         ComponentImportFieldOrigin.PublicWeb
     } else ComponentImportFieldOrigin.Server
     val resolvedBrand = if (fieldOrigins.brand in setOf(ComponentImportFieldOrigin.User,
@@ -356,8 +357,12 @@ fun ComponentImportCandidate.withOfficialMetadata(
     }.orEmpty()
 
     val mergedNotes = buildList {
-        addAll(notes)
+        addAll(ReferencePriceNotes.merge(notes, metadata.referencePrice))
         metadata.source?.let { addIfMissing("识别来源：$it") }
+        if (metadata.source in setOf("lceda_public_library", "easyeda_public_library")) {
+            addIfMissing("资料来源：嘉立创EDA/EasyEDA官方库")
+            addIfMissing("元件库链接：https://lceda.cn/ · https://easyeda.com")
+        }
         metadata.vendor?.let { addIfMissing("识别厂商：$it") }
         metadata.modelFamily?.let { addIfMissing("识别型号族：$it") }
         metadata.matchedBy?.let { addIfMissing("官方查询：匹配方式 ${it.uppercase()}") }
@@ -572,6 +577,7 @@ fun trustedProductImageUrl(value: String?): String? {
             uri.port == -1 &&
             host in setOf(
                 "assets.lcsc.com",
+                "alimg.szlcsc.com",
                 "www.lcsc.com",
                 "img.szlcsc.com",
                 "image.szlcsc.com",
