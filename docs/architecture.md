@@ -28,7 +28,7 @@
 - `InventoryRepository` 保留配置、读取和预览入口；`InventoryWriteService` 管理元件、库位、出入库、批量入库和转移事务，`InventoryImportCatalog` 管理识别、官方查询、学习映射与查询缓存。学习映射写入复用元件保存的同一个 SQLite 事务。
 - `InventorySyncService` 管理网络交换、账户绑定、上传快照、拉取和队列确认；与保存同步配置共用配置锁。账户检查仍在上传前，拉取及队列确认同事务提交，随后保存游标。`InventoryPreferenceKeys` 集中共享键值，不改变已有设置文件或键名。
 - 流水的来源/目标库位区分 JSON 空值与文本。同步事务仅修正不存在对应真实库位的历史 `null` 字符串引用，保留流水、库存和原时间；不新增 schema 迁移。
-- Android 设置和库存内容消费外层安全区域后处理 IME inset；主导航切换清除输入焦点。库存的全部、低库存、筛选、分类、库位、排序共用单行横向滚动栏，直接下拉立即生效；综合筛选面板保留独立草稿，取消不修改条件，应用后再提交。底部 NavigationBar 在 IME 实际遮住底部时使用 NavigationSuiteType.None 释放占高，库存外部底边距同时归零，页面继续负责 imePadding；不改变 MainActivity 的全局窗口策略，侧边 rail 不受影响。
+- Android 设置和库存内容消费外层安全区域后处理 IME inset；主导航切换清除输入焦点。库存的全部、低库存、分类、库位、排序共用单行横向滚动栏，直接下拉立即生效；不再提供重复的综合筛选按钮与面板。底部 NavigationBar 在 IME 实际遮住底部时使用 NavigationSuiteType.None 释放占高，库存外部底边距同时归零，页面继续负责 imePadding；不改变 MainActivity 的全局窗口策略，侧边 rail 不受影响。
 - 主 Tab 与设置分组内容使用 180ms 原生 Animatable 淡入，只组合当前页面；独立 SecondaryPageScaffold 额外上移 8dp，不在普通重组或 IME 变化时重播。原生时长缩放响应系统设置，不改系统配置。SaveableStateHolder 保留草稿和滚动状态。
 - Android 添加菜单共用“添加元件”入口，扫码/商城查询表单提供手动填写操作，复用完整元件编辑器；不再暴露独立手动录入与 Component Hub 迁移菜单。旧迁移解析、已有文件和 Windows 路径未改动。
 - 库存筛选、结果操作、多选区与元件行共用一个LazyColumn；键盘展开或短窗口时可把头部滚出以完整查看元件，不固定占满列表高度。搜索值仍来自原ViewModel，滚回顶部可继续调整筛选，不增加库存提交入口。

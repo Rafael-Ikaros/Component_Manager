@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import com.componentvault.android.R
 import com.componentvault.android.model.InventoryScreenUiState
+import com.componentvault.android.model.InventorySortOption
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +29,7 @@ class InventoryFilterLayoutUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun narrowPaneKeepsQuickFiltersInOneRowAndOpensAdvancedPanel() {
+    fun narrowPaneKeepsAllFiveControlsInOneScrollableRowWithoutFilterPanel() {
         val context: Application = RuntimeEnvironment.getApplication()
         compose.setContent {
             MaterialTheme {
@@ -44,7 +45,7 @@ class InventoryFilterLayoutUiTest {
             }
         }
         val pane = compose.onNodeWithTag("filter_pane").getUnclippedBoundsInRoot()
-        val quickFilters = listOf(R.string.filter_all, R.string.filter_low_stock, R.string.inventory_filter_button)
+        val quickFilters = listOf(R.string.filter_all, R.string.filter_low_stock)
             .map { compose.onNodeWithText(context.getString(it)).assertIsDisplayed().getUnclippedBoundsInRoot() }
         quickFilters.forEach { bounds ->
             assertTrue(bounds.left >= pane.left && bounds.right <= pane.right)
@@ -58,15 +59,11 @@ class InventoryFilterLayoutUiTest {
             assertTrue(kotlin.math.abs((bounds.top + bounds.bottom - quickFilters.first().top - quickFilters.first().bottom).value) <= 2f,
                 "Advanced selectors must remain on the same horizontal row")
         }
-        compose.onNodeWithTag("inventory_filter_panel_button").performScrollTo().performClick()
-        for (label in listOf(R.string.filter_category_label, R.string.filter_location_label, R.string.filter_sort_label)) {
-            compose.onNode(hasText(context.getString(label), substring = true)
-                and hasAnyAncestor(hasTestTag("inventory_filter_panel"))).assertIsDisplayed()
-        }
-
+        compose.onNodeWithTag("inventory_filter_panel_button").assertDoesNotExist()
+        compose.onNodeWithTag("inventory_filter_panel").assertDoesNotExist()
     }
     @Test
-    fun panelEditsAreDraftsUntilAppliedAndResetClearsAdvancedFiltersOnly() {
+    fun directSelectorsApplyImmediatelyAndCanReturnToAllCategories() {
         val context: Application = RuntimeEnvironment.getApplication()
         val state = mutableStateOf(InventoryScreenUiState(availableCategories = listOf("Resistor")))
         compose.setContent {
@@ -82,33 +79,17 @@ class InventoryFilterLayoutUiTest {
                 }
             }
         }
-        fun openAndSelectCategory() {
-            compose.onNodeWithTag("inventory_filter_panel_button").performClick()
-            compose.onNode(hasText(context.getString(R.string.filter_category_label), substring = true)
-                and hasAnyAncestor(hasTestTag("inventory_filter_panel"))).performClick()
-            compose.onNodeWithText("Resistor").performClick()
-            compose.runOnIdle { assertEquals(null, state.value.filters.category) }
-        }
-        openAndSelectCategory()
-        compose.onNodeWithText(context.getString(R.string.action_cancel)).performClick()
-        compose.runOnIdle { assertEquals(null, state.value.filters.category) }
-        openAndSelectCategory()
-        compose.onNodeWithText(context.getString(R.string.inventory_filter_apply)).performClick()
-        compose.runOnIdle { assertEquals("Resistor", state.value.filters.category) }
-        compose.onNodeWithTag("inventory_filter_panel_button").assertIsSelected().performClick()
-        compose.onNodeWithText(context.getString(R.string.inventory_filter_reset)).performClick()
-        compose.runOnIdle { assertEquals("Resistor", state.value.filters.category) }
-        compose.onNodeWithText(context.getString(R.string.inventory_filter_apply)).performClick()
-        compose.runOnIdle { assertEquals(null, state.value.filters.category) }
-        compose.onNodeWithTag("inventory_filter_panel_button").assertIsNotSelected()
-        compose.onNode(hasText(context.getString(R.string.filter_category_label), substring = true)
+        fun openSelector(label: Int) = compose.onNode(hasText(context.getString(label), substring = true)
             and hasAnyAncestor(hasTestTag("inventory_filter_bar"))).performScrollTo().performClick()
+        openSelector(R.string.filter_category_label)
         compose.onNodeWithText("Resistor").performClick()
         compose.runOnIdle { assertEquals("Resistor", state.value.filters.category) }
-        compose.onNodeWithTag("inventory_filter_panel_button").performScrollTo().assertIsSelected().performClick()
-        compose.onNode(hasText("Resistor", substring = true)
-            and hasAnyAncestor(hasTestTag("inventory_filter_panel"))).assertIsDisplayed()
-
+        openSelector(R.string.filter_category_label)
+        compose.onNodeWithText(context.getString(R.string.filter_category_all)).performClick()
+        compose.runOnIdle { assertEquals(null, state.value.filters.category) }
+        openSelector(R.string.filter_sort_label)
+        compose.onNodeWithText(context.getString(R.string.sort_name)).performClick()
+        compose.runOnIdle { assertEquals(InventorySortOption.Name, state.value.filters.sort) }
     }
 
 }

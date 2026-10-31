@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,7 +32,6 @@ import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -536,16 +534,6 @@ internal fun InventoryFilterHeader(
     onSortChange: (InventorySortOption) -> Unit,
 ) {
     val strings = vaultStrings()
-    val focusManager = LocalFocusManager.current
-    var filterPanelVisible by rememberSaveable { mutableStateOf(false) }
-    var draftCategory by rememberSaveable { mutableStateOf<String?>(null) }
-    var draftLocation by rememberSaveable { mutableStateOf<String?>(null) }
-    var draftSort by rememberSaveable { mutableStateOf(InventorySortOption.UpdatedNewest) }
-    val activeFilterCount = listOf(
-        uiState.filters.category != null,
-        uiState.filters.location != null,
-        uiState.filters.sort != InventorySortOption.UpdatedNewest,
-    ).count { it }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -580,22 +568,7 @@ internal fun InventoryFilterHeader(
                 onClick = { onStockFilterChange(InventoryStockFilter.LowStock) },
                 label = { Text(strings.inventory.filterLowStock) },
             )
-            FilterChip(
-                selected = activeFilterCount > 0,
-                modifier = Modifier.testTag("inventory_filter_panel_button"),
-                onClick = {
-                    focusManager.clearFocus()
-                    draftCategory = uiState.filters.category
-                    draftLocation = uiState.filters.location
-                    draftSort = uiState.filters.sort
-                    filterPanelVisible = true
-                },
-                label = {
-                    Text(if (activeFilterCount == 0) stringResource(R.string.inventory_filter_button)
-                    else stringResource(R.string.inventory_filter_button_active, activeFilterCount))
-                },
-            )
-            InventoryAdvancedFilters(
+            InventoryDropdownFilters(
                 uiState = uiState, category = uiState.filters.category,
                 location = uiState.filters.location, sort = uiState.filters.sort,
                 onCategoryChange = onCategoryChange, onLocationChange = onLocationChange,
@@ -603,46 +576,10 @@ internal fun InventoryFilterHeader(
             )
         }
     }
-    if (filterPanelVisible) {
-        AlertDialog(
-            onDismissRequest = { filterPanelVisible = false },
-            title = { Text(stringResource(R.string.inventory_filter_button)) },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag("inventory_filter_panel"),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    InventoryAdvancedFilters(
-                        uiState = uiState, category = draftCategory, location = draftLocation, sort = draftSort,
-                        onCategoryChange = { draftCategory = it }, onLocationChange = { draftLocation = it },
-                        onSortChange = { draftSort = it },
-                    )
-                    TextButton(onClick = {
-                        draftCategory = null
-                        draftLocation = null
-                        draftSort = InventorySortOption.UpdatedNewest
-                    }) { Text(stringResource(R.string.inventory_filter_reset)) }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onCategoryChange(draftCategory)
-                    onLocationChange(draftLocation)
-                    onSortChange(draftSort)
-                    filterPanelVisible = false
-                }) { Text(stringResource(R.string.inventory_filter_apply)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { filterPanelVisible = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
 }
 
 @Composable
-private fun InventoryAdvancedFilters(
+private fun InventoryDropdownFilters(
     uiState: InventoryScreenUiState,
     category: String?,
     location: String?,

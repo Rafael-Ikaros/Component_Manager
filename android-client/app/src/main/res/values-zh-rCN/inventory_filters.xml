@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="inventory_filter_button">筛选</string>
-    <string name="inventory_filter_button_active">筛选 (%1$d)</string>
-    <string name="inventory_filter_apply">应用</string>
-    <string name="inventory_filter_reset">重置</string>
-</resources>
