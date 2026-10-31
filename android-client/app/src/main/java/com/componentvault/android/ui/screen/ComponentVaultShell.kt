@@ -1,6 +1,12 @@
 package com.componentvault.android.ui.screen
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,8 +25,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import com.componentvault.android.model.InventorySortOption
 import com.componentvault.android.model.InventoryStockFilter
@@ -119,7 +129,7 @@ internal fun ComponentVaultAppShell(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ComponentVaultAppShellContent(
     uiState: InventoryUiState,
@@ -219,7 +229,19 @@ internal fun ComponentVaultAppShellContent(
         }
     }
 
+    val adaptiveNavigationType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+    // IME padding belongs to the page. Release the bottom bar's layout space while the
+    // keyboard covers it, otherwise that reserved space becomes a gap above the IME.
+    val density = LocalDensity.current
+    val imeOccludesBottom = WindowInsets.isImeVisible &&
+        WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
+    val navigationType = if (adaptiveNavigationType == NavigationSuiteType.NavigationBar && imeOccludesBottom) {
+        NavigationSuiteType.None
+    } else {
+        adaptiveNavigationType
+    }
     NavigationSuiteScaffold(
+        layoutType = navigationType,
         navigationSuiteItems = {
             InventoryDestination.entries.forEach { item ->
                 val label = strings.shell.destinationLabel(item)
@@ -240,48 +262,50 @@ internal fun ComponentVaultAppShellContent(
             snackbarHost = { SnackbarHost(effectiveSnackbarHostState) },
             containerColor = MaterialTheme.colorScheme.background,
         ) { padding ->
-            destinationStateHolder.SaveableStateProvider(destination.name) {
-                ShellContent(
-                    contentPadding = padding,
-                    uiState = uiState,
-                    destination = destination,
-                    layoutMode = layoutMode,
-                    onQueryChange = onQueryChange,
-                    onStockFilterChange = onStockFilterChange,
-                    onCategoryChange = onCategoryChange,
-                    onLocationChange = onLocationChange,
-                    onScanInventory = onScanInventory,
-                    onSortChange = onSortChange,
-                    onSelectComponent = onSelectComponent,
-                    onOpenComponentDetail = onOpenComponentDetail,
-                    onImportComponent = onImportComponent,
-                    onGenerateLabel = onGenerateLabel,
-                    onOpenBluetoothPrint = onOpenBluetoothPrint,
-                    onEditComponent = onEditComponent,
-                    onRequestDeleteComponent = onRequestDeleteComponent,
-                    onBatchTransfer = onBatchTransfer,
-                    onQuickMovement = onQuickMovement,
-                    onScanMovementLabel = onScanMovementLabel,
-                    onRetryMovementScan = onRetryMovementScan,
-                    onDismissMovementScanResult = onDismissMovementScanResult,
-                    onDiscardMovementBatch = onDiscardMovementBatch,
-                    onOpenMovementBatchReview = onOpenMovementBatchReview,
-                    onUpdateMovementBatchItemMovementType = onUpdateMovementBatchItemMovementType,
-                    onUpdateMovementBatchItemQuantity = onUpdateMovementBatchItemQuantity,
-                    onUpdateMovementBatchItemReason = onUpdateMovementBatchItemReason,
-                    onUpdateMovementBatchItemNote = onUpdateMovementBatchItemNote,
-                    onRemoveMovementBatchItem = onRemoveMovementBatchItem,
-                    onSearchInventoryBySku = onSearchInventoryBySku,
-                    onRecordMovement = onRecordMovement,
-                    onOpenLowStockInventory = onOpenLowStockInventory,
-                    onSelectOverviewComponent = onSelectOverviewComponent,
-                    onOpenMovements = onOpenMovements,
-                    onSelectMovement = onSelectMovement,
-                    onOpenMovementDetail = onOpenMovementDetail,
-                    onOpenSettings = onOpenSettingsHome,
-                    onOpenSyncSettings = onOpenSyncSettings,
-                    settingsContent = settingsContent,
-                )
+            Box(Modifier.fillMaxSize().then(pageEntranceMotion(destination))) {
+                destinationStateHolder.SaveableStateProvider(destination.name) {
+                    ShellContent(
+                        contentPadding = padding,
+                        uiState = uiState,
+                        destination = destination,
+                        layoutMode = layoutMode,
+                        onQueryChange = onQueryChange,
+                        onStockFilterChange = onStockFilterChange,
+                        onCategoryChange = onCategoryChange,
+                        onLocationChange = onLocationChange,
+                        onScanInventory = onScanInventory,
+                        onSortChange = onSortChange,
+                        onSelectComponent = onSelectComponent,
+                        onOpenComponentDetail = onOpenComponentDetail,
+                        onImportComponent = onImportComponent,
+                        onGenerateLabel = onGenerateLabel,
+                        onOpenBluetoothPrint = onOpenBluetoothPrint,
+                        onEditComponent = onEditComponent,
+                        onRequestDeleteComponent = onRequestDeleteComponent,
+                        onBatchTransfer = onBatchTransfer,
+                        onQuickMovement = onQuickMovement,
+                        onScanMovementLabel = onScanMovementLabel,
+                        onRetryMovementScan = onRetryMovementScan,
+                        onDismissMovementScanResult = onDismissMovementScanResult,
+                        onDiscardMovementBatch = onDiscardMovementBatch,
+                        onOpenMovementBatchReview = onOpenMovementBatchReview,
+                        onUpdateMovementBatchItemMovementType = onUpdateMovementBatchItemMovementType,
+                        onUpdateMovementBatchItemQuantity = onUpdateMovementBatchItemQuantity,
+                        onUpdateMovementBatchItemReason = onUpdateMovementBatchItemReason,
+                        onUpdateMovementBatchItemNote = onUpdateMovementBatchItemNote,
+                        onRemoveMovementBatchItem = onRemoveMovementBatchItem,
+                        onSearchInventoryBySku = onSearchInventoryBySku,
+                        onRecordMovement = onRecordMovement,
+                        onOpenLowStockInventory = onOpenLowStockInventory,
+                        onSelectOverviewComponent = onSelectOverviewComponent,
+                        onOpenMovements = onOpenMovements,
+                        onSelectMovement = onSelectMovement,
+                        onOpenMovementDetail = onOpenMovementDetail,
+                        onOpenSettings = onOpenSettingsHome,
+                        onOpenSyncSettings = onOpenSyncSettings,
+                        settingsContent = settingsContent,
+                    )
+                }
             }
         }
     }

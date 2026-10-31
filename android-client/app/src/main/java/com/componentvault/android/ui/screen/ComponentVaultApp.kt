@@ -430,6 +430,10 @@ fun ComponentVaultApp(
                         viewModel.saveStorageLocation(id, name, com.componentvault.android.model.StorageLocationSaveIntent.Create, complete)
                     },
                     onDismiss = ::closeImportSurface,
+                    onManualEntry = {
+                        closeImportSurface()
+                        openComponentEditor(null)
+                    },
                     onLocationCodeScan = ::applyScannedLocation,
                     onSaveImportedComponent = { draft, sourceCandidate, onComplete ->
                         submitImportedDraft(
@@ -736,6 +740,10 @@ fun ComponentVaultApp(
                         viewModel.saveStorageLocation(id, name, com.componentvault.android.model.StorageLocationSaveIntent.Create, complete)
                     },
                     onDismiss = ::closeImportSurface,
+                    onManualEntry = {
+                        closeImportSurface()
+                        openComponentEditor(null)
+                    },
                     onLocationCodeScan = ::applyScannedLocation,
                     onSaveImportedComponent = { draft, sourceCandidate, onComplete ->
                         submitImportedDraft(
@@ -764,18 +772,9 @@ fun ComponentVaultApp(
                     showAddEntrySheet = false
                     importSurfaceVisible = true
                 },
-                onAddComponent = {
-                    showAddEntrySheet = false
-                    openComponentEditor(null)
-                },
                 onImportBom = {
                     showAddEntrySheet = false
                     bomImportInitialMode = BomImportMode.Bom
-                    bomImportVisible = true
-                },
-                onImportMigration = {
-                    showAddEntrySheet = false
-                    bomImportInitialMode = BomImportMode.Migration
                     bomImportVisible = true
                 },
                 onBatchJlc = {
@@ -839,9 +838,7 @@ internal fun ComponentEditorRoute(
 internal fun AddComponentEntrySheet(
     onDismiss: () -> Unit,
     onImportComponent: () -> Unit,
-    onAddComponent: () -> Unit,
     onImportBom: () -> Unit,
-    onImportMigration: () -> Unit,
     onBatchJlc: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
@@ -855,8 +852,6 @@ internal fun AddComponentEntrySheet(
             ImportMenuRow(R.string.import_menu_single, R.string.import_menu_single_hint, onImportComponent)
             ImportMenuRow(R.string.import_menu_batch, R.string.import_menu_batch_hint, onBatchJlc)
             ImportMenuRow(R.string.import_menu_bom, R.string.import_menu_bom_hint, onImportBom)
-            ImportMenuRow(R.string.import_menu_migration, R.string.import_menu_migration_hint, onImportMigration)
-            ImportMenuRow(R.string.import_menu_manual, R.string.import_menu_manual_hint, onAddComponent)
         }
     }
 }

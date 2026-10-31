@@ -35,7 +35,7 @@ class UiScreenshotTest {
     fun captureImportWorkflowChooserLight() {
         compose.setContent {
             ComponentVaultTheme(darkTheme = false) {
-                AddComponentEntrySheet({}, {}, {}, {}, {}, {})
+                AddComponentEntrySheet({}, {}, {}, {})
             }
         }
 

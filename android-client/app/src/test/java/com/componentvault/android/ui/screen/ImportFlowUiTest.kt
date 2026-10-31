@@ -28,16 +28,14 @@ class ImportFlowUiTest {
     private val context: Application get() = RuntimeEnvironment.getApplication()
 
     @Test
-    fun chooserPresentsFourDistinctWorkflowsAndSecondaryManualEntry() {
+    fun chooserHasOneAddEntryAndNoMigrationOrDuplicateManualEntry() {
         var selected = ""
         compose.setContent {
             MaterialTheme {
                 AddComponentEntrySheet(
                     onDismiss = {},
                     onImportComponent = { selected = "single" },
-                    onAddComponent = { selected = "manual" },
                     onImportBom = { selected = "bom" },
-                    onImportMigration = { selected = "migration" },
                     onBatchJlc = { selected = "batch" },
                 )
             }
@@ -51,16 +49,15 @@ class ImportFlowUiTest {
             R.string.import_menu_single,
             R.string.import_menu_batch,
             R.string.import_menu_bom,
-            R.string.import_menu_migration,
         )
         workflows.forEach { labelRes ->
             val label = context.getString(labelRes)
             compose.onNodeWithText(label).performScrollTo().assertIsDisplayed()
         }
-        compose.onNodeWithText(context.getString(R.string.import_menu_migration)).performClick()
-        assertEquals("migration", selected)
-        val manualLabel = context.getString(R.string.import_menu_manual)
-        compose.onNodeWithText(manualLabel).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.import_menu_migration)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.import_menu_manual)).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.import_menu_single)).performClick()
+        assertEquals("single", selected)
     }
 
     @Test
@@ -70,13 +67,38 @@ class ImportFlowUiTest {
             MaterialTheme {
                 androidx.compose.material3.Text("Inventory host")
                 if (visible.value) {
-                    AddComponentEntrySheet({ visible.value = false }, {}, {}, {}, {}, {})
+                    AddComponentEntrySheet({ visible.value = false }, {}, {}, {})
                 }
             }
         }
         compose.onNodeWithText("Inventory host").assertExists()
         compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithText("Inventory host").assertIsDisplayed()
+    }
+
+    @Test
+    fun unifiedAddFormOffersManualEntryWithoutSavingAnything() {
+        var manualOpened = false
+        var saved = false
+        compose.setContent {
+            MaterialTheme {
+                ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
+                    JlcImportSurface(
+                        layoutMode = rememberInventoryLayoutMode(),
+                        syncConfiguration = com.componentvault.android.model.SyncConfiguration("test", "", "", false, "", ""),
+                        appPreferences = com.componentvault.android.model.AppPreferences(),
+                        onCreateStorageLocation = { _, _, _ -> },
+                        onDismiss = {},
+                        onSaveImportedComponent = { _, _, _ -> saved = true },
+                        onOpenFullEditor = { _, _ -> },
+                        onManualEntry = { manualOpened = true },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.import_manual_entry)).assertIsDisplayed().performClick()
+        assertEquals(true, manualOpened)
+        assertEquals(false, saved)
     }
 
     @Test

@@ -1,14 +1,20 @@
 package com.componentvault.android.ui.screen
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +33,7 @@ import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -60,6 +67,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -142,7 +150,7 @@ internal fun InventoryScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun InventoryContent(
     contentPadding: PaddingValues,
@@ -166,6 +174,9 @@ internal fun InventoryContent(
     onBatchTransfer: BatchTransferAction? = null,
     onQuickMovement: QuickMovementAction? = null,
 ) {
+    val density = LocalDensity.current
+    val imeOccludesBottom = WindowInsets.isImeVisible &&
+        WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
     val focusManager = LocalFocusManager.current
     val listState = rememberLazyListState()
     val selectionModeState = rememberSaveable { mutableStateOf(false) }
@@ -176,7 +187,8 @@ internal fun InventoryContent(
             Modifier.fillMaxSize()
                 .consumeWindowInsets(contentPadding)
                 .imePadding()
-                .padding(rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp)),
+                .padding(rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp,
+                    bottom = if (imeOccludesBottom) 0.dp else 20.dp)),
         ) {
             val scaffoldDirective = calculatePaneScaffoldDirective(currentWindowAdaptiveInfo()).copy(
                 maxHorizontalPartitions = if (maxWidth >= 836.dp) 2 else 1,
@@ -260,7 +272,8 @@ internal fun InventoryContent(
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding)
                 .imePadding(),
-            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 12.dp,
+                bottom = if (imeOccludesBottom) 0.dp else 12.dp),
             uiState = uiState,
             statusMessage = statusMessage,
             compactRows = layoutMode.widthClass != InventoryWidthClass.Compact,
@@ -511,7 +524,7 @@ private fun InventoryListPane(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun InventoryFilterHeader(
     uiState: InventoryScreenUiState,
@@ -523,9 +536,16 @@ internal fun InventoryFilterHeader(
     onSortChange: (InventorySortOption) -> Unit,
 ) {
     val strings = vaultStrings()
-    var categoryMenuExpanded by rememberSaveable { mutableStateOf(false) }
-    var locationMenuExpanded by rememberSaveable { mutableStateOf(false) }
-    var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    var filterPanelVisible by rememberSaveable { mutableStateOf(false) }
+    var draftCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    var draftLocation by rememberSaveable { mutableStateOf<String?>(null) }
+    var draftSort by rememberSaveable { mutableStateOf(InventorySortOption.UpdatedNewest) }
+    val activeFilterCount = listOf(
+        uiState.filters.category != null,
+        uiState.filters.location != null,
+        uiState.filters.sort != InventorySortOption.UpdatedNewest,
+    ).count { it }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -545,10 +565,10 @@ internal fun InventoryFilterHeader(
             },
             singleLine = true,
         )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("inventory_filter_bar"),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             FilterChip(
                 selected = uiState.filters.stockFilter == InventoryStockFilter.All,
@@ -560,72 +580,145 @@ internal fun InventoryFilterHeader(
                 onClick = { onStockFilterChange(InventoryStockFilter.LowStock) },
                 label = { Text(strings.inventory.filterLowStock) },
             )
-            FilterMenuButton(
-                label = strings.inventory.filterCategoryLabel,
-                value = uiState.filters.category
-                    ?.let { localizedCategoryLabel(it) }
-                    ?: strings.inventory.filterCategoryAll,
-                expanded = categoryMenuExpanded,
-                onExpandedChange = { categoryMenuExpanded = it },
-            ) {
-                DropdownMenuItem(
-                    text = { FilterMenuItemText(strings.inventory.filterCategoryAll) },
-                    onClick = {
-                        onCategoryChange(null)
-                        categoryMenuExpanded = false
-                    },
-                )
-                uiState.availableCategories.forEach { category ->
-                    DropdownMenuItem(
-                        text = { FilterMenuItemText(localizedCategoryLabel(category)) },
-                        onClick = {
-                            onCategoryChange(category)
-                            categoryMenuExpanded = false
-                        },
+            FilterChip(
+                selected = activeFilterCount > 0,
+                modifier = Modifier.testTag("inventory_filter_panel_button"),
+                onClick = {
+                    focusManager.clearFocus()
+                    draftCategory = uiState.filters.category
+                    draftLocation = uiState.filters.location
+                    draftSort = uiState.filters.sort
+                    filterPanelVisible = true
+                },
+                label = {
+                    Text(if (activeFilterCount == 0) stringResource(R.string.inventory_filter_button)
+                    else stringResource(R.string.inventory_filter_button_active, activeFilterCount))
+                },
+            )
+            InventoryAdvancedFilters(
+                uiState = uiState, category = uiState.filters.category,
+                location = uiState.filters.location, sort = uiState.filters.sort,
+                onCategoryChange = onCategoryChange, onLocationChange = onLocationChange,
+                onSortChange = onSortChange,
+            )
+        }
+    }
+    if (filterPanelVisible) {
+        AlertDialog(
+            onDismissRequest = { filterPanelVisible = false },
+            title = { Text(stringResource(R.string.inventory_filter_button)) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag("inventory_filter_panel"),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    InventoryAdvancedFilters(
+                        uiState = uiState, category = draftCategory, location = draftLocation, sort = draftSort,
+                        onCategoryChange = { draftCategory = it }, onLocationChange = { draftLocation = it },
+                        onSortChange = { draftSort = it },
                     )
+                    TextButton(onClick = {
+                        draftCategory = null
+                        draftLocation = null
+                        draftSort = InventorySortOption.UpdatedNewest
+                    }) { Text(stringResource(R.string.inventory_filter_reset)) }
                 }
-            }
-            FilterMenuButton(
-                label = strings.inventory.filterLocationLabel,
-                value = uiState.filters.location?.let {
-                    displayLocationName(it, uiState.storageLocations, strings.common.labelNotConfigured)
-                } ?: strings.inventory.filterLocationAll,
-                expanded = locationMenuExpanded,
-                onExpandedChange = { locationMenuExpanded = it },
-            ) {
-                DropdownMenuItem(
-                    text = { FilterMenuItemText(strings.inventory.filterLocationAll) },
-                    onClick = {
-                        onLocationChange(null)
-                        locationMenuExpanded = false
-                    },
-                )
-                uiState.availableLocations.forEach { location ->
-                    DropdownMenuItem(
-                        text = { FilterMenuItemText(displayLocationName(location, uiState.storageLocations, strings.common.labelNotConfigured)) },
-                        onClick = {
-                            onLocationChange(location)
-                            locationMenuExpanded = false
-                        },
-                    )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onCategoryChange(draftCategory)
+                    onLocationChange(draftLocation)
+                    onSortChange(draftSort)
+                    filterPanelVisible = false
+                }) { Text(stringResource(R.string.inventory_filter_apply)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { filterPanelVisible = false }) {
+                    Text(stringResource(R.string.action_cancel))
                 }
-            }
-            FilterMenuButton(
-                label = strings.inventory.filterSortLabel,
-                value = inventorySortLabel(uiState.filters.sort),
-                expanded = sortMenuExpanded,
-                onExpandedChange = { sortMenuExpanded = it },
-            ) {
-                InventorySortOption.entries.forEach { option ->
-                    DropdownMenuItem(
-                        text = { FilterMenuItemText(inventorySortLabel(option)) },
-                        onClick = {
-                            onSortChange(option)
-                            sortMenuExpanded = false
-                        },
-                    )
-                }
-            }
+            },
+        )
+    }
+}
+
+@Composable
+private fun InventoryAdvancedFilters(
+    uiState: InventoryScreenUiState,
+    category: String?,
+    location: String?,
+    sort: InventorySortOption,
+    onCategoryChange: (String?) -> Unit,
+    onLocationChange: (String?) -> Unit,
+    onSortChange: (InventorySortOption) -> Unit,
+) {
+    val strings = vaultStrings()
+    var categoryMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var locationMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    var sortMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    FilterMenuButton(
+        label = strings.inventory.filterCategoryLabel,
+        value = category
+            ?.let { localizedCategoryLabel(it) }
+            ?: strings.inventory.filterCategoryAll,
+        expanded = categoryMenuExpanded,
+        onExpandedChange = { categoryMenuExpanded = it },
+    ) {
+        DropdownMenuItem(
+            text = { FilterMenuItemText(strings.inventory.filterCategoryAll) },
+            onClick = {
+                onCategoryChange(null)
+                categoryMenuExpanded = false
+            },
+        )
+        uiState.availableCategories.forEach { category ->
+            DropdownMenuItem(
+                text = { FilterMenuItemText(localizedCategoryLabel(category)) },
+                onClick = {
+                    onCategoryChange(category)
+                    categoryMenuExpanded = false
+                },
+            )
+        }
+    }
+    FilterMenuButton(
+        label = strings.inventory.filterLocationLabel,
+        value = location?.let {
+            displayLocationName(it, uiState.storageLocations, strings.common.labelNotConfigured)
+        } ?: strings.inventory.filterLocationAll,
+        expanded = locationMenuExpanded,
+        onExpandedChange = { locationMenuExpanded = it },
+    ) {
+        DropdownMenuItem(
+            text = { FilterMenuItemText(strings.inventory.filterLocationAll) },
+            onClick = {
+                onLocationChange(null)
+                locationMenuExpanded = false
+            },
+        )
+        uiState.availableLocations.forEach { location ->
+            DropdownMenuItem(
+                text = { FilterMenuItemText(displayLocationName(location, uiState.storageLocations, strings.common.labelNotConfigured)) },
+                onClick = {
+                    onLocationChange(location)
+                    locationMenuExpanded = false
+                },
+            )
+        }
+    }
+    FilterMenuButton(
+        label = strings.inventory.filterSortLabel,
+        value = inventorySortLabel(sort),
+        expanded = sortMenuExpanded,
+        onExpandedChange = { sortMenuExpanded = it },
+    ) {
+        InventorySortOption.entries.forEach { option ->
+            DropdownMenuItem(
+                text = { FilterMenuItemText(inventorySortLabel(option)) },
+                onClick = {
+                    onSortChange(option)
+                    sortMenuExpanded = false
+                },
+            )
         }
     }
 }

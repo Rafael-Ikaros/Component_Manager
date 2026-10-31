@@ -302,7 +302,7 @@ internal fun SettingsContent(
         val detail: @Composable (Modifier) -> Unit = { modifier ->
             sectionStateHolder.SaveableStateProvider(section.name) {
                 LazyColumn(
-                    modifier = modifier.testTag("settings_detail_list"),
+                    modifier = modifier.then(pageEntranceMotion(section)).testTag("settings_detail_list"),
                     state = detailStates.getValue(section),
                     contentPadding = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

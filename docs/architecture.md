@@ -1,6 +1,6 @@
 # Architecture Notes
 
-应用品牌母版位于 `docs/design/branding/component-vault-logo-v2.png`。Android 使用应用自有 mipmap 与自适应前景/背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。
+应用品牌母版位于 `docs/design/branding/component-vault-logo-ikaros.png`。`tools/branding/generate_icons.py` 使用 Pillow 生成现有路径的派生资源；Android 使用应用自有 mipmap 与自适应前景/白色背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。
 
 > 标签界面：Android 的单元件标签与批量打印统一进入 `BluetoothLabelPrintScreen`，原独立预览页及诊断弹窗已移除。可编辑 `LabelDesign` 与原元件 `ComponentLabelSeed` 分开保存；前者决定显示文字和纸面位置，后者决定二维码身份。队列 v3 按张保存设计快照和元件/自由标签来源，兼容读取旧 v1/v2 元件队列。自由标签没有库存身份，元件二维码仍从 ComponentLabelSeed 生成。预览、导出和打印共用 M1 纸面渲染器，底层分帧与走纸协议保持不变。开发版功能以对应 Release 说明为准。
 
@@ -28,7 +28,9 @@
 - `InventoryRepository` 保留配置、读取和预览入口；`InventoryWriteService` 管理元件、库位、出入库、批量入库和转移事务，`InventoryImportCatalog` 管理识别、官方查询、学习映射与查询缓存。学习映射写入复用元件保存的同一个 SQLite 事务。
 - `InventorySyncService` 管理网络交换、账户绑定、上传快照、拉取和队列确认；与保存同步配置共用配置锁。账户检查仍在上传前，拉取及队列确认同事务提交，随后保存游标。`InventoryPreferenceKeys` 集中共享键值，不改变已有设置文件或键名。
 - 流水的来源/目标库位区分 JSON 空值与文本。同步事务仅修正不存在对应真实库位的历史 `null` 字符串引用，保留流水、库存和原时间；不新增 schema 迁移。
-- Android 设置和库存内容消费外层安全区域后处理 IME inset，避免键盘把整页平移到屏外；主导航切换清除输入焦点。库存筛选以当前列表栏的宽度换行，双栏设备不依赖横向滑动寻找库位或排序。
+- Android 设置和库存内容消费外层安全区域后处理 IME inset；主导航切换清除输入焦点。库存的全部、低库存、筛选、分类、库位、排序共用单行横向滚动栏，直接下拉立即生效；综合筛选面板保留独立草稿，取消不修改条件，应用后再提交。底部 NavigationBar 在 IME 实际遮住底部时使用 NavigationSuiteType.None 释放占高，库存外部底边距同时归零，页面继续负责 imePadding；不改变 MainActivity 的全局窗口策略，侧边 rail 不受影响。
+- 主 Tab 与设置分组内容使用 180ms 原生 Animatable 淡入，只组合当前页面；独立 SecondaryPageScaffold 额外上移 8dp，不在普通重组或 IME 变化时重播。原生时长缩放响应系统设置，不改系统配置。SaveableStateHolder 保留草稿和滚动状态。
+- Android 添加菜单共用“添加元件”入口，扫码/商城查询表单提供手动填写操作，复用完整元件编辑器；不再暴露独立手动录入与 Component Hub 迁移菜单。旧迁移解析、已有文件和 Windows 路径未改动。
 - 库存筛选、结果操作、多选区与元件行共用一个LazyColumn；键盘展开或短窗口时可把头部滚出以完整查看元件，不固定占满列表高度。搜索值仍来自原ViewModel，滚回顶部可继续调整筛选，不增加库存提交入口。
 - 平板库存行和详情呈现独立在 `InventoryTabletParts.kt`，复用原左滑动作和业务回调；Expanded 窗口在扣除导航、页边距后的净宽达到836dp时显示420dp列表与详情，否则沿同一 Adaptive navigator 单窗格切换，Medium走独立详情路线。主界面及各主导航目的地使用 SaveableStateHolder 保留列表/设置上下文。设置净宽达到700dp时采用240dp分组导航及最大640dp表单，较窄时逐页进入；输入草稿与分组滚动使用 Compose 保存状态，不自动保存业务配置或触发同步。
 - 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。项目用料/迁移预览的说明、行和末尾操作共用一个 LazyColumn，标签模板尺寸页由底部操作栏避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。

@@ -85,6 +85,7 @@ internal fun JlcImportSurface(
     onSaveImportedComponent: (ComponentDraft, ComponentImportCandidate, (OperationResult) -> Unit) -> Unit,
     onOpenFullEditor: (ComponentDraft, ComponentImportCandidate) -> Unit,
     onLocationCodeScan: (String) -> Unit = {},
+    onManualEntry: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val repository = remember(context) { InventoryRepository(context) }
@@ -471,6 +472,11 @@ internal fun JlcImportSurface(
             }
         },
     ) {
+        if (baseCandidate == null && onManualEntry != null) item {
+            OutlinedButton(onClick = onManualEntry, modifier = Modifier.fillMaxWidth()) {
+                Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_manual_entry))
+            }
+        }
         item {
             SectionPane(
                 title = strings.importer.subtitle,

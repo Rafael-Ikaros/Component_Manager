@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.componentvault.android.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +26,7 @@ internal fun SecondaryPageScaffold(
 ) {
     BackHandler { if (navigationEnabled) onBack() }
     Scaffold(
+        modifier = pageEntranceMotion(Unit, rise = 8.dp),
         topBar = {
             TopAppBar(
                 title = { Text(title) },

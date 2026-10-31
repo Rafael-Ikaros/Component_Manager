@@ -1,7 +1,8 @@
 <resources>
     <string name="import_menu_title">Import and scan</string>
-    <string name="import_menu_single">Scan or find one component</string>
-    <string name="import_menu_single_hint">Scan a label, enter a C number, or search the catalog</string>
+    <string name="import_menu_single">Add component</string>
+    <string name="import_menu_single_hint">Scan a label, search the catalog, or enter details manually</string>
+    <string name="import_manual_entry">Enter details manually</string>
     <string name="import_menu_batch">Batch JLC inbound</string>
     <string name="import_menu_batch_hint">Collect packages, resolve details, then confirm stock</string>
     <string name="import_menu_bom">Project materials</string>

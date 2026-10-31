@@ -1,7 +1,8 @@
 <resources>
     <string name="import_menu_title">导入与扫码</string>
-    <string name="import_menu_single">单个元件扫码 / 查询</string>
-    <string name="import_menu_single_hint">扫描标签、输入 C 编号或搜索立创商城</string>
+    <string name="import_menu_single">添加元件</string>
+    <string name="import_menu_single_hint">扫描标签、商城查询或手动填写</string>
+    <string name="import_manual_entry">手动填写</string>
     <string name="import_menu_batch">批量嘉立创入库</string>
     <string name="import_menu_batch_hint">连续收集包装，统一解析后确认入库</string>
     <string name="import_menu_bom">项目用料</string>

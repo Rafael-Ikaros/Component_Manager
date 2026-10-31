@@ -1,7 +1,7 @@
 {
   "product": "Component Vault",
   "design": "Chibi Ikaros holding an electronic-parts storage box, with localized dark side-lock tips and a clean two-arc frame",
-  "status": "selected_for_next_dev",
+  "status": "integrated_for_0.7.9-dev.2",
   "selected_on": "2026-11-01",
   "selected_candidate": "v17, second image (outer tied tails remain pink)",
   "source_file": "component-vault-logo-ikaros.png",
@@ -27,8 +27,12 @@
   ],
   "supersedes_selected_master": "component-vault-logo-v2.png",
   "integration": {
-    "status": "pending_dev_integration",
+    "status": "integrated_for_0.7.9-dev.2",
     "readme_logo_updated": true,
-    "production_icon_references_changed": false
+    "production_icon_references_changed": false,
+    "production_icon_resources_updated": true,
+    "generator": "tools/branding/generate_icons.py",
+    "targets": ["Android launcher", "Windows executable, window and package icons", "admin-web logo and favicons"],
+    "validation_boundary": "Generated resource dimensions and references checked; runtime appearance pending dev validation"
   }
 }

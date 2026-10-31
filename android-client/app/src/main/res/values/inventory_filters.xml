@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="inventory_filter_button">Filters</string>
+    <string name="inventory_filter_button_active">Filters (%1$d)</string>
+    <string name="inventory_filter_apply">Apply</string>
+    <string name="inventory_filter_reset">Reset</string>
+</resources>

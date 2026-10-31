@@ -83,15 +83,16 @@ internal fun rememberContentPadding(
     contentPadding: PaddingValues,
     horizontal: Dp = 0.dp,
     vertical: Dp = 0.dp,
+    bottom: Dp = vertical,
 ): PaddingValues {
     val layoutDirection = LocalLayoutDirection.current
 
-    return remember(contentPadding, horizontal, vertical, layoutDirection) {
+    return remember(contentPadding, horizontal, vertical, bottom, layoutDirection) {
         PaddingValues(
             start = contentPadding.calculateStartPadding(layoutDirection) + horizontal,
             top = contentPadding.calculateTopPadding() + vertical,
             end = contentPadding.calculateEndPadding(layoutDirection) + horizontal,
-            bottom = contentPadding.calculateBottomPadding() + vertical,
+            bottom = contentPadding.calculateBottomPadding() + bottom,
         )
     }
 }
