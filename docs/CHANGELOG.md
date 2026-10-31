@@ -17,6 +17,13 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.3] - 2026-11-01
+
+- Android 库存页移除重复的独立“筛选”按钮及综合弹窗，清理对应草稿状态和中英文资源。
+- 筛选栏仅保留“全部／低库存／分类／库位／排序”，始终同一栏，窄屏可横向滑动；分类、库位和排序直接选择即生效，无需再确认应用。
+- 保留 dev.2 的新 Ikaros Logo、键盘空白修复和页面动画，不修改库存数据、写入行为或同步协议。
+- 两项直接相关筛选 UI 测试及 Debug 构建通过；小米 9 独立候选完成按钮移除、同排显示、分类立即生效和横向触达库位/排序的实机核对。实现提交 `75b4f2f` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41225224610) 各项通过，发布与公开包验证见[工作记录](current-work.md)。Dev 不移动 Docker 正式标签。
+
 ## [0.7.9-dev.2] - 2026-11-01
 
 ### Android 库存与导入
