@@ -11,6 +11,8 @@
   `io.componentvault.server-update=1` 能力标识；不支持的旧版本会被拒绝，现有容器不变。
   待包含此能力的正式版通过验证并发布后，才能在受支持的正式版与 dev 之间在线切换。
 - 只更新本项目 API 和已部署的 Web；不管理其它应用，不自动更新 updater 自身，不自动回滚数据库。
+- updater 使用 Docker CLI 28.x / 配套 Compose 并保留 API 自动协商，照顾尚未更新 Engine 的 NAS。
+  Docker 29 移除了针对较旧 Engine API 的部分客户端兼容处理，见[官方说明](https://docs.docker.com/engine/release-notes/29/)。这不是所有 DSM/Engine 组合都已经实测的承诺。
 - 群晖实际按钮以 DSM / Container Manager 版本为准。以下配置是 Compose 项目操作，
   不是单独创建三个互不关联的容器；未在用户 NAS 上验证的步骤应先在测试项目试用。
 

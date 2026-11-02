@@ -1,4 +1,7 @@
-FROM docker:cli AS docker-cli
+# Keep the 28.x client/Compose baseline for older NAS Engines. Docker 29 removed
+# client-side compatibility handling for Engine APIs older than 1.44.
+# Leave API negotiation enabled; do not force DOCKER_API_VERSION.
+FROM docker:28-cli AS docker-cli
 
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
