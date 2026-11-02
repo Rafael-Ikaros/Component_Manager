@@ -1,241 +1,40 @@
-# Android Native Client
+# Android 客户端
 
-This directory contains the Android-native client built with Jetpack Compose
-and Material 3.
+本目录是 Jetpack Compose / Material 3 原生客户端。库存先保存到本机 SQLite，
+离线可用；服务端同步是可选项。完整能力和操作见[使用指南](../docs/README.md)。
 
-## Current State
+## 功能与代码入口
 
-- Native navigation shell implemented
-- Inventory-first adaptive shell implemented with three top-level destinations
-  (`Inventory`, `Movements`, `Overview`) plus a secondary `Settings` route
-- Official adaptive Compose shell primitives now back the Android UI:
-  `NavigationSuiteScaffold`, window size classes,
-  `NavigableListDetailPaneScaffold`, and a `SearchBar`-first Inventory header
-- Local SQLite persistence and sync settings persistence implemented
-- Component create/edit/soft delete workflow implemented
-- Movement entry workflow implemented
-- JLC copied-text import and package QR import implemented through an in-app
-  CameraX scanner backed by bundled ML Kit barcode scanning
-- Supplier packaging OCR import implemented through an in-app CameraX scanner
-  backed by bundled ML Kit Chinese text recognition
-- Quantity-first import confirmation implemented with optional full editor
-  handoff for JLC text, JLC-compatible QR payloads, warehouse labels, and
-  supplier packaging text
-- Compact label preview plus PNG/PDF export implemented for inventory labels,
-  including `10x40mm QR`, horizontal `30x40mm QR`, and pure text strip
-  templates
-- Expanded local-only settings implemented for sync behavior, import defaults,
-  and About, now grouped into dedicated sections
-- Optional hybrid server-side part enrichment implemented for JLC text and QR
-  imports through `/admin-api/part-lookup`, with local cache reuse and an
-  in-app toggle, while `/admin-api/lcsc/lookup` remains a server compatibility
-  endpoint
-- Push/pull sync wiring implemented against the FastAPI service
-- Chinese-first Material 3 UI implemented for the primary screens, with a
-  matching Simplified Chinese (`zh-CN`) resource set
-- Compose Preview sample states added for inventory, overview, movements,
-  settings, shell, and form flows so the main screens can be inspected without
-  booting an emulator
-- Preview rendering now uses injected static `ComponentVaultStrings` sample
-  bundles plus content-level preview composables so Android Studio does not
-  have to resolve the runtime `R.string` graph for preview-only rendering
-- Android build chain now targets AGP `8.10.1`, Gradle wrapper `8.11.1`,
-  Kotlin `2.0.21`, Lifecycle `2.9.2`, Android SDK Platform `35`, Build Tools
-  `35.0.0`, and Java 21 in CI
-- `.\android-client\gradlew.bat -p android-client help --no-daemon` verified
-  successfully on `2026-05-17`
-- Last full `assembleDebug` verification completed successfully on
-  `2026-05-16` on this host
-- Last full `assembleRelease` verification completed successfully on
-  `2026-05-16` on this host
-- Current source-level verification on this host reaches Gradle and SDK
-  resolution with Android Studio JBR, then stops because the configured SDK
-  path is read-only and AGP cannot install `build-tools;35.0.0`
-- On this host, non-blocking Android metrics warnings and Kotlin daemon
-  fallback messages can appear during verification
+应用提供首页、库存、记录、设置四个主入口。库存中的“导入与扫码”包含添加元件、
+批量嘉立创入库和项目用料；标签模板、预览、编辑及 M1 打印共用编辑器。
+中文目录查询使用国内嘉立创 EDA，英文使用国际来源，不依赖识别服务器或 OpenAPI 密钥。
 
-## Build Preconditions
+`app/src/main/java/com/componentvault/android/` 下的 UI、数据和同步按功能分工。
+当前职责见[Android 模块边界](../docs/architecture.md#android-功能模块边界)，
+照片和 BOM 预设通过独立阶段同步；打印队列、采购提醒等本机状态不等同于共享库存。
 
-- Android SDK installed
-- `ANDROID_HOME` or `ANDROID_SDK_ROOT` configured
-- Java provided through `JAVA_HOME`, Android Studio, or the CI runner toolchain
-- Gradle can resolve Android plugins and dependencies from Google Maven
-- Alternatively, copy `local.properties.example` to `local.properties` and set
-  `sdk.dir=<absolute-sdk-path>`
-- The repository intentionally does not commit `org.gradle.java.home`, so
-  machine-specific JDK paths do not break other environments
-- For official JLC/LCSC enrichment during imports, the configured sync server
-  must also expose `/admin-api/lcsc/lookup` with valid LCSC OpenAPI credentials
+## 构建
 
-## This Host Setup
+安装 Android SDK 和符合项目要求的 JDK，配置 `ANDROID_HOME` / `ANDROID_SDK_ROOT`，
+或复制 `local.properties.example` 为 `local.properties` 并填写本机 `sdk.dir`。
+插件、SDK 和 Kotlin 版本以构建文件为准，不提交开发者机器的绝对路径。
 
-Verified working paths on this Windows machine:
-
-- Android SDK: `C:\Users\gdblz\AppData\Local\Android\Sdk`
-- JDK: `D:\android_studio\jbr`
-- Gradle wrapper: `.\android-client\gradlew.bat`
-- Project-local Gradle cache: `D:\Project_Folder\Component_warehouse\.gradle-user-home`
-- Project-local Android user home: `D:\Project_Folder\Component_warehouse\.android-user`
-
-`android-client/local.properties` should contain:
-
-```properties
-sdk.dir=C:\\Users\\gdblz\\AppData\\Local\\Android\\Sdk
-```
-
-## Quick Check
+在仓库根目录执行：
 
 ```powershell
-$env:GRADLE_USER_HOME='D:\Project_Folder\Component_warehouse\.gradle-user-home'
-$env:JAVA_HOME='D:\android_studio\jbr'
-$env:ANDROID_SDK_ROOT='C:\Users\gdblz\AppData\Local\Android\Sdk'
-$env:ANDROID_HOME='C:\Users\gdblz\AppData\Local\Android\Sdk'
-$env:ANDROID_USER_HOME='D:\Project_Folder\Component_warehouse\.android-user'
-& '.\android-client\gradlew.bat' -p android-client help --no-daemon
-& '.\android-client\gradlew.bat' -p android-client assembleDebug --no-daemon
-& '.\android-client\gradlew.bat' -p android-client assembleRelease --no-daemon
+.\android-client\gradlew.bat -p android-client assembleDebug --no-daemon
+.\android-client\gradlew.bat -p android-client assembleRelease --no-daemon
 ```
 
-For this Windows host, you can also use the repository helper script:
+Windows 也可使用 `scripts/android-gradle.ps1`。签名发布所需的四个 Secrets、工具链和排障见
+[运维手册](../docs/runbook.md#android-release-secrets)。构建成功不代表相机、键盘或打印机已经实测。
 
-```powershell
-.\scripts\android-gradle.ps1 assembleDebug
-.\scripts\android-gradle.ps1 assembleRelease
-```
+## 界面开发与设备验证
 
-That helper prefers Android Studio's embedded JBR and then calls the
-repository wrapper, so local Windows builds stay aligned with the checked-in
-Gradle version.
+使用 Android Studio 打开本目录。Compose Preview 位于
+`app/src/main/java/com/componentvault/android/ui/screen/preview/`，使用合成数据，
+不连接用户库存；可先检查尺寸、主题和语言，再用真实设备检查权限、相机、键盘和返回行为。
+Compose 使用 Preview / Live Edit，不使用 XML 拖放设计器。
 
-If this host logs Kotlin daemon access warnings under
-`C:\Users\gdblz\AppData\Local\kotlin\daemon\...`, Gradle may fall back to
-non-daemon compilation and still finish successfully.
-
-If an older branch or stale dependency cache still fails in
-`lintVitalAnalyzeRelease` with `KaCallableMemberCall` and
-`androidx.lifecycle.lint.NonNullableMutableLiveDataDetector`, sync to the
-current repository baseline first: AGP `8.10.1`, Gradle wrapper `8.11.1`,
-Lifecycle `2.9.2`, SDK Build Tools `35.0.0`, and Java 21.
-
-If local `assembleDebug` or `assembleRelease` instead fails with
-`Failed to install the following SDK components: build-tools;35.0.0` and
-`The SDK directory is not writable`, the current user cannot repair or install
-the required build-tools package in the configured SDK path. In that state,
-`.\android-client\gradlew.bat -p android-client help --no-daemon` and
-`compileDebugKotlin --no-daemon` are still valid source-level checks, but APK
-packaging will stay blocked until the SDK is writable again.
-
-## Visual Editing
-
-Jetpack Compose does not use the old XML layout designer. For this client,
-visual editing means Compose Preview, Interactive Preview, Run Preview, and
-Live Edit inside Android Studio.
-
-The Android Studio tutorial for `Layout Editor` applies to View/XML layouts,
-not to this Compose client. For this project, use the Compose tooling flow
-instead of the XML drag-and-drop editor.
-
-Use this workflow:
-
-1. Open `android-client/` in Android Studio.
-2. Open one of the dedicated preview files under
-   `app/src/main/java/com/componentvault/android/ui/screen/preview/`.
-3. Start with:
-   `OverviewScreenPreview.kt`, `InventoryScreenPreview.kt`,
-   `MovementsScreenPreview.kt`, `SettingsScreenPreview.kt`,
-   `QrScannerPreview.kt`,
-   `AppShellPreviews.kt`, or `DialogsPreview.kt`.
-4. In the editor, switch to `Split` or `Design`.
-5. Use the Preview panel group filter to start with `Phone` and `Tablet`.
-6. Use `Locale`, `Theme`, `Accessibility`, `Shell`, and `Dialogs` only for
-   targeted follow-up checks after the baseline previews render cleanly.
-7. If the preview does not refresh, click `Build & Refresh`.
-8. If Preview still shows stale `R.string` / `NoSuchFieldError` render
-   problems after code changes, run `Build > Rebuild Project` once and reopen
-   the preview file.
-9. For lightweight taps, text entry, and dialog-state checks, use
-   `Interactive Preview`.
-10. For real device context, permissions, and runtime behavior, use
-   `Run Preview` or a normal emulator/device run.
-11. Once the app is running, use `Live Edit` for rapid spacing, color, and
-    typography adjustments.
-
-The current preview catalog is baseline-first:
-
-- baseline light previews for inventory phone and tablet states, overview,
-  movements, settings, shell, and form surfaces
-- dedicated medium-width and narrow-phone previews for adaptive density checks
-- targeted secondary previews for `zh-CN`, dark theme, and large-font checks
-  on selected high-value states instead of multiplying every screen by every
-  variant
-- dialog and shell previews kept to single light variants to reduce Compose
-  Preview rendering load inside Android Studio
-
-This lighter matrix keeps Preview more reliable while still covering the
-important density, locale, theme, and accessibility checks before running an
-emulator.
-
-## UI Structure
-
-The Android UI is now split so Preview-friendly composables are isolated from
-the `ViewModel` entrypoint:
-
-- `ui/screen/ComponentVaultApp.kt`
-  Route/container that connects `InventoryViewModel` to the UI
-- `ui/screen/ComponentVaultStrings.kt`
-  Runtime string bundle assembly plus preview-safe composition locals for
-  shared UI copy
-- `ui/screen/ComponentVaultShell.kt`
-  Adaptive app shell and destination routing built on
-  `NavigationSuiteScaffold`
-- `ui/screen/OverviewScreen.kt`
-  Summary-first overview surface
-- `ui/screen/InventoryScreen.kt`
-  Search-first inventory list, adaptive list-detail handling through
-  `NavigableListDetailPaneScaffold`, dense filter rows, and JLC import
-  entrypoint
-- `ui/screen/MovementsScreen.kt`
-  Movement history and detail flows
-- `ui/screen/SettingsScreen.kt`
-  Section-based grouped sync, import, app-language, and About layout
-- `ui/screen/JlcImportScreen.kt`
-  Quantity-first import surface for JLC text, JLC-compatible QR payloads,
-  supplier packaging OCR, warehouse labels, and background official metadata
-  enrichment
-- `ui/screen/JlcQrScannerScreen.kt`
-  App-internal CameraX + bundled ML Kit QR scanner surface with permission handling
-- `ui/screen/ImportTextScannerScreen.kt`
-  App-internal CameraX + bundled ML Kit Chinese text recognition surface for
-  supplier packaging OCR
-- `ui/screen/ComponentLabelPreviewScreen.kt`
-  Compact inventory label preview and PNG/PDF export flow with physical-size
-  templates and preview-safe aspect ratios
-- `ui/screen/InventoryForms.kt`
-  Adaptive full-screen and dialog-based editing forms
-- `ui/screen/InventoryUiParts.kt`
-  Shared dense list rows, badges, and section containers
-- `data/InventoryRepository.kt`
-  Local SQLite, sync wiring, and cached `/admin-api/part-lookup` integration
-- `ui/screen/preview/`
-  Preview annotations, preview host, static preview string bundles, sample
-  states, and dedicated preview files
-
-This split keeps the Preview targets parameter-driven so Android Studio can
-render them without booting the full runtime graph, and lets preview-only
-surfaces bypass runtime resource lookups that can go stale inside the IDE.
-
-Important limitation:
-
-- Visual Studio can edit and build this Kotlin project when the Android toolchain
-  is configured, but it does not provide the Google-native Compose Preview
-  experience. For Android UI visual editing, use Android Studio.
-
-## GitHub Release Build
-
-`release.yml` expects Android signing values from environment variables. In
-GitHub Actions, these are supplied from repository secrets:
-
-- `ANDROID_KEYSTORE_BASE64`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
+涉及升级或同步的设备检查须保留应用数据。已记录的验证路径和未覆盖边界见
+[验证记录](../docs/history/verification.md)，M1 的纸张与设备限制见[打印指南](../docs/m1-printing-feature-matrix.md)。

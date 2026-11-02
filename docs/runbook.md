@@ -32,162 +32,42 @@ docker compose -f docker-compose.hub.yml --profile web ps
 
 ## Docker Hub image deployment
 
-Use `docker-compose.hub.yml` to pull a published API image instead of building
-the server locally. Copy `.env.example` to the root `.env`; an existing deployment
-may continue supplying its `API_TOKEN` there. The Compose defaults use the
-floating API `latest` and Web `web-latest` tags. Check their
-current versions on Docker Hub before pulling. Override both image variables
-to select a fixed, published release, such as `0.7.8` and `web-0.7.8`.
-The server image listens on port 8787 and stores SQLite under `/data`; preserve
-the Compose project name and `component_vault_data` volume when upgrading.
-The admin Web app remains a separate image. Start the optional profile with
-`docker compose -f docker-compose.hub.yml --profile web up -d`. API `0.7.4`
-and Web `web-0.7.4` were published in the same repository; floating tags can
-move with later stable releases. Historical verification details are in the
-Docker Hub guide.
+普通部署和升级见[快速部署](docker-quickstart.md)、[渠道切换](docker-channels.md)和
+[网页更新](server-web-update.md)。保留原项目名称、完整 `/data` 及应用配置；
+0.7.8 升级 dev 不会自动创建 updater。Web 更新首次需配置，之后由管理员确认作业。
 
-Repository maintainers configure Actions variables `DOCKERHUB_USERNAME` and
-`DOCKERHUB_IMAGE`, plus secret `DOCKERHUB_TOKEN`. CI always validates a container
-without registry credentials. Publishing requires both variables and the token; missing values fail the Docker
-job explicitly. Native release artifacts are reported independently.
-A manual `Docker Images` run with `push_image=true` can publish an existing
-release afterward; normal CI never pushes an image. Follow the complete
-[Docker quickstart and API Token lookup](docker-quickstart.md), or the complete
-[Docker Hub setup, verification and upgrade instructions](dockerhub.md).
+维护者发布镜像见[Docker Hub 发布](dockerhub.md)。普通部署者不需要 Docker Hub 发布 Token。
+API/Web/updater 镜像身份、发布门禁和 ARM 运行边界应分别核对，不能仅凭 GitHub 附件判断容器发布完成。
 
 ### Optional Watchtower updates for the Hub deployment
 
-The base Hub Compose file does not start an updater. For opt-in updates of
-`api` (`latest`) and `admin-web` (`web-latest`), place
-[`docker-compose.watchtower.yml`](../docker-compose.watchtower.yml) beside the
-existing Hub file and `.env`, and retain the original project name and `/data`
-mount. Back up the entire data directory consistently **before** enabling
-updates, including `users/` and `config.json`; schedule recurring backups
-before the update window. The original
-[`containrrr/watchtower`](https://github.com/containrrr/watchtower) is
-archived. The override explicitly uses the maintained
-[`nicholas-fedor/watchtower` fork](https://github.com/nicholas-fedor/watchtower)
-(`nickfedor/watchtower:latest`); check Docker Engine/API compatibility on the
-host. It adds enable labels only to the existing API and Web services, sets
-`WATCHTOWER_LABEL_ENABLE=true`, and mounts the Docker socket only into the
-updater. It does not enable in-app updates or change the database volume.
-
-```sh
-docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web config --quiet
-docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web up -d
-docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web logs --tail=100 watchtower
-```
-
-Omit `--profile web` for API-only installations. Reuse `-p <original-project>`
-on every command if the deployment used it. On Synology Container Manager,
-merge the override labels and `watchtower` service into the **existing** project
-Compose definition, then redeploy the project; container restart alone does
-not apply labels or a new image. Keep the original bind mount or named volume.
-Watchtower checks once per day and recreates selected containers when floating
-images change. API and Web updates are independent, not atomic. After a change,
-check Compose `ps`, `logs api`, `/health` `version`/`revision`, and
-`compose images api admin-web` against the paired Hub tags; then verify browser
-login and inventory read. Stop Watchtower and restore a
-compatible API/Web pair from the consistent backup if necessary. Automatic
-updates have not been verified on a NAS in this change. Full steps are in
-[Docker Hub deployment](dockerhub.md#可选-watchtower-自动更新).
+定时跟随当前镜像渠道可选择[Watchtower](docker-quickstart.md#watchtower-updates)。
+它不会自动跨渠道，且不与网页 updater 同时管理同一 API/Web。群晖安装该组件仍需一次原项目配置。
 
 ### 排查镜像与客户端账户接口不一致
 
-客户端提示服务端过老时，先按 [Docker 排障步骤](docker-quickstart.md#7-客户端提示服务端版本过老或无法确认账户身份)
-核对实际容器与客户端 API 地址。镜像构建把发布 tag 与实际 checkout commit 写入
-`/health` 的 `version` / `revision`；源码启动明确显示 `source` / `unknown`。
-容器 CI 也会验证认证后的 `/auth/me`，避免仅凭旧 `/auth/ping` 成功就放行。
-Web 读取 API 设置 15 秒超时，对地址、CORS、HTTPS/HTTP 混用及缺少账户接口提供提示。
-版本元数据不改变账户身份或同步协议。
+见[账户接口排障](docker-quickstart.md#7-客户端提示服务端版本过老或无法确认账户身份)。
+先核对实际 API `/health` 版本及认证 `/auth/me`，再检查端口、反向代理和账户密钥。
 
 ## Admin console deployment and API token
 
-The first setup token is the administrator account key. Keep it for deployment
-and account management; issue a distinct ordinary key per user's inventory from
-Web Settings. The user's Android, Windows and Web sessions use that same key.
-Creation/reset shows a key once; copy it for the user. If lost, reset the key;
-disabling or rotating access does not delete stock. There is no public signup.
+首次密钥属于管理员，普通账户由管理员创建；会话、权限和删除范围见[账户指南](accounts.md)。
+Web/API 需同站点且精确允许 Web origin；网页保存的设置与非空环境变量的优先级见
+[配置说明](docker-quickstart.md#3-环境变量和网页配置的优先级)。MQTT 有独立的数据库配置优先级。
 
-Back up the entire `/data` directory consistently while writes are stopped,
-including the original administrator database, its account registry, `users/`,
-configuration and logs. A backup of only `component_vault.db` does not contain
-ordinary users' inventory. Keep the same mount on upgrade. Ordinary accounts
-need account-aware native clients; older admin clients remain usable. A native
-workspace identity mismatch must be resolved with a separate local workspace or
-an explicit export/reset process, never automatic inventory deletion.
-
-Web language is selected in login/settings; `/setup` has its own selector.
-The preference is saved in each browser origin, not as a server-wide language.
-
-The new Web login sends the account key once to `POST /auth/session`; browser login state in
-localStorage retains only the API URL. The API issues a 12-hour `HttpOnly`,
-`SameSite=Lax` cookie, and logout revokes the session. Native Android and
-Windows clients still authenticate with `Authorization: Bearer <account-key>`.
-Serve Web and API from the same site (the same scheme and hostname; ports 8081
-and 8787 may differ). Because those ports are different origins, configure the
-exact Web `scheme://host:port` in `ADMIN_WEB_ORIGINS`; credentialed CORS does not
-work with a wildcard. After changing an environment-provided origin, recreate
-the API with `compose up -d`; `restart` does not reload `.env`. A saved origin
-in `/data/config.json` is read dynamically. Ensure a reverse proxy forwards
-`/auth/session`, `/auth/me`, and `/admin-api/*` to the API.
-The admin console is read-only by default. Set `WEB_INVENTORY_ENABLED=true` on
-the API only when authenticated browser users should create locations and
-components, edit metadata, and record inbound/outbound movements. Writes use
-`expected_updated_at` concurrency checks and persistent `request_id` receipts;
-quantity and allocations cannot be changed through the metadata form.
-Turning the flag off blocks later browser writes but does not reverse completed
-inventory movements. Exact request retries are safe; after a 409 stale-version
-response, refresh the component before deciding whether to submit a new request ID.
-
-For a new Docker deployment, copy the repository-root `.env.example` to `.env`
-and leave `API_TOKEN`, `ADMIN_WEB_ORIGINS`, `ADMIN_WEB_URL`, and `WEB_INVENTORY_ENABLED` empty.
-Confirm the versions currently behind `latest` and `web-latest` before deploying;
-first-run `/setup` requires API 0.7.1 or later.
-Start the API, then open `http://server:8787/setup`; the same-origin first-run
-page stores these settings under `/data/config.json`. Existing deployments may
-keep non-empty environment values, which take precedence and remain read-only in
-the setup UI. To update Hub images, run `docker compose -f docker-compose.hub.yml --profile web pull`
-followed by `docker compose -f docker-compose.hub.yml --profile web up -d` when the
-Web profile is enabled; omit `--profile web` for API-only deployments. `restart`
-alone does not pull new images or reload changed `.env` values. The `ADMIN_WEB_URL`
-entry and direct server configuration editing in the Web console are 0.7.4
-features. Verify that both images contain 0.7.4 before using them; the floating
-tags do not establish that until the stable Docker images are published.
-Set the actual Web console URL in the setup page, including any reverse-proxy
-subpath. After the first save, copy the API token before selecting **Enter admin
-console**; the console asks for that token again. If the Web console is not
-deployed, leave its URL empty and continue to use authenticated `/setup`.
-Authenticated users can later edit deployment settings from the Web console.
-A `.env` in `server/` is not the Compose root environment file. For a direct
-server launch, explicitly export the variables or run uvicorn with
-`--env-file .env` from `server/`; editing a file alone does not update a running
-process. The bundled requirements include support for uvicorn environment files.
-
-The web console is served on port 8081 and the API on port 8787. On another phone
-or PC, use the server host address, not `localhost`. An optional
-`VITE_DEFAULT_API_BASE_URL` configures the public API default during web build;
-without it, the web login suggests its own host with port 8787. HTTPS reverse
-proxy deployments should configure their HTTPS API URL and allowed web origin.
+升级前一致备份整个 `/data`，包含管理员账户注册表、`users/`、配置及各账户 `.db.photos/`。
+回退到不支持账户的旧程序会令普通账户无法登录；换镜像不能撤销数据库迁移。
 
 ### API token discovery
 
-The token is the deployment's `API_TOKEN`, not a GitHub access token and not a
-random value generated on every startup. Check the authenticated `/setup` page,
-Compose root `.env` / container environment, `/data/config.json`, or the
-environment used to launch uvicorn. Both native clients and the web login use the
-same value. Only the unconfigured first-run state permits anonymous setup; after
-save, viewing or changing settings and logs requires the current token.
-After changing the server token, update client settings and sign in again.
+按[密钥查找步骤](docker-quickstart.md#4-api-token-在哪里)确定当前生效值。
+管理员密钥不是 Docker Hub 或 GitHub Token；普通用户需要自己的账户密钥。
+不要为了升级清空现有 API_TOKEN，也不要让旧客户端绕过账户绑定上传。
 
 ### Upgrade from the HTTP 422 long-name failure
 
-Upgrade the server as well as the client. Component names imported by previous
-versions may contain product descriptions longer than 200 characters. The server
-now accepts names up to 4000 characters, preserving their full contents. New
-catalog imports prefer the model and store official product descriptions in the
-description field. Existing custom names are not rewritten. Retry synchronization
-after upgrading; clearing app data is unnecessary and would discard local data.
+服务端兼容最多4000字符的旧元件名称；新导入将型号与描述分开。
+同时更新服务端和客户端后重试同步，无需清空应用数据；用户名称不会被批量重写。
 
 ## Multi-location inventory upgrade
 
@@ -243,11 +123,6 @@ cd server
 `py -3.12` launcher registration by falling back to a repo-local
 `uv`-managed Python 3.12 under `.uv-python/` when `uv` is installed.
 
-Verification snapshot on a healthy local toolchain (`2026-05-08`):
-
-- `.\.venv\Scripts\python.exe -m pytest` -> backend suite passed
-- `/admin-api/dashboard` smoke request with token -> `200 OK`
-
 ## Local Admin Web Development
 
 The separated admin web console lives in `admin-web/`.
@@ -265,7 +140,7 @@ Default local addresses:
 
 ## Docker Deployment
 
-Start the bundled single-user stack with:
+从仓库根目录构建并启动源码版 API 与管理台：
 
 ```powershell
 docker compose up --build
@@ -282,7 +157,7 @@ Admin web is available at:
 
 ### Server
 
-- `API_TOKEN`: optional environment-provided shared token for authenticated endpoints
+- `API_TOKEN`: optional environment-provided administrator account key; ordinary accounts use their own keys
 - `DATABASE_PATH`: SQLite file path; Compose fixes it to `/data/component_vault.db`
 - `CONFIG_PATH`: optional override for `config.json`; defaults beside SQLite
 - `LOG_DIR`: optional application log directory; defaults to `logs` beside SQLite
@@ -598,21 +473,21 @@ treated as the primary production UI target.
 ### Server Health
 
 ```powershell
-curl http://localhost:8787/health
+curl.exe http://localhost:8787/health
 ```
 
 ### Admin API Check
 
 ```powershell
-curl http://localhost:8787/admin-api/dashboard `
-  -H "Authorization: Bearer change-me"
+curl.exe http://localhost:8787/admin-api/dashboard `
+  -H "Authorization: Bearer <你的账户密钥>"
 ```
 
 ### Auth Check
 
 ```powershell
-curl -X POST http://localhost:8787/auth/ping `
-  -H "Authorization: Bearer change-me"
+curl.exe -X POST http://localhost:8787/auth/ping `
+  -H "Authorization: Bearer <你的账户密钥>"
 ```
 
 ## Common Failure Modes
@@ -886,7 +761,7 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/Relea
 
 只有改动相关部分时才需在本地运行对应项目。候选构建可通过 `Release Artifacts` 的 `workflow_dispatch` 设置 `source_ref` 为完整提交 SHA、`release_tag` 为拟验证的 dev 标签，并将 `publish_github_release` 设为 `false`；这样只生成验证附件，不创建公开 Release。桌面验收通过后再写具体版本的 CHANGELOG 标题触发发布；仅编辑 Unreleased 不发布。dev 不推送 Docker 稳定标签。
 
-订单复核、待验收项和服务端 Issue #25 的实现建议见 [2026-10-28 记录](issues-2026-10-28.md)。
+订单更新操作见[订单资料指南](order-metadata-update.md)，历史验证边界见[验证记录](history/verification.md)。
 
 
 ### 从订单更新已有资料（dev.21）
@@ -901,4 +776,4 @@ API 与 Web 配套更新后，在“库存 → 国内资料批量更新”扫描
 分析不写入；应用沿用 `WEB_INVENTORY_ENABLED` 或已保存的 Web 库存操作开关。
 无需 Cookie、新环境变量或数据库 schema 迁移。先同步各设备，逐页预览并选择字段，应用后再同步回设备。
 任务预览只存在本次服务进程，重启后重新分析；网络失败可重试，版本冲突需重新预览。
-dev 不移动 Docker 正式标签；需要试用新服务端时，按[资料更新教程](parameter-enrichment.md)从对应 dev 标签构建 API 与 Web，保留原数据挂载和 Compose 项目名。
+开发镜像使用 dev/web-dev，正式镜像使用 latest/web-latest。试用时成对更新并保留原项目和数据；需要源码构建时见[资料更新教程](parameter-enrichment.md)。

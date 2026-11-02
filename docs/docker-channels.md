@@ -65,7 +65,7 @@ COMPONENT_VAULT_WEB_IMAGE=
 
 ## Watchtower 与版本确认
 
-沿用 [Watchtower 配置](dockerhub.md#可选-watchtower-自动更新)。它跟随当前容器的镜像渠道更新，
+沿用 [Watchtower 配置](docker-quickstart.md#watchtower-updates)。它跟随当前容器的镜像渠道更新，
 不会自动跨渠道；切换助手保留原 override 中的 Watchtower labels。
 
 在服务端“设置 → 关于服务端”查看实际版本，`/health` 也提供 `version / revision`。

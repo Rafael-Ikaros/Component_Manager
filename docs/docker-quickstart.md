@@ -1,6 +1,7 @@
 # Docker 快速部署与 API Token 查找
 
-这条路径面向普通部署者。拉取公开镜像不需要 Docker Hub 登录、Docker Hub Token 或 GitHub PAT。首次配置由 API 自带的同源页面完成，不依赖额外的管理 Web 镜像或 CORS 配置。
+本指南说明 Docker／群晖的安装、持久化文件、账户密钥和常见故障。
+公开镜像可直接拉取。首次配置页面由 API 提供，不需要先启动独立 Web。
 
 已有正式版希望升级到 dev 并在网页管理，请直接看[保留数据升级与网页配置](server-web-update.md#已有正式版先升级到-dev)。
 API/Web 可以先成对升级，应用设置随后在网页修改；要连镜像更新也放进网页，需一次启用 updater。
@@ -40,17 +41,36 @@ docker compose -f docker-compose.hub.yml --profile web up -d
 
 以后使用默认浮动标签更新时，先在 Docker Hub 核对 `latest` 和 `web-latest` 当前对应的版本，再在原部署目录执行 `docker compose -f docker-compose.hub.yml --profile web pull` 和 `docker compose -f docker-compose.hub.yml --profile web up -d`；仅部署 API 时去掉 `--profile web`。单独执行 `restart` 不会拉取新镜像。
 
+<a id="watchtower-updates"></a>
+
 ### 可选：Watchtower 自动更新 API 与 Web
 
-默认只使用 `docker-compose.hub.yml`，**不会自动更新**。若决定启用自动更新，先备份整个 `/data`（含管理员数据库、`users/`、`config.json`），确认 `.env` 的两个镜像变量仍是 `latest` / `web-latest` 且 Docker Hub 已发布配套版本，再把 [`docker-compose.watchtower.yml`](../docker-compose.watchtower.yml) 放进原部署目录。不要新建项目或换目录；保持原 Compose project name、`.env` 和数据卷。
+Watchtower 适合自动跟随**当前镜像标签**更新，不负责在正式/dev之间切换。
+默认模板不启动它。它与网页 updater 二选一，不能同时管理同一 API/Web。
 
-```sh
-docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web config --quiet
-docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web up -d
-docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web logs --tail=100 watchtower
-```
+1. 一致备份整个 `/data`，保留原项目名称、目录和数据映射。
+2. 核对 API/Web 已选择同一渠道，例如 `latest / web-latest` 或 `dev / web-dev`。
+3. 把 [`docker-compose.watchtower.yml`](../docker-compose.watchtower.yml) 放到原部署目录，执行：
 
-只部署 API 时可省略 `--profile web`。覆盖文件仅给 `api`、`admin-web` 加 `com.centurylinklabs.watchtower.enable=true`，由独立 Watchtower 容器以 `WATCHTOWER_LABEL_ENABLE=true` 每 24 小时检查；Docker socket 只挂在 Watchtower 上。它会拉取新镜像并**重建**目标容器，`restart` 不会完成镜像升级。API 与 Web 是两个容器，更新不是同一事务；更新后查看 `docker compose ... ps`、`logs api`、`http://服务器IP:8787/health` 的 `version`/`revision`，再用相同 `-f` 参数执行 `images api admin-web` 核对配套镜像（仅部署 API 时只查 `api`），并打开 Web 确认登录、库存读取正常。出错时停用 Watchtower，再使用备份和已核对兼容的 API/Web 成对版本恢复；不要删除数据卷。完整边界与群晖配置见 [Watchtower 更新说明](dockerhub.md#可选-watchtower-自动更新)。
+   ```sh
+   docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web config --quiet
+   docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web up -d
+   docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --profile web logs --tail=100 watchtower
+   ```
+
+只部署 API 时省略 `--profile web`；原部署带 `-p 项目名` 时，每条命令继续使用原项目名。
+群晖 GUI 只接受单文件时，在**原项目**合入 override 的 API/Web 标签和 watchtower 服务，保存后重新部署。
+不要只填写环境变量代替标签，也不要创建第二个空项目。
+
+模板采用 `nickfedor/watchtower:latest`，以 `WATCHTOWER_LABEL_ENABLE=true` 限定目标，
+只更新带 `com.centurylinklabs.watchtower.enable=true` 的 API/Web，约每24小时检查一次。
+Docker socket 仅挂入 Watchtower；使用前在其日志核对与宿主 Docker 的连接情况。
+更新由停止并重建容器完成，不是 `restart`。Watchtower 自身仍需在原项目维护。
+
+API/Web 更新并非原子操作。更新后核对容器、`/health` 版本、登录和库存读取；
+失败时停用自动更新，使用一致备份与兼容的 API/Web 配对恢复，不删除数据卷。
+自动更新不包含数据库备份或数据回滚。该模板尚未在所有群晖机型实测。
+关闭时移除 Watchtower 服务和目标标签，再部署原项目，保留数据卷。
 
 ## 2. 群晖 Container Manager 与文件映射
 
@@ -156,6 +176,16 @@ PowerShell 可用 `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString(
 
 完整的升级、备份、CORS、MQTT 与维护者发布说明见 [Docker Hub 镜像发布与部署教程](dockerhub.md) 和 [Runbook](runbook.md)。
 
+## 6. 升级前备份与回退
+
+暂停写入后备份整个 `/data`，包括管理员数据库、`users/`、`config.json`、各账户 `.db.photos/` 和需要保留的日志。
+SQLite 应使用一致备份；复制原文件时先停止 API 写入，不能只复制 `.db` 而遗漏仍有数据的 WAL。
+保留原 Compose、`.env`、项目名和挂载来源，配置备份不能代替业务数据备份。
+
+恢复时同时恢复配套的数据库、照片和配置，再核对账户和库存。
+切回旧镜像不会撤销新版的数据库迁移；先确认旧版本能读取该数据格式。
+普通账户不能用不支持账户的老服务登录。客户端未上传的本地数据和 BOM 预设另行备份。
+
 ## 7. 客户端提示“服务端版本过老”或无法确认账户身份
 
 0.7.5 起，原生客户端同步前会读取 `GET /auth/me`，确认服务器和账户身份。
@@ -181,7 +211,7 @@ docker compose -f docker-compose.hub.yml --profile web ps
 按顺序核对：
 
 1. 客户端填写 API 的 `8787` 地址，不是 Web 的 `8081` 地址，也不要附加 `/setup`。
-2. 用同一地址访问 `/health`。本次改动起，镜像响应增加 `version` 和 `revision`，
+2. 用同一地址访问 `/health`。当前镜像响应包含 `version` 和 `revision`，
    Web 设置的运行配置也显示它们；0.7.5 和更早镜像没有这两个字段，字段缺失不能单独证明没有账户接口。
    从源码直接启动且未注入构建信息时显示 `source` / `unknown`。
 3. 重新运行客户端“测试连接”。`/auth/me` 返回 404，表示所访问的服务没有这个路由，

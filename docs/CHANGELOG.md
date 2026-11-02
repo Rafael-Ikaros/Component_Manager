@@ -19,6 +19,9 @@ bump: patch
 
 ### 文档与部署说明
 
+- 重写仓库首页，增加 Ikaros 首屏、版本与构建徽章、Android／Windows／Docker 入口和按任务组织的文档导航。
+- 合并重复阶段记录，移除分散的旧 Issue 快照、上游对比、库存扩展计划与跨设备待办；验证摘要集中到 `history/verification.md`，原始证据通过固定提交追溯。更新各模块 README，删除个人工具链路径和早期验证状态。
+- 明确 0.7.8 保留数据升级 dev 与零配置启用网页更新的区别：首次仍需配置 updater，之后管理员可确认更新兼容渠道，网页检查不会自动安装。
 - 清理四份被现行指南与架构取代的账户、Android 重构及 UI 计划，修复入口引用；保留协议、实机与历史版本证据并标注日期范围。
 - 统一 dev Docker 镜像发布、原图持久目录、查询语言来源、账户删除和标签工具说明，纠正旧文档中的相互矛盾表述。
 - 补充已有正式版直接升级 dev 的步骤，以及网页应用配置与宿主 Compose 配置的边界；首次升级可同时启用 updater，保留原项目、账户、数据及环境配置。仅更新文档，不创建新安装包或移动镜像渠道。
@@ -30,7 +33,7 @@ bump: patch
 - 修复 dev.6 发布验收暴露的 `.env` 权限问题：更新组件以 root 执行时，原子替换前保留原文件所有者、组和权限，备份同样保留属性，不再令宿主原用户失去配置访问权。属性复制失败时不拉取、不修改配置或重建。
 - 新增 `docker-compose.hub-web-update.yml` 完整单文件模板，群晖项目无需手动合并 Hub 与 updater 多份配置，Web 默认启动。旧项目仍需一次在 GUI 中保留原数据来源、端口、网络并启用更新组件，之后日常操作在网页进行。
 - 增加模板渲染一致性检查及 POSIX 权限回归，继续使用真实临时 Compose 项目的发布后更新门禁。dev.6 三镜像虽然已推送，最终更新验收因权限缺陷失败，不建议使用；以本版最终 CI 结果为准。
-- 不更改库存 schema、同步协议或原生业务；仅发布 dev 镜像，不移动正式 `latest / web-latest`。验证结果和发布摘要见[工作记录](current-work.md)。
+- 不更改库存 schema、同步协议或原生业务；仅发布 dev 镜像，不移动正式 `latest / web-latest`。验证结果和发布摘要见[验证记录](history/verification.md)。
 - [主CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059523)、[Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059508)和[发布](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059575)全部成功。真实临时项目的管理员更新流程已验证API/Web替换、updater保持、库存/库位/挂载/端口及宿主配置可读性保留；三组开发镜像已核对为本版，包含amd64/arm64。未在真实群晖上操作。
 
 ## [0.7.9-dev.6] - 2026-11-02
@@ -47,7 +50,7 @@ bump: patch
 ### 验证与边界
 
 - 管理员代理11项、updater/helper11项及版本前缀兼容检查通过，Web构建和浏览器隔离模拟流程通过：确认、旧正式拒绝、短暂断线、重连和刷新恢复。未操作真实NAS或已有库存。
-- [初版主CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41387818268)及[最终Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41388859367)通过真实三镜像构建、容器启动、鉴权与任务持久化检查。发布还需通过独立临时Compose项目的真正更新验收，核对数据、端口、挂载与容器替换；最终结果记录在[工作记录](current-work.md)。
+- [初版主CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41387818268)及[最终Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41388859367)通过真实三镜像构建、容器启动、鉴权与任务持久化检查。发布还需通过独立临时Compose项目的真正更新验收，核对数据、端口、挂载与容器替换；最终结果记录在[验证记录](history/verification.md)。
 - 本轮只发布dev；当前正式镜像仍不包含网页更新，不能承诺现在即可在线切回旧正式版。API/Web和updater均提供独立开发镜像，不推动正式标签。
 
 ## [0.7.9-dev.5] - 2026-11-02
@@ -68,7 +71,7 @@ bump: patch
 ### 验证
 
 - 本次实现 `195dbe0` 的[独立 Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073824) 构建及容器启动检查通过；[主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073611) 各项检查通过。
-- 隔离浏览器实测两项批删取消/确认，接口核对删除墓碑和保护字段；实际检测正式版与开发版，刷新保留渠道，中英文显示通过。助手使用假 Docker 验证失败/配套检查/原配置保留，本机未做真实 NAS 切换。镜像发布与摘要核对见[工作记录](current-work.md)。
+- 隔离浏览器实测两项批删取消/确认，接口核对删除墓碑和保护字段；实际检测正式版与开发版，刷新保留渠道，中英文显示通过。助手使用假 Docker 验证失败/配套检查/原配置保留，本机未做真实 NAS 切换。镜像发布与摘要核对见[验证记录](history/verification.md)。
 
 ## [0.7.9-dev.4] - 2026-11-01
 
@@ -89,14 +92,14 @@ bump: patch
 ### 验证
 
 - 本次功能提交 `0bc0f6d` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41230588248) 全部通过，包含 Windows 标准核心测试、自包含发布与启动检查，以及 Android、Web、服务端和容器检查。
-- 隔离服务端真实联网、Web 预览与选择性应用通过，逐字段核对保护数据未变；小米 9 独立候选实际同步后数据库内容与服务端一致，并目视验证中文资料、参考价、国内 C70565 查询和英文价格显示。未修改原应用数据或设备显示参数；Windows 桌面价格区本轮未目视验收。发布与公开包验证后续记录于[工作记录](current-work.md)。
+- 隔离服务端真实联网、Web 预览与选择性应用通过，逐字段核对保护数据未变；小米 9 独立候选实际同步后数据库内容与服务端一致，并目视验证中文资料、参考价、国内 C70565 查询和英文价格显示。未修改原应用数据或设备显示参数；Windows 桌面价格区本轮未目视验收。发布与公开包验证后续记录于[验证记录](history/verification.md)。
 
 ## [0.7.9-dev.3] - 2026-11-01
 
 - Android 库存页移除重复的独立“筛选”按钮及综合弹窗，清理对应草稿状态和中英文资源。
 - 筛选栏仅保留“全部／低库存／分类／库位／排序”，始终同一栏，窄屏可横向滑动；分类、库位和排序直接选择即生效，无需再确认应用。
 - 保留 dev.2 的新 Ikaros Logo、键盘空白修复和页面动画，不修改库存数据、写入行为或同步协议。
-- 两项直接相关筛选 UI 测试及 Debug 构建通过；小米 9 独立候选完成按钮移除、同排显示、分类立即生效和横向触达库位/排序的实机核对。实现提交 `75b4f2f` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41225224610) 各项通过，发布与公开包验证见[工作记录](current-work.md)。Dev 不移动 Docker 正式标签。
+- 两项直接相关筛选 UI 测试及 Debug 构建通过；小米 9 独立候选完成按钮移除、同排显示、分类立即生效和横向触达库位/排序的实机核对。实现提交 `75b4f2f` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41225224610) 各项通过，发布与公开包验证见[验证记录](history/verification.md)。Dev 不移动 Docker 正式标签。
 
 ## [0.7.9-dev.2] - 2026-11-01
 
@@ -114,7 +117,7 @@ bump: patch
 ### 验证与发布边界
 
 - Android 直接相关测试分阶段共 16 项通过；最终外露筛选项后，2 项筛选 UI 和 1 项完整 shell 键盘回归及 Debug 构建通过。实现提交 `a954dbc` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41223461154) 各项已通过。
-- 小米 9 独立测试包验证单行横向筛选、直接库位名称选择与排序、搜索结果、键盘空白修复、导航恢复、简化菜单和手动编辑返回；库存保持两种元件各 20、零流水。桌面已显示新 Logo。原应用升级前备份已导出，公开包安装及备份比对结果见[工作记录](current-work.md)。
+- 小米 9 独立测试包验证单行横向筛选、直接库位名称选择与排序、搜索结果、键盘空白修复、导航恢复、简化菜单和手动编辑返回；库存保持两种元件各 20、零流水。桌面已显示新 Logo。原应用升级前备份已导出，公开包安装及备份比对结果见[验证记录](history/verification.md)。
 - 本轮没有修改库存 schema、同步协议或写入行为；Windows/Web 的新图标已接入资源并通过 CI 构建，未重新完成运行界面目视验收。Dev 仅发布预发布附件，不移动 Docker 正式标签。
 
 ## [0.7.9-dev.1] - 2026-10-31
@@ -135,7 +138,7 @@ bump: patch
 
 - Android 最终 16 项业务单测、4 项导入入口 UI 测试及 Debug 构建通过；Windows 8 项预设互通测试（含行 ID 冲突）及最终自包含发布构建通过，Web 生产构建通过。
 - Windows 隔离数据与小米 9 独立测试包完成共享预设加载、人工匹配、追加手动行、修改数量、保存原预设、来源与跳过项保留、复核取消及一次确认扣料。两端取消后库存保持 20/20；确认后为 10/18，数据库各仅新增两条出库流水 10/2。Windows 原用户四个配置文件 hash 恢复一致，Android 原真实应用未修改。
-- 这是定向 UI 验收，不代表全量 QA；Android 独立测试包不证明原应用升级保留数据。代码提交 `88ff489` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41182213609) 全部通过，公开发布与附件读回结果见[工作记录](current-work.md)。Dev 发布只生成附件，不更新 Docker 正式标签。
+- 这是定向 UI 验收，不代表全量 QA；Android 独立测试包不证明原应用升级保留数据。代码提交 `88ff489` 的 [GitHub CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41182213609) 全部通过，公开发布与附件读回结果见[验证记录](history/verification.md)。Dev 发布只生成附件，不更新 Docker 正式标签。
 
 ## [0.7.8] - 2026-10-28
 
@@ -258,7 +261,7 @@ bump: patch
 - 修复 Android、Windows 元件转移后仍显示旧库位：详情仅展示有库存的分配，零库存时显示主库位；历史分配和同步数据不删除。
 - 补齐 dev.16 的 Android 实机验收：BOM 自动识别、取消匹配、跳过、暂存、旋转、复核扣料；采购在途与到货提醒、导出后批量标记；真实相机扫描库位二维码后筛选库存。
 - 修复提交 201d861 的 CI 与签名候选构建成功；Android 17 保留数据覆盖安装 dev.17，已复测 BOM 数量自动刷新及旧库位隐藏。清理专用测试数据后为 26 项、810 件，前后备份逐行确认原有库存、库位、分配和流水未变。
-- 本版为 dev 预发布，不更新 Docker 正式标签。Windows 展示修复已通过定向测试与 CI，本轮未重新进行 Windows 手工 UI 或实体打印验收。详情见 [Issues 与实机记录](issues-2026-10-22.md)。
+- 本版为 dev 预发布，不更新 Docker 正式标签。Windows 展示修复已通过定向测试与 CI，本轮未重新进行 Windows 手工 UI 或实体打印验收。详情见 [Issues 与实机记录](history/verification.md)。
 ## [0.7.8-dev.16] - 2026-10-18
 
 - Android BOM 会话保留旋转中的文件、预览和选择；加入取消匹配、匹配状态提示和退出暂存确认。
@@ -275,7 +278,7 @@ bump: patch
 - GitHub CI 通过。签名候选包在 Android 17 实机验证保留数据升级、导入保存、数量加号、出入库、编辑库位时全量转移、BOM 匹配扣料、相机入口返回、重启持久化、备份导出和隔离服务器连接测试。
 - 清理专用测试元件及库位后，活动库存恢复 26 项、810 件；导出备份逐行确认原有元件、库位、分配和流水未变。未进行生产服务端完整往返同步或实体标签识读，本版不代表全功能 QA。
 
-本版为 dev 重构验证版，不更新 Docker 正式标签。测试边界、已知问题与验收证据见 [当前工作记录](current-work.md)。
+本版为 dev 重构验证版，不更新 Docker 正式标签。测试边界、已知问题与验收证据见 [当前工作记录](history/verification.md)。
 
 ## [0.7.8-dev.14] - 2026-10-18
 
@@ -285,7 +288,7 @@ bump: patch
 - 出入库表单独立维护，库位显示名称；流水刷新保持选中记录。写入成功但界面刷新失败时明确提示已保存，避免误导重复提交。
 - 本地 37 项相关测试和 WinUI 编译通过。发布前使用 GitHub 构建的 Windows ZIP 实际验证新建、入库、出库、概览/流水/详情刷新、同步失败恢复、隔离服务端连接测试及测试数据清理。
 
-本版为 dev 验证版，不更新 Docker 正式标签。原有库存与同步配置保留；实机验收范围、CI 和数据核对结果见 [当前工作记录](current-work.md)。
+本版为 dev 验证版，不更新 Docker 正式标签。原有库存与同步配置保留；实机验收范围、CI 和数据核对结果见 [当前工作记录](history/verification.md)。
 
 ## [0.7.8-dev.13] - 2026-10-18
 

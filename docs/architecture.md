@@ -2,6 +2,8 @@
 
 ## 可选网页更新服务
 
+网页更新是可选部署能力，首次启用必须配置独立 updater、原 Compose 部署目录及内部连接；仅将 0.7.8 的 API/Web 换成新镜像不会自动完成这些配置。配置后，管理员日常可选择正式或 Dev 渠道并明确提交更新作业；服务不会定时自动安装新版本。渠道检测与实际更新作业是不同操作。
+
 `docker-compose.hub-web-update.yml` 提供适合群晖项目的完整单文件声明，与 Hub 基础配置加 updater override 保持一致，仅让 Web 默认启动；CI 核对渲染结果，避免两份模板漂移。既有自定义端口、数据来源及网络仍由原部署声明保留。
 
 - `server/app/admin/update_agent.py` 只为管理员代理固定 `UPDATER_URL` 的内部作业接口，沿用会话/CSRF；读取3秒、写入5秒超时。内部令牌自动原子创建，使用显式 `UPDATE_TOKEN_FILE` 或原数据库父目录，绝不返回浏览器，不修改账户密钥。
@@ -62,7 +64,7 @@
 
 Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享库存状态。完整编辑器在应用根节点使用同一组合位置，紧凑全屏与宽屏对话框切换不另建草稿状态。完整编辑器的文字、数量、库位以及导入来源使用 Compose 保存状态；待提交扫码批次通过 `SavedStateHandle` 保存用户输入，重建时重新读取当前库存，恢复到复核状态，不自动执行库存写入。取消或成功后清理草稿，提交失败保留供修正。已采纳的本地图片随编辑会话恢复；明确取消（包括系统返回）才删除会话新建图片，保存成功保留采用的图片。系统保存状态恢复不等同于长期草稿备份，不保证强制停止或设备重启恢复；提交期间中断应先核对记录，避免手动重复入库/出库。
 
-自动化测试使用隔离数据库；实际界面验证只创建带测试标记的合成元件。编译、定向测试和 CI 结果分别记录在 [current-work.md](current-work.md)，不代表真实业务数据及全量 UI 验收。
+自动化测试使用隔离数据库；实际界面验证只创建带测试标记的合成元件。编译、定向测试和 CI 结果分别记录在 [current-work.md](history/verification.md)，不代表真实业务数据及全量 UI 验收。
 
 ## Topology
 
@@ -74,7 +76,7 @@ Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享�
   inventory admin APIs, optional authenticated Web inventory writes, and MQTT
   configuration writes.
 - Android, Windows, and server all use SQLite in the current architecture, and
-  each runtime is now implemented against live storage.
+  each runtime is implemented against live storage.
 
 The API and admin Web containers are built independently. `server-image.yml`
 always builds and starts amd64 validation images, checks API/auth/database
@@ -237,7 +239,7 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Built with Jetpack Compose and Material 3.
 - Current implementation is a stable-mode local-first client backed by
   on-device SQLite and shared preferences.
-- User-facing copy is now routed through Android string resources, with a
+- User-facing copy is routed through Android string resources, with a
   Chinese-first default UI, persisted app-language switching (`zh-CN` and
   `en`), and matching Simplified Chinese (`zh-CN`) resource coverage for the
   primary screens. Compose Preview uses injected `ComponentVaultStrings`
@@ -270,20 +272,20 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   primitives: `NavigationSuiteScaffold` for top-level navigation,
   window size classes for width handling, and
   `NavigableListDetailPaneScaffold` for Inventory list-detail behavior. The
-  Inventory header now treats search as the primary action through
+  Inventory header treats search as the primary action through
   an inline `OutlinedTextField`, with results visible while typing, fixed horizontal filters and denser inventory rows instead
-  of the older stacked filter-card layout. It now also includes quantity-first
+  of the older stacked filter-card layout. It also includes quantity-first
   import flows for JLC copied mobile product text, package QR payloads,
   supplier packaging OCR, and generated warehouse labels.
-- Package QR scanning now runs through an in-app CameraX surface backed by the
+- Package QR scanning runs through an in-app CameraX surface backed by the
   bundled ML Kit Barcode Scanning API, so first use does not depend on Google
   Play services downloading an external scanner module.
 - Supplier text recognition runs through an in-app CameraX surface backed by
-  bundled ML Kit Chinese text recognition. The current Android flow now asks
+  bundled ML Kit Chinese text recognition. The current Android flow asks
   the user to align packaging text, capture a photo with ImageCapture, build a
   structured OCR result with ordered text lines, and only then parse packaging
   fields into the quantity-first import confirmation form.
-- Android OCR now goes through a dedicated engine abstraction with local
+- Android OCR goes through a dedicated engine abstraction with local
   preference storage. `Auto` currently resolves to the bundled ML Kit engine,
   `ML Kit` forces the same offline recognizer explicitly. The unavailable
   `Paddle experimental` choice is hidden and old preferences fall back to Auto.
@@ -293,10 +295,10 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   be exported as PNG or PDF for physical bag, bin, or drawer labels. The
   current Android implementation uses three client-side label templates:
   `10x40mm QR`, `30x40mm QR`, and a pure text strip. The narrow label renders
-  horizontally with the QR code on the right and now emits a shorter
+  horizontally with the QR code on the right and emits a shorter
   lookup-first warehouse payload (`cvl3|sku|qty`) so dense small labels stay
   scan-friendly; legacy compact `cvl2` labels and app-generated
-  JLC-compatible labels still round-trip. The `30x40mm` label now uses a
+  JLC-compatible labels still round-trip. The `30x40mm` label uses a
   horizontal physical `40x30mm` page with the QR on the left, a centered
   package-plus-name stack on the right, and bottom-aligned metadata rows, and
   the pure text strip uses single-line fit-to-fill typography. Preview now
@@ -306,7 +308,7 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   resolve the compact `10x40mm` payload locally by `sku` so no sync API or
   schema change is required for the shorter code path.
 - `Movements` uses the same adaptive approach: compact history-first layouts on
-  phones and split history/detail arrangements on larger widths. It now also
+  phones and split history/detail arrangements on larger widths. It also
   supports a scan-first workflow for warehouse labels and original JLC packaging QR codes:
   CameraX + bundled ML Kit barcode scanning returns raw QR content, the client
   resolves the label locally by parsed `sku`, without catalog lookup or automatic component creation. Original packaging quantity is not a stock-out instruction; the review starts at one unit. A successful match closes the
@@ -334,18 +336,18 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - JLC import metadata, OCR-derived metadata, and label round-trip hints are
   mapped into existing component fields and appended to `description` so these
   workflows do not require sync API or schema changes.
-- Android local storage now also includes an `import_learning_mappings` SQLite
+- Android local storage also includes an `import_learning_mappings` SQLite
   table for device-only JLC import learning keyed by source SKU with MPN
   fallback reuse.
 - JLC text and QR imports are seeded by parser output, then enriched by
   bundled offline recognition rules, device-only learned mappings, and finally
   optional direct LCSC public product metadata. The local rule
-  pack now also recognizes more vendor numbering schemes so package and
+  pack also recognizes more vendor numbering schemes so package and
   category inference can come from model families instead of only raw
-  keywords. Canonical component names now stay blank until explicit source
+  keywords. Canonical component names stay blank until explicit source
   text, learned mappings, or public product metadata confirms them, so raw model codes
   are no longer written into the saved `name` field by fallback. Local parsing
-  now also treats supplier `vendor` fields as a `brand` fallback and rejects
+  also treats supplier `vendor` fields as a `brand` fallback and rejects
   model-like tokens when persisting learned names. User edits in the import
   confirmation form remain authoritative.
 - Android keeps a local cache for repeated public lookups. Server lookup routes
@@ -363,7 +365,7 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   AGP cannot auto-install `build-tools;35.0.0`. Kotlin and Compose source
   compilation are not the blocker in the current state.
   Preview-focused `Phone`, `Medium`, `Tablet`, `Locale`, `Theme`,
-  `Accessibility`, `Shell`, and `Dialogs` surfaces are now isolated under
+  `Accessibility`, `Shell`, and `Dialogs` surfaces are isolated under
   `ui/screen/preview/`.
 
 ## Versioning
@@ -398,7 +400,7 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Built with WinUI 3 and Windows App SDK.
 - Current implementation is a native desktop client backed by local SQLite in
   the user's local app data directory.
-- User-facing copy is now organized around Chinese-first WinUI pages while
+- User-facing copy is organized around Chinese-first WinUI pages while
   retaining Windows-native layout and interaction patterns.
 - Release distribution uses a self-contained unpackaged WinUI 3 ZIP; no MSIX
   signing or certificate installation is required. CI checks actual window
@@ -421,7 +423,7 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   inbound. Busy batch operations block Back and sidebar navigation; leaving an
   idle batch persists edits. Dashboard, movements and batch controls reflow at
   narrower window widths. Sync progress and result dialogs have an action guard.
-- Startup diagnostics now log fatal launch/runtime exceptions under
+- Startup diagnostics log fatal launch/runtime exceptions under
   `%LOCALAPPDATA%\ComponentVault\logs\startup.log` and surface the log path in
   a native Windows error dialog.
 - Windows build verification completed successfully on `2026-05-09`, and the
@@ -474,7 +476,7 @@ from server/MQTT payloads and inventory Excel exports. See
 - FastAPI exposes a small token-protected sync API.
 - FastAPI exposes token-protected inventory snapshots at `/admin-api/*` and
   MQTT configuration GET/POST at `/admin-api/mqtt/config`.
-- The server now exposes `GET /admin-api/part-lookup` as a token-protected
+- The server exposes `GET /admin-api/part-lookup` as a token-protected
   hybrid recognition endpoint that applies bundled or refreshed rule packs
   first and then optionally merges official LCSC metadata when credentials are
   configured or public LCSC product-page metadata when
@@ -715,7 +717,7 @@ data before a transaction imports new records; existing IDs/SKUs are not overwri
 Own history is retained; foreign workbooks lacking history produce explicit initial
 inventory movements. Local images can be embedded without network access during export.
 See [storage and backup guide](storage-and-backup.md) and the exact shared columns
-in [implementation record](inventory-expansion-plan.md).
+in [storage and backup contract](storage-and-backup.md).
 
 ## Inventory statistics and MQTT publication
 
@@ -782,7 +784,7 @@ failures trigger the external probe. HTTP authentication/validation and malforme
 response errors remain visible. Once selected, the endpoint is fixed for that
 push/pull cycle; a failure preserves the local queue. The next cycle retries the
 primary. Routing does not modify the saved primary URL or reset the sync cursor.
-Both addresses must refer to the same service/database. Windows now follows the
+Both addresses must refer to the same service/database. Windows follows the
 same boundary: it probes primary first, falls back only for DNS, connection, or
 timeout failures, fixes the endpoint for the complete push/pull run, and never
 switches and replays a failed write. Its optional address is added to older
@@ -856,7 +858,7 @@ CI 在原有回归组前单独运行 `MovementLabelResolutionTest`、`QuantitySt
 - Android 库位选择只显示 name，内部持久化 id；选择与创建分开，创建生成内部码且拒绝重复名称。无供应商 SKU 的编辑草稿保存前生成 CV-UUID，不改变已有 SKU。
 - Android CategoryLearningStore 按官方完整分类路径保存用户修正，跨 SKU 复用；User/Learned 字段仍优先。清空学习记录同时清理该映射，不依品牌猜分类。
 - 立创订单 BIFF .xls 使用 JExcelAPI 解析，提取 C 料号、品牌、型号、商品分类、封装、订购数量。配送费/汇总不入库。订单号与 SKU 构成稳定 order- 回执键，复用 batch_jlc_receipts 跨本机导入会话去重；不传输原始订单表，不构建跨设备订单账本。
-- 手工照片复用 InventoryImageStore 的本地图片标记与 Excel 图片工作簿能力。父编辑器管理暂存图片生命周期，取消清理新图，成功保存保留引用；服务器同步 description 标记但不传图片二进制。
+- 手工照片复用 InventoryImageStore 的本地图片标记与 Excel 图片工作簿能力。父编辑器管理暂存图片生命周期，取消清理新图，成功保存保留引用；description 同步照片关联，图片二进制通过下文照片协议独立交换。
 - Web DELETE /admin-api/components/{id} 复用账户数据库、Web 写入开关、版本检查和请求回执，在事务内保存删除墓碑；下次同步传播删除，流水保留。
 
 
@@ -871,9 +873,9 @@ CI 在原有回归组前单独运行 `MovementLabelResolutionTest`、`QuantitySt
 
 ## 项目用料与 BOM 预设同步
 
-Android / Windows 将导入 BOM 与临时配套统一到“项目用料”，入口为“导入 BOM”“已保存预设”“手动选料”。Android 由 `BomImportScreen` / `BomImportSession` 承载，Windows 由 `BomView` 承载；独立 `KittingScreen` / `KittingView` 及导航入口移除。这是客户端工作区整合，已通过本轮定向自动化与 Windows / 小米 9 隔离数据 UI 验收，已在 [0.7.9-dev.1](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.1) 预发布中提供；不代表全量 QA 或 Android 原应用升级保留数据验证，证据见 [当前工作](current-work.md)。
+Android / Windows 将导入 BOM 与临时配套统一到“项目用料”，入口为“导入 BOM”“已保存预设”“手动选料”。Android 由 `BomImportScreen` / `BomImportSession` 承载，Windows 由 `BomView` 承载；独立 `KittingScreen` / `KittingView` 及导航入口移除。验证记录见 [当前工作](history/verification.md)。
 
-导入行和手动行共用既有 BOM 模型、库存匹配、跳过状态、每套数量、预设保存和复核流程。手动行使用稳定需求 ID；修改或保存清单保留导入来源行、位号及既有预设 ID。两端沿用下述预设内容格式、离线存储和同步接口，本轮不修改服务端、数据库 schema 或 API。范围不含地图；未来 PCB 输入只考虑用户自行导入的嘉立创可视化 BOM，当前没有该功能。
+导入行和手动行共用既有 BOM 模型、库存匹配、跳过状态、每套数量、预设保存和复核流程。手动行使用稳定需求 ID；修改或保存清单保留导入来源行、位号及既有预设 ID。两端使用下述预设内容格式、离线存储和同步接口；不支持地图或 PCB 文件输入。
 
 原生客户端 `BomPresetStore` 使用 `{version:2,presets:[...]}` 原子文件，旧格式成功解码后先备份再迁移。公共 content `schema_version:1` 保留稳定预设/需求 ID、工作表与源行、每套用量、套数、人工选择和跳过项。`selection=null` 表示自动匹配，空字符串表示明确不匹配，非空字符串为库存 component ID。Android 合并源行与 Windows 独立源行转换时，按需求行用量计算一次，不能按 source_rows 再累加。
 
@@ -892,13 +894,13 @@ dev18 直接验收记录：真实 Windows 服务将共享预设发送到隔离 F
 
 服务端 `app/photos.py` 从认证账户数据库推导引用，文件为 `<database_path>.photos/<key>`，不引入通用附件系统或外部存储。整文件临时写入+原子替换，网络 I/O 不占库存事务。原生客户端原图与下载缓存分离，展示和 Excel 通过同一解析入口读取二者；清缓存不删除原图，失效下载与临时文件可回收。Web `ComponentPhoto` 使用会话获取 Blob 并回收 Object URL，图片缺失、失败、重试均有明确状态。
 
-使用与备份边界见[元件照片跨设备同步](photo-sync.md)。本次不提供照片人工冲突合并或离线 Web；供应商公开图片保持既有独立规则。
+使用与备份边界见[元件照片跨设备同步](photo-sync.md)。不支持照片人工冲突合并或离线 Web；供应商公开图片保持既有独立规则。
 
 
 ## dev20 同步运行状态与中断恢复
 
-- Android 使用既有 SharedPreferences，Windows 使用数据库旁的 `sync-run-state.json` 记录本轮状态、阶段、库存/BOM 的范围成功时间与已确认预设版本。它们是进度元数据，不改变库存 schema、服务器 API 或本地库存优先的方式。
-- 应用启动只将遗留 Running 恢复为 Interrupted；普通状态读取不能把当前仍在执行的任务误报中断。取消沿用本轮取消令牌并终止当前网络请求；重试复用原幂等交换和现有队列，不回滚成功库存，也不自动重新出库。
+- Android 使用既有 SharedPreferences，Windows 使用数据库旁的 `sync-run-state.json` 记录同步任务状态、阶段、库存/BOM 的范围成功时间与已确认预设版本。它们是进度元数据，不改变库存 schema、服务器 API 或本地库存优先的方式。
+- 应用启动只将遗留 Running 恢复为 Interrupted；普通状态读取不能把当前仍在执行的任务误报中断。取消使用该任务的取消令牌并终止当前网络请求；重试复用原幂等交换和现有队列，不回滚成功库存，也不自动重新出库。
 - 库存提交在附件阶段前完成。库存 pending 来自本地队列，BOM pending 比较当前 ID/updated_at 与服务器已确认版本，照片按当前引用和原有 manifest 推导；请求期间的新本地改动保持待处理。旧服务器/账户/配置范围的完成时间不显示成当前配置成功。
 - UI 摘要和设置复用同一状态来源，分别标明库存/BOM/照片最近完成时间。人工冲突合并、自动后台恢复和跨设备生产批次账本仍不在范围内。
 - 库存偶尔为空尚无证实的源码根因；仅在数据发布和实际库存列表渲染时加入脱敏计数诊断，记录数目及筛选激活形状，不记录搜索词、元件、库位名或凭据。诊断沿用当前进程的有界反馈缓冲，复现后应在关闭应用前导出反馈。

@@ -109,6 +109,21 @@ Android 库存卡片左滑显示“删除”，点击后仍需确认；多选状
 原始 SQLite 升级前备份与 Excel 数据交换用途不同；回退旧二进制需要恢复升级前数据库，
 不能直接让旧版本写入新库存结构。
 
+### 文件格式与字段
+
+工作表顺序为 meta、components、storage_locations、allocations、stock_movements。
+meta 无表头，以 key/value 两列记录 format=component-vault、schemaVersion=1、exportedAt=UTC ISO。
+
+- components: id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,image_preview
+- storage_locations: id,name,updated_at,deleted
+- allocations: component_id,location_id,quantity
+- stock_movements: id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id
+
+ID/SKU/库位编码为字符串，数量为严格整数，deleted 为 Excel Boolean，null 留空。
+内嵌图片位于 components 对应行 image_preview 列，one-cell anchor，PNG/JPEG，每组件最多一张。
+LCSC_android_erp 迁移使用其原始 camelCase 表头、epoch millis 时间，不与本项目格式混淆。
+
+
 ## LCSC_android_erp 数据迁移
 
 从该应用导出 schemaVersion=1 Excel 备份后，在本项目的备份导入入口选择文件。
@@ -118,9 +133,9 @@ Android 库存卡片左滑显示“删除”，点击后仍需确认；多选状
 
 该来源格式没有导出库存历史流水，因此只生成注明迁移来源的初始入库记录。
 不能从现存数量反推曾经出库多少；源文件本身未包含的型号或历史也无法恢复。
-`component-hub` 的 JSON 迁移继续使用原入口，详见 [BOM 与迁移](bom-and-migration.md)。
+`component-hub` 的 JSON 迁移在 Windows 保留入口；Android 已移除日常菜单入口，详见 [BOM 与迁移](bom-and-migration.md)。
 
-实现契约与验证进展见 [实施记录](inventory-expansion-plan.md)。
+迁移格式参考 [LCSC_android_erp 固定提交](https://github.com/BrokenClient/LCSC_android_erp/tree/7a40b842b8dfa94fd2168c38a9ddcc3411997b83) 的 InventoryBackupManager。
 
 ## 导入学习映射
 
@@ -128,7 +143,7 @@ Android 库存卡片左滑显示“删除”，点击后仍需确认；多选状
 
 ## 立创订单对账单导入
 
-Android 开发版在“导入与扫码 → 批量嘉立创入库”中选择“导入立创商城订单对账单（.xls）”。目前识别商城的旧版 BIFF 物料明细对账单，不把嘉立创 EDA BOM 当订单入库。
+Android 在“导入与扫码 → 批量嘉立创入库”中选择“导入立创商城订单对账单（.xls）”。目前识别商城的旧版 BIFF 物料明细对账单，不把嘉立创 EDA BOM 当订单入库。
 
 1. 先选择已有库位（显示名称），或创建新库位。
 2. 选择导出的 .xls 文件，自动读取商品编号、商品型号、商品名称、品牌、商品类型、封装格式和订购数量；配送费与汇总行忽略。
@@ -140,6 +155,6 @@ Android 开发版在“导入与扫码 → 批量嘉立创入库”中选择“�
 ## 手工元件与照片
 
 没有商城料号时 SKU 可留空，保存会生成唯一 CV- 内部编号。照片可拍摄或从图库选择，按“使用照片”后随元件保存；取消编辑清理本次新建照片。图片先保存在本机，配置支持照片协议的服务端后可跨设备同步；本机可用的图片包含在 Excel 备份中，具体范围见下文。
-## 照片同步后的备份（dev19）
+## 照片同步后的备份
 
 本机已下载的照片与原图都可进入既有 Excel 图片备份；尚未下载的引用不等于图片字节，先同步完成再导出。服务端应备份整个 `/data`，包括各账户数据库旁的 `.photos` 目录。下载缓存清理、失败重试与升级步骤见[照片同步教程](photo-sync.md)。

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="84" viewBox="0 0 250 84" role="img" aria-labelledby="title desc">
+  <title id="title">Windows</title><desc id="desc">自包含 ZIP · 解压即用</desc>
+  <rect x="1" y="1" width="248" height="82" rx="16" fill="#102d3b" stroke="#365965" stroke-width="2"/>
+  <path d="M18 1h35" stroke="#71dfc8" stroke-width="2"/>
+  <g fill="none" stroke="#91ead5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="21" width="40" height="28" rx="4"/><path d="M13 58h50M31 49v9m14-9v9"/></g>
+  <g font-family="Segoe UI, Microsoft YaHei, Noto Sans SC, sans-serif"><text x="77" y="35" fill="#ffffff" font-size="21" font-weight="650">Windows</text><text x="77" y="58" fill="#bed0d6" font-size="12">自包含 ZIP · 解压即用</text></g>
+  <path d="m225 26 6 6-6 6m6-6h-13" fill="none" stroke="#91ead5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

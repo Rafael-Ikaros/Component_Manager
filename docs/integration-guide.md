@@ -2,6 +2,8 @@
 
 ## 网页更新作业（管理员）
 
+首次启用需按[部署说明](server-web-update.md)配置独立 updater 和原 Compose 项目目录；仅更新 0.7.8 的 API/Web 镜像不能自动启用。启用后由管理员选择渠道并明确创建作业，不是后台定时自动更新。未部署 updater 时仍可使用原有部署方式更新。
+
 `GET /admin-api/server-update/status` 返回 enabled/current_version/current_channel/active_job/latest_job。
 未配置 UPDATER_URL 时 enabled=false，不创建内部令牌或执行更新。
 `POST /admin-api/server-update/jobs` 接受 `{ "channel": "dev", "request_id": "unique-job-id" }`，
@@ -567,7 +569,7 @@ Android 和 Windows 将官方参数保存在既有元件 `description` 的参数
 
 ## 旧库存参数批量补全 API
 
-所有路径位于 `/admin-api/components/spec-enrichment`，使用现有 Bearer 账户密钥，数据库从认证身份解析。写请求受 `WEB_INVENTORY_ENABLED` 控制，读请求可在只读模式下预览。
+所有路径位于 `/admin-api/components/spec-enrichment`，使用现有 Bearer 账户密钥或 Web 会话认证（Cookie 写请求需 CSRF），数据库从认证身份解析。写请求受 `WEB_INVENTORY_ENABLED` 控制，读请求可在只读模式下预览。
 
 | 方法与子路径 | 行为 |
 | --- | --- |

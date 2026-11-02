@@ -1,65 +1,38 @@
-# Admin Web
+# Web 管理台
 
-This directory contains the separated web admin console built with `React`,
-`Vite`, `Tailwind CSS`, and `shadcn/ui`.
+本目录是 React、Vite、Tailwind CSS 和 shadcn/ui 实现的独立管理台。
+用户操作见[使用指南](../docs/README.md)，本文只说明开发和部署边界。
 
-## Current State
+## 功能与认证
 
-- Separated login flow implemented against `POST /auth/ping`
-- Read-only dashboard, inventory, sync, and settings pages implemented
-- Shared bearer token model aligned with the FastAPI sync service
-- Protected route flow implemented with browser local storage session state
-- `npm run build` verified successfully on `2026-05-08`
+- 查看当前账户的库存、出入库记录、同步审计、设备和 BOM 预设。
+- 管理员管理普通账户、部署配置、日志和 MQTT；普通账户的数据独立。
+- 库存写入默认关闭，管理员启用 `WEB_INVENTORY_ENABLED` 后可编辑、出入库和删除库存。
+- 登录通过 `/auth/session` 换取后端 HttpOnly 会话；浏览器不持久保存账户密钥，写请求携带 CSRF Token。
+- 镜像更新需额外启用 updater。检查新版本与执行容器更新是两个操作，详见[网页更新](../docs/server-web-update.md)。
 
-## Local Development
+## 本地开发
+
+在仓库根目录执行：
 
 ```powershell
 cd admin-web
-cmd /c npm install
+cmd /c npm ci
 cmd /c npm run dev
 ```
 
-Default local URL:
-
-- `http://localhost:5173`
-
-Default API target:
-
-- `http://localhost:8787`
-
-The login page allows overriding the API base URL before validating the token.
-
-## Build
+默认页面 `http://localhost:5173`，默认 API `http://localhost:8787`。
+登录时可以修改 API 地址。API 必须允许页面的实际 origin；会话要求同站点的主机名和协议。
 
 ```powershell
-cd admin-web
 cmd /c npm run build
 ```
 
-Production output:
+产物在 `dist/`，发布附件为 `component-vault-admin-web.zip`。
+Vite 构建参数只影响源码构建，不会在已构建的 Hub 镜像中随运行时环境变量重新打包。
 
-- `admin-web/dist/`
+## 部署与接口
 
-GitHub `release.yml` also packages this directory as:
-
-- `component-vault-admin-web.zip`
-
-## Container
-
-The Docker image uses a Node build stage and an Nginx runtime stage.
-
-When using `docker compose up --build`, the admin web container is published at:
-
-- `http://localhost:8081`
-
-## Backend Dependency
-
-The web admin expects these FastAPI endpoints:
-
-- `POST /auth/ping`
-- `GET /admin-api/dashboard`
-- `GET /admin-api/inventory`
-- `GET /admin-api/sync`
-- `GET /admin-api/settings`
-
-The backend must allow the browser origin through `ADMIN_WEB_ORIGINS`.
+管理台与 API 是两个配套镜像。Hub 模板的 Web 使用 `web` profile，端口为 `8081:80`；
+完整网页更新模板默认启动 Web。普通部署见[快速部署](../docs/docker-quickstart.md)。
+接口契约以[集成指南](../docs/integration-guide.md)为准，不以本页维护一份不完整的端点清单。

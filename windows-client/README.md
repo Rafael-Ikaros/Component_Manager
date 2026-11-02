@@ -1,64 +1,33 @@
-# Windows Native Client
+# Windows 客户端
 
-This directory contains the Windows-native desktop client built with WinUI 3.
+本目录是 WinUI 3 桌面客户端，以本机 SQLite 管理库存，可选连接自托管服务同步。
+库存、导入编辑、库位、出入库、BOM 项目用料与同步按模块维护；职责见
+[客户端架构](../docs/architecture.md#客户端库存编辑与恢复)，用户操作见[使用指南](../docs/README.md)。
 
-## Current State
+## 构建与分发
 
-- NavigationView-based desktop shell implemented
-- Inventory-first Windows IA implemented with `Inventory`, `Movements`,
-  `Overview`, and `Settings` destinations
-- Dense inventory list/detail workspace, movement ledger, overview summary, and
-  grouped sync settings surfaces implemented
-- Local SQLite persistence implemented
-- Component create/edit/soft delete workflow implemented
-- Movement entry workflow implemented
-- Push/pull sync wiring implemented against the FastAPI service
-- Chinese-first WinUI page copy and desktop-oriented detail panels implemented
-- XAML designer sample data added for overview, inventory, movements, and
-  settings pages so the main screens can be previewed directly in Visual Studio
-- `dotnet build` verified successfully on `2026-05-09`
-- portable unpackaged `dotnet publish` verified successfully on `2026-05-08`
+使用 Windows、符合项目目标的 .NET SDK 及 WinUI 构建工具。当前目标框架以
+`ComponentVault.WinUI/ComponentVault.WinUI.csproj` 为准。
 
-## Quick Check
+在仓库根目录执行：
 
 ```powershell
 dotnet build windows-client\ComponentVault.WinUI\ComponentVault.WinUI.csproj
 dotnet publish windows-client\ComponentVault.WinUI\ComponentVault.WinUI.csproj -c Release /p:PublishProfile=win-x64.pubxml
 ```
 
-The publish commands write the Windows release outputs under:
+分发产物是自包含 x64 ZIP，解压完整目录后运行 `ComponentVault.WinUI.exe`，不分发 MSIX。
+更新时关闭旧应用、解压新版本并保留 `%LOCALAPPDATA%\ComponentVault`，不删除业务数据库。
+启动失败时查看 `%LOCALAPPDATA%\ComponentVault\logs\startup.log`。
+安装、更新与旧 MSIX 迁移见[应用更新](../docs/app-updates.md)。
 
-- `windows-client\ComponentVault.WinUI\bin\Release\net9.0-windows10.0.19041.0\win-x64\publish\`
+## 界面和业务维护
 
-The project is distributed as an unpackaged, self-contained x64 ZIP. Extract
-the complete archive and run `ComponentVault.WinUI.exe`; no test certificate or
-administrator installation step is required.
+页面位于 `ComponentVault.WinUI/Views/`；ViewModel 协调页面与独立库存、写入和同步服务。
+使用 Visual Studio 的 XAML 编辑与运行时 Hot Reload。设计样本位于 `Design/`，
+Preview 或编译不能代替真实窗口、高 DPI、键盘及鼠标交互检查。
+应用资源须合并 `XamlControlsResources`；主题资源和启动问题见[运维排障](../docs/runbook.md)。
 
-If startup fails on a target machine, the app now writes a diagnostic log to:
-
-- `%LOCALAPPDATA%\ComponentVault\logs\startup.log`
-
-The runtime also shows a native Windows error dialog with the log path.
-
-## Visual Editing
-
-Use Visual Studio 2022 with the WinUI 3 workload installed.
-
-1. Open `windows-client\ComponentVault.WinUI\ComponentVault.WinUI.csproj`.
-2. Open one of the page files under `ComponentVault.WinUI\Views\`:
-   `DashboardView.xaml` (Overview), `ComponentsView.xaml` (Inventory),
-   `MovementsView.xaml`, or `SettingsView.xaml`.
-3. Open the XAML Designer or split view.
-4. Use Hot Reload while the app is running for runtime refinement.
-5. If the designer or app reports missing resources such as
-   `TextFillColorSecondaryBrush`, verify that `App.xaml` still merges
-   `XamlControlsResources`. The page previews depend on those WinUI theme
-   resources being present at the application level.
-
-Designer support is backed by:
-
-- `ComponentVault.WinUI\Design\DesignMainViewModel.cs`
-- `ComponentVault.WinUI\Design\ViewModelResolver.cs`
-
-These files provide design-time sample data and prevent the page constructors
-from depending on the live application state while the designer is loading.
+相关变更只运行对应测试项目；订单导入的合成/私有样本验证说明见
+[订单测试说明](ComponentVault.WinUI/Tests/JlcOrderImport/README.md)。
+已记录的构建和设备证据见[验证记录](../docs/history/verification.md)。
