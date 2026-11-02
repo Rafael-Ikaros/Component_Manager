@@ -36,8 +36,10 @@ Web 库存操作关闭时仍可分析预览；实际应用需先在服务端启�
 
 ## 开发版部署
 
-此功能先随 dev 源码和 Web 附件提供。dev 不替换 Docker Hub 的 latest /
+此功能可随 dev 源码、Web 附件或对应开发镜像使用。dev 不替换 Docker Hub 的 latest /
 web-latest；只拉旧的正式镜像不会得到新接口。API 与 Web 必须配套更新。
+从 dev.5 起开发镜像使用 dev/web-dev，切换步骤见[Docker 渠道教程](docker-channels.md)，
+需以独立 Docker 发布成功且配套标签可拉取为准。
 
 源码 Compose 部署可在对应 dev 标签目录中，保留**原 Compose 项目名**、原 .env
 及完整 /data 挂载，先备份再构建：

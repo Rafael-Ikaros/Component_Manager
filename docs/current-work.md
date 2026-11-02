@@ -4,7 +4,8 @@
 - Docker CI 从普通 CI 拆出，Docker Images 独立发布，changelog 后并行调用 Docker 与原生附件。dev 固定/浮动镜像仅更新开发标签，正式版才更新 latest/web-latest；支持独立重跑 Docker，不需重建客户端。
 - 增加官方 Compose 切换助手：读取原项目、工作目录和全部配置组合，先拉取配套 API/Web，再备份 `.env` 和重建；保留端口、卷与 Watchtower override。Web 关于卡片可选择版本检测渠道，偏好按 API 地址保存在浏览器，检测不会替换容器。
 - 相关后端删除 7 项、更新检测 11 项、已有 pending-request 6 项测试及 Web 构建通过。5 份 YAML / 41 段 Bash 语法、渠道标签与版本格式校验通过。助手以 Git Bash 和假 Docker 覆盖匹配/不匹配镜像、失败、预览、路径空格、旧导出变量与原 Watchtower 配置保留；本机无 Docker CLI，尚未做真实 NAS 切换，远端 Docker CI 与发布仍待执行。
-- 浏览器隔离库存已实际验证两项选择、取消保持 3 项、确认后仅剩未选的 1 项，界面显示删除 2 项；开发渠道实际查询 GitHub 返回 dev.4，刷新保留偏好。正式渠道检测正在核对。原应用、业务数据库与用户附件未操作。
+- 浏览器隔离库存已实际验证两项选择、取消保持 3 项、确认后仅剩未选的 1 项，界面显示删除 2 项；实际 `/sync/pull` 返回两项墓碑，名称、数量、分配、备注、库位与流水比对保持不变。开发/正式渠道实际查询 GitHub 分别返回 dev.4 / 0.7.8，刷新保留偏好，中英文新文案可见。原应用、业务数据库与用户附件未操作。
+- 实现 `195dbe040a05ca9b408725d53cdf6a50a650cfbe` 的 [Docker CI 41383073824](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073824) 成功完成真实构建、Compose 渲染与容器启动验证；[主 CI 41383073611](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073611) 各 job 通过。正在发布 dev.5，正式 latest/web-latest 已记录发布前摘要，将核对开发发布没有移动正式标签。
 
 # 2026-11-01 国内 EDA 资料与参考价（0.7.9-dev.4 已发布）
 
