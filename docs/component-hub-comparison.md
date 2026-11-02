@@ -1,5 +1,8 @@
 # component-hub 对比与功能移植路线
 
+> 历史上游对比：结论针对下文记录的源码版本，保留来源与许可证分析。
+> 文中的阶段路线和查询方式不代表当前产品；现有能力见 [README](../README.md)，现行查询见[架构说明](architecture.md#国内-eda-资料与参考价格)。
+
 分析日期：2026-09-15。
 
 参考仓库：[ParkerNeol/component-hub](https://github.com/ParkerNeol/component-hub)。本报告固定源码版本为 `5d8d15266c549fdb0a7d2f003271e6c670035a70`，区分已实现代码与 README 的功能描述。未执行参考项目、未安装其依赖、未复制其实现。

@@ -50,7 +50,7 @@ Android 库存页将“全部／低库存／分类／库位／排序”放在同
 
 Android“导入与扫码”保留“添加元件／批量嘉立创入库／项目用料”三个入口。“添加元件”内可扫码、查询商城或手动填写；Component Hub 数据迁移不再作为手机菜单项。Excel 备份与恢复仍位于设置中。
 
-Android 核心代码按库存显示、扫码复核、导入确认、库存写入、识别与学习、同步、工作簿和 BOM 提交分开维护，保留原页面、数据库和偏好设置。模块职责见[Android 功能模块边界](docs/architecture.md#android-功能模块边界)，阶段进度与实机验收见[重构计划](docs/android-refactor-plan.md)和[工作记录](docs/current-work.md)。
+Android 核心代码按库存显示、扫码复核、导入确认、库存写入、识别与学习、同步、工作簿和 BOM 提交分开维护，保留原页面、数据库和偏好设置。模块职责见[Android 功能模块边界](docs/architecture.md#android-功能模块边界)，阶段进度与实机验收见[工作记录](docs/current-work.md)。
 
 平板布局重排按[布局提案与交互预览](docs/design/tablet-ui-proposal.md)分阶段进行：dev.24 第一阶段调整库存列表/详情与设置分组，按实际可用宽度切换呈现并保留草稿和返回上下文；库存筛选与元件行可统一滚动，键盘展开后仍能完整查看并选择元件。HTML 预览使用合成数据；其中 BOM、标签和配套件工作区后续布局阶段延期，尚未实现到 Android，不能把预览中的占位选项视为已有功能。
 
@@ -68,13 +68,13 @@ Android 和 Windows 的标签 Excel 导出支持全部库位或多选指定库�
 
 ### 账户与数据隔离
 
-0.7.5 加入账户隔离：首次配置的密钥作为管理员账户，继续使用原有库存数据库；管理员可在 Web 设置中创建普通账户，普通账户使用各自的密钥和独立的库存数据库。客户端绑定已认证的服务器和账户身份后才上传本地数据，避免把原有库存推到其他账户。普通账户不能管理部署、日志、其他账户或 MQTT。操作步骤见[多用户账户教程](docs/accounts.md)，设计与迁移边界见[账户隔离实施计划](docs/account-isolation-plan.md)。安装包与镜像的发布状态以对应 [Release](https://github.com/Rafael-Ikaros/Component_Manager/releases) 为准。
+首次配置的密钥作为管理员账户，继续使用原有库存数据库；管理员可在 Web 设置中创建普通账户，普通账户使用各自的密钥和独立的库存数据库。客户端绑定已认证的服务器和账户身份后才上传本地数据，避免把原有库存推到其他账户。普通账户不能管理部署、日志、其他账户或 MQTT。操作步骤见[多用户账户教程](docs/accounts.md)，设计与迁移边界见[账户架构](docs/architecture.md#account-ownership)。安装包与镜像的发布状态以对应 [Release](https://github.com/Rafael-Ikaros/Component_Manager/releases) 为准。
 
 管理台使用 12 小时 HttpOnly 后端会话，账户密钥仅用于登录，不长期保存在浏览器。管理员可删除普通账户及其服务端数据库资料；客户端本地副本不会被远程清除，管理员原库不可删除。同步页面提供按设备登记、上传/拉取审计、冲突双方快照与人工处理记录。旧客户端未发送设备 ID 的拉取显示为未知设备；此前历史不会被补造。
 
 Android 编辑元件的分类可选择或手动输入；Android / Windows 库位提供“选择已有”和“新建”两个入口，界面显示库位名称，内部用稳定库位码关联。Android / Windows 编辑主库位会把该元件的全部库存集中到目标库位；部分转移使用单独的转移操作。记录页默认隐藏已删除元件的流水，打开“包含已删除元件”可追溯历史；不会抹掉已保存流水。
 
-设置 → 关于显示作者、构建版本与正式版更新检查；不在应用内更新服务端。可按 [Watchtower 教程](docs/dockerhub.md#可选-watchtower-自动更新)选择配置容器自动更新，默认部署不启用。
+原生客户端的“设置 → 关于”显示作者、构建版本和正式／dev 更新通道，用于更新该客户端。服务端镜像更新在 Web 管理台进行，需先启用[可选网页更新服务](docs/server-web-update.md)；也可用 [Watchtower](docs/dockerhub.md#可选-watchtower-自动更新)跟随当前镜像标签自动更新。同一 API/Web 不同时交给两个更新器管理。
 
 ### 0.7.8 导入能力
 
@@ -87,6 +87,8 @@ Android 编辑元件的分类可选择或手动输入；Android / Windows 库位
 订单格式与操作见[库存导入说明](docs/storage-and-backup.md#立创订单对账单导入)。功能范围与已有验证边界见 [0.7.8 正式说明](docs/releases/0.7.8.md)。
 
 ## 快速部署 API 与管理 Web
+
+已有正式版可保留原项目和完整 `/data`，成对升级到 `dev / web-dev` 后继续使用，无需重新初始化账户或库存。升级后在 Web 修改应用设置；启用网页管理镜像更新则还需一次加入 updater。两者的区别和最少操作见[从正式版升级到 dev](docs/server-web-update.md#已有正式版先升级到-dev)。
 
 将仓库中的 [`docker-compose.hub.yml`](docker-compose.hub.yml) 和 [`.env.example`](.env.example) 放进固定部署目录，复制 `.env.example` 为 `.env`。新部署让 `API_TOKEN`、`ADMIN_WEB_ORIGINS`、`ADMIN_WEB_URL` 和 `WEB_INVENTORY_ENABLED` 保持空值，再执行：
 

@@ -48,7 +48,7 @@
 
 ## 操作流程
 
-实际元件标签不打印外围边框。诊断用的固定测试图仍有边框，用于观察裁切和位置；
+实际元件标签不打印外围边框。历史诊断用的固定测试图带有边框，用于观察裁切和位置，独立测试入口已从日常界面撤下；
 二维码周围的白色静区属于可扫描性要求，不是打印边框。
 
 1. 在 Android 系统蓝牙设置配对 M1，打开打印机并装好正确的间隙标签纸。
@@ -112,6 +112,6 @@ dev.2（707002）已实机检查：左滑只展开右侧 80 dp 删除区，点�
 通过，进程未重启，暂未稳定复现之前的跳转，不据此断言其原因或已修复。测试后库存统计不变，
 临时修改的屏幕超时已恢复为原来的 60 秒。
 
-dev.2 的 [CI](https://github.com/Rafael-ban/Component_Manager/actions/runs/36299135091) 与
-[发布构建](https://github.com/Rafael-ban/Component_Manager/actions/runs/36299135231) 均通过。
+dev.2 的 [CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/36299135091) 与
+[发布构建](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/36299135231) 均通过。
 它是 prerelease，Docker 发布已跳过；Windows 构建通过，但本轮没有 Windows 界面实机验收。

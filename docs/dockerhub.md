@@ -125,61 +125,52 @@ GitHub Variables 的官方说明见 [Store information in variables](https://doc
 
 GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)。
 
-## 五、补发 v0.7.0 API 与 Web 镜像
+## 五、独立补发已验证版本的镜像
 
-配置完成后，打开 [Server Docker Image 工作流](https://github.com/Rafael-ban/Component_Manager/actions/workflows/server-image.yml)：
+打开 [Docker Images 工作流](https://github.com/Rafael-Ikaros/Component_Manager/actions/workflows/server-image.yml)：
 
-1. 左侧选择 **Server Docker Image**。
-2. 点击 **Run workflow**。
-3. **Use workflow from** 选择 `master`。
-4. `source_ref` 填已经存在且经过验证的 `v0.7.0` tag。
-5. `release_tag` 填 `v0.7.0`。
-6. `push_image` 选择 `true` 或勾选发布选项。
-7. 点击 **Run workflow**。
+1. 左侧选择 **Docker Images**，点击 **Run workflow**。
+2. **Use workflow from** 选择 `master`。
+3. `source_ref` 留空，默认检出下方 tag；也可显式填相同提交或 tag。
+4. `release_tag` 填已经存在且通过验证的目标 tag，例如 `v0.7.9-dev.7`。
+5. `push_image` 选择 `true`，运行并等待独立任务结束。
 
-手动运行 workflow 的官方说明见 [Manually running a workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
+`source_ref` 决定源码，`release_tag` 决定版本与渠道；发布前会检查二者指向同一提交。
+独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
+手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
-`source_ref` 决定实际构建哪一份源码，`release_tag` 决定镜像版本 tag。发布时两者应指向同一版本。
+以 dev.7 为例会推送 API `0.7.9-dev.7 / dev`、Web `web-0.7.9-dev.7 / web-dev`、
+updater `updater-0.7.9-dev.7 / updater-dev`。正式版本使用相同固定前缀，但浮动渠道为
+`latest / web-latest / updater-latest`。补发历史版本会移动**该渠道**的浮动标签，操作前应确认目标，
+不要为了补旧版本附件而无意回退当前渠道。
 
-这次补发会同时推送：
-
-- `rafaelikaros/component_manager:0.7.0`
-- `rafaelikaros/component_manager:latest`
-- `rafaelikaros/component_manager:web-0.7.0`
-- `rafaelikaros/component_manager:web-latest`
-
-因此，用旧版本做补发时要特别留意：API `latest` 和 Web `web-latest` 都会被改为该旧版本。补发历史版本前先判断是否允许两个浮动标签一起回退。
-
-普通 CI 或手动运行但 `push_image=false` 时，只构建并检查镜像，不会登录或推送。自动 Release 在用户名、镜像名或 Token 不完整时，会保留原生客户端与 Web 发布，并跳过 Docker Hub 镜像任务。但直接手动运行 **Server Docker Image** 且设置 `push_image=true` 时，缺少任一项配置都会明确失败，不会静默跳过。
+普通 Docker CI 或 `push_image=false` 只构建检查。请求发布但用户名、镜像名或 Token 缺失时，
+Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job，一方成功不能代表另一方成功，
+因此 GitHub Release 已出现也仍要核对 Docker job。
 
 ## 六、确认发布确实成功
 
-先在本次 Actions run 中确认：
+先在本次 Actions run 中确认发布配置、API/Web/updater 构建及启动、登录、三组多平台镜像推送均成功。
+发布末尾的 **Verify real Web-triggered Compose update and data preservation** 也须成功；
+该项在唯一临时项目中执行真实更新，不操作用户 NAS。
 
-1. **Validate publishing configuration** 成功。
-2. **Verify API startup, authentication and mounted database** 成功。
-3. **Verify web startup and bundled assets** 成功。
-4. **Login to Docker Hub** 成功，而不是 skipped。
-5. **Publish multi-platform API image** 和 **Publish multi-platform web image** 成功。
+再到 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 确认：
 
-再到 Docker Hub 仓库的 **Tags** 页面确认：
+- 存在对应 API、Web、updater 的固定版本与该渠道浮动标签。
+- 同一角色的固定/浮动标签摘要一致，三角色 OCI `version / revision` 对应同一发布源。
+- 清单包含 `linux/amd64` 和 `linux/arm64`。
 
-- 存在 `0.7.0` 和 `latest`；
-- 存在 `web-0.7.0` 和 `web-latest`；
-- manifest 包含 `linux/amd64` 和 `linux/arm64`。
+工作流在 `linux/amd64` 实际启动 API、Web、updater，验证健康、认证、任务持久化和 Web 资源。
+发布后通过管理员 API 发起真实更新，检查 API/Web 被替换、updater 持续运行，以及数据、挂载、端口保留。
+`linux/arm64` 参与构建与发布，当前 workflow 不在 ARM 机器上启动；这也不等于所有群晖机型实测。
 
-工作流会在 `linux/amd64` 上实际启动两个容器，验证 API `/health`、鉴权、挂载数据库，以及 Web 首页生成的 JS/CSS 资源。`linux/arm64` 会参与多平台构建与发布，但当前 workflow 不会在 ARM 机器上实际启动。
-
-如本地已安装 Docker，可选执行：
+本地有 Docker 时可额外检查；维护者通过 Actions 发布并不要求本机安装 Docker：
 
 ```sh
-docker buildx imagetools inspect rafaelikaros/component_manager:0.7.0
-docker buildx imagetools inspect rafaelikaros/component_manager:web-0.7.0
-docker pull rafaelikaros/component_manager:0.7.0
-docker pull rafaelikaros/component_manager:web-0.7.0
+docker buildx imagetools inspect rafaelikaros/component_manager:dev
+docker buildx imagetools inspect rafaelikaros/component_manager:web-dev
+docker buildx imagetools inspect rafaelikaros/component_manager:updater-dev
 ```
-
-发布者完成上述网页配置和 Actions 补发只需要浏览器，本地无需安装 Docker；这些本地命令只是额外核验手段。
 
 ## 七、部署端准备
 
@@ -209,7 +200,7 @@ Compose 默认使用 API `latest` 与 Web `web-latest`。这两个浮动标签�
 `ADMIN_WEB_ORIGINS` 填浏览器访问 Web 管理页时的来源，格式是 `scheme://host:port`，例如 `http://192.168.1.10:8081`。它不是服务端 API URL，不要填 `http://192.168.1.20:8787`，除非浏览器中的 Web 页面本身确实由该 origin 提供。多个 Web 来源用逗号分隔。API 自带的 `/setup` 页面与 API 同源，不依赖这项 CORS 设置。
 新管理 Web 的登录状态仅在 localStorage 保留 API URL；账户密钥通过 `POST /auth/session` 换取 API 发放的 12 小时 `HttpOnly`、`SameSite=Lax` Cookie，Web 请求使用凭据模式并携带允许来源。Web 与 API 应同站点（相同协议和主机，不同端口可用），但不同端口仍是不同 origin，必须将实际 Web `scheme://host:port` 精确列入 `ADMIN_WEB_ORIGINS`，不能使用通配符；API 开启了带凭据 CORS。原生 Android/Windows 继续使用 Bearer 密钥。服务器通过 `/auth/session` 认证浏览器会话；“检查更新”与这条登录流程无自动部署关联。
 
-`0.7.4` 的 API 支持管理台实际地址 `ADMIN_WEB_URL`；`0.7.4` 的 Web 管理台支持直接编辑服务端配置。使用前须确认所用的 API 与 Web 镜像都已包含 `0.7.4`：固定标签需核对 `0.7.4` 和 `web-0.7.4` 均已发布，默认的 `latest` 和 `web-latest` 则需核对实际指向；开发预发布不发布 Docker 镜像。已有 `0.7.1` 部署可继续使用已认证的 `/setup` 修改配置。可在 `/setup` 填写管理台完整地址（支持反向代理子路径），首次保存后先复制 API Token，再点“进入管理台”；非空 `ADMIN_WEB_URL` 环境变量优先并锁定网页输入。
+当前 API/Web 可通过已认证的设置页编辑应用配置，`/setup` 继续可用。`ADMIN_WEB_URL` 可填写管理台完整地址（支持反向代理子路径）；非空环境值优先并锁定对应网页输入。已有正式版可在原项目中成对升级为 `dev / web-dev`，保留账户与数据后继续使用；如果还希望网页管理镜像更新，可在同一次原项目编辑中加入 updater，见[升级与配置区别](server-web-update.md#已有正式版先升级到-dev)。不要先清空原环境配置，也不要在未持久挂载的容器目录中修改文件代替部署升级。
 
 ## 八、拉取并启动服务端
 
@@ -275,7 +266,7 @@ docker compose -f docker-compose.hub.yml --profile web up -d
 docker compose -f docker-compose.hub.yml ps
 ```
 
-`latest` 与 `web-latest` 便于日常更新，但浮动标签本身不会在容器运行期间自动拉取。未启用下文可选的 Watchtower 时，每次手动更新都要先执行上述 `pull`，再执行 `up -d`；仅执行 `restart` 不会换用新镜像。固定版本 tag 便于审计和回退。保持原部署目录和 Compose project name，才能自然复用原 named volume。
+浮动标签本身不会在容器运行期间自动拉取。启用网页 updater 后从 Web 确认更新；选择 Watchtower 时它跟随当前标签；两者都未启用时才需要手动 `pull` 后 `up -d`。仅 `restart` 不会换用新镜像。保持原部署目录、项目名及 `/data` 来源；固定版本方便明确选择版本，但回退前仍须核对数据库兼容性。
 不要执行 `docker compose down -v`，`-v` 会删除库存数据库所在 volume。
 
 从源码版 Compose 迁移到 Hub Compose 时，也应保留原目录和 project name。如果必须更换目录，在所有命令中显式使用原 project name，例如：

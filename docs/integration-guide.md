@@ -482,17 +482,19 @@ Failure behavior:
 - `503 Service Unavailable`: LCSC credentials are not configured for the
   compatibility lookup path.
 
-## Android direct public lookup
+## Native direct public lookup
 
-The import UI can resolve a scanned `C70565` by reading
-`https://www.lcsc.com/product-detail/C70565.html` directly. It sends neither the
-raw packaging QR payload nor the user's server token. It requires no server
-endpoint or OpenAPI credentials. The normal Android import flow no longer calls
-the server-assisted recognizer; the legacy server route is retained for older
-clients. Windows uses the same public page and exact-SKU rule.
+Android and Windows route catalog requests by UI language. Chinese queries the
+domestic EasyEDA endpoint `https://pro.lceda.cn/api/eda/product/search`, matching
+the exact returned C code. English uses international LCSC product pages for
+exact-SKU lookup and international EasyEDA for keyword search. There is no
+automatic cross-region fallback, Cookie requirement or server/OpenAPI dependency.
+Neither the raw packaging QR payload nor the user's sync token is sent to the
+catalog. The server-assisted recognizer remains a legacy integration endpoint,
+not the normal native import path.
 
-Only matching `Product` JSON-LD is accepted; unrelated recommendations and page
-titles alone are insufficient. Manual SKU changes invalidate a pending result
+International page parsing accepts only matching `Product` JSON-LD, not unrelated
+recommendations or page titles. Manual SKU changes invalidate a pending result
 for a different SKU. User-edited fields are preserved, and packaging quantity
 is independent of supplier stock. Disable direct lookups in import settings for
 an offline-only workflow. Cached results expire after seven days; repeated

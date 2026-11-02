@@ -2,6 +2,10 @@
 
 这条路径面向普通部署者。拉取公开镜像不需要 Docker Hub 登录、Docker Hub Token 或 GitHub PAT。首次配置由 API 自带的同源页面完成，不依赖额外的管理 Web 镜像或 CORS 配置。
 
+已有正式版希望升级到 dev 并在网页管理，请直接看[保留数据升级与网页配置](server-web-update.md#已有正式版先升级到-dev)。
+API/Web 可以先成对升级，应用设置随后在网页修改；要连镜像更新也放进网页，需一次启用 updater。
+新部署需要这项能力时，可直接使用[完整单文件模板](../docker-compose.hub-web-update.yml)，当前从 dev.7 或更高兼容版本开始，不必先部署基础模板再合并。
+
 ## 1. 准备并启动
 
 下载配套的 `docker-compose.hub.yml` 和 `.env.example`，放进固定部署目录。将 `.env.example` 复制为同目录的 `.env`。新安装保持下面的配置为空，让首次配置页面管理支持的项目：
@@ -70,10 +74,12 @@ services:
 | --- | --- |
 | `data/component_vault.db` | 库存、同步状态，以及从 Web 设置页保存的 MQTT 配置 |
 | `data/config.json` | 首次配置页保存的 Token、允许来源和 Web 写入开关 |
+| `data/users/<账户ID>.db` | 普通账户各自的库存、预设及同步记录 |
+| `data/component_vault.db.photos/`、`data/users/<账户ID>.db.photos/` | 各账户已同步的原图；需随完整 `/data` 一起备份 |
 | `data/logs/server.log` | API 滚动日志；大小和保留数量有上限 |
 | `data/recognition_rules_cache.json` | 可选的服务端远程识别规则缓存，仅启用并刷新远程规则后生成 |
 
-容器仍会向 stdout/stderr 输出日志，因此也能在 Container Manager 的容器日志页或 `docker compose ... logs` 中查看。`server.log` 保存应用运行事件，最多 1 MiB，保留 3 份轮转文件；容器标准输出还包括启动和运行时诊断。当前服务端保存的是元件元数据与图片 URL，没有上传图片目录需要映射。
+容器仍会向 stdout/stderr 输出日志，因此也能在 Container Manager 的容器日志页或 `docker compose ... logs` 中查看。`server.log` 保存应用运行事件，最多 1 MiB，保留 3 份轮转文件；容器标准输出还包括启动和运行时诊断。商品远程图片仍以 URL 引用；用户原图存入 `<账户数据库完整路径>.photos/`，如 `/data/component_vault.db.photos/`。使用一个完整 `/data` 挂载即可，见[原图同步](photo-sync.md)。启用 updater 时另用独立状态卷保存更新任务，见[网页更新映射表](server-web-update.md#群晖一次性配置)。
 
 仓库默认继续使用 named volume `component_vault_data`，方便普通 Docker 用户无修改升级。上面的 bind mount 更适合希望用 File Station 查看配置和日志的 NAS 新安装。
 
@@ -83,12 +89,17 @@ services:
 
 已有部署可继续在 `.env` 或群晖 **api 容器 → 环境变量** 中设置 `API_TOKEN`、`ADMIN_WEB_ORIGINS`、`ADMIN_WEB_URL` 和 `WEB_INVENTORY_ENABLED`。非空环境变量优先于 `/data/config.json`；被环境变量接管的值不能在网页中修改。若希望网页管理某一项，应清空对应环境变量并执行 `up -d` 重建容器，仅执行 `restart` 不会重新读取 `.env`。
 
+解除覆盖前，先备份并确认该项现值已写入持久化配置。`config.json` 使用 `api_token`、
+`admin_web_origins`、`admin_web_url`、`web_inventory_enabled` 字段；空配置下直接移除旧 Token
+可能改变生效密钥，移除旧允许来源可能令浏览器无法登录。单纯升级镜像无需清空这些值。
+MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT 环境默认值，修改后按页面提示重启 API。
+
 `ADMIN_WEB_ORIGINS` 填浏览器访问 Web 页面的 origin，例如 `http://NAS地址:8081`，不是 API 的 `8787` 地址。后端未配置时仍采用内置 CORS 默认值，Web 库存写入默认关闭。
 新管理 Web 的登录状态仅将 **API 地址**保存在浏览器 localStorage；账户密钥只提交给 `POST /auth/session`，由 API 发放有效期 12 小时的 `HttpOnly` 会话 Cookie。登出会撤销会话；Android、Windows 仍使用各自账户密钥的 `Authorization: Bearer`，不依赖浏览器 Cookie。Web 与 API 应使用同一站点的主机名和协议，例如 `http://nas:8081` 与 `http://nas:8787`（不同端口可以）；混用 `nas`/IP、HTTP/HTTPS 或跨站域名可能令 `SameSite=Lax` Cookie 无法随请求发送。
 
 由于 8081 和 8787 是不同 **origin**，须把浏览器实际打开的 Web `scheme://host:port` 精确加入 `ADMIN_WEB_ORIGINS`，例如 `http://nas:8081`，不要填 API origin 或通配符。API 对允许来源启用带凭据 CORS；改动环境变量后在原项目目录执行 `up -d` **重建** API，单独 `restart` 不会读取新 `.env`。若设置保存于 `/data/config.json`，服务端会动态读取。反向代理应同时正确转发 `/auth/session`、`/auth/me` 与 `/admin-api/*`。
 
-`0.7.4` 的 API 支持设置管理台实际地址 `ADMIN_WEB_URL`；`0.7.4` 的 Web 管理台支持直接编辑服务端配置。默认的 `latest` 和 `web-latest` 应核对实际指向；开发预发布不发布 Docker 镜像。已有 `0.7.1` 部署可继续使用已认证的 `/setup` 修改配置。`ADMIN_WEB_URL` 可填写实际 Web 页面完整地址（支持反向代理子路径）；首次保存后先复制 API Token，再点“进入管理台”并用同一 Token 登录。
+当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。Docker 已分别发布正式与 dev 镜像：正式使用 `latest / web-latest`，开发使用 `dev / web-dev`；网页更新组件开发镜像为 `updater-dev`。以[Docker Hub 核对记录](dockerhub.md)和实际运行的 `/health` 为准。
 
 `.env.example` 后半部分列出全部可由 Compose 传入的 LCSC、远程识别规则和 MQTT 高级选项。普通部署无需填写。Web 设置页保存的 MQTT 配置也位于 SQLite，并在 API 下次启动时优先于 MQTT 环境变量默认值。
 
@@ -121,7 +132,7 @@ docker compose -f docker-compose.hub.yml exec api printenv API_TOKEN
 
 源码 Compose 使用 `docker compose exec api printenv API_TOKEN`。命令只会显示环境变量来源的值；若输出为空，Token 可能由 `/data/config.json` 管理，应登录配置页查看。命令会在终端显示秘密值，注意终端历史、录屏和旁观者。粘贴到客户端时只复制值，不包含 `API_TOKEN=`。
 
-如果忘记网页配置的 Token，可直接在 File Station 打开映射目录的 `config.json`，查看 `API_TOKEN` 的值；无需先登录网页或重置数据库。高级用户也可在容器终端仅输出该字段：
+如果忘记网页配置的 Token，可直接在 File Station 打开映射目录的 `config.json`，查看 `api_token` 字段；无需先登录网页或重置数据库。若同时有非空 `API_TOKEN` 环境变量，则以环境变量为准。高级用户也可在容器终端仅输出当前生效值：
 
 ```sh
 docker compose -f docker-compose.hub.yml exec api python -c 'from app.config import get_settings; print(get_settings().api_token)'
@@ -151,8 +162,8 @@ PowerShell 可用 `[guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString(
 `/auth/ping` 成功只说明密钥可用于旧认证接口，不能证明账户接口已部署。
 最新客户端的“测试连接”同时检查库存协议和账户接口，不会执行同步或更换本地绑定。
 
-2026-09-27 排查时，Docker Hub 的 `latest` / `web-latest` 对应 0.7.5；已核对该版本公开
-API 镜像中确实包含 `/auth/me`。Docker Hub 的标签更新不会自动替换 NAS 上已运行的容器。
+当前正式与开发镜像均包含 `/auth/me`。Docker Hub 的浮动标签会随对应渠道发布而变化，
+不会自动替换 NAS 上已运行的容器；以实际 `/health` 和[发布核对记录](dockerhub.md)为准。
 若 `.env` 中固定了更早的 `COMPONENT_VAULT_IMAGE`，拉取 `latest` 也不会改变 Compose
 实际使用的固定标签。先检查这两个镜像变量，再在原项目目录更新：
 

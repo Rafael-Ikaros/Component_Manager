@@ -127,7 +127,9 @@ identity. Legacy previously-synced workspaces initially bind only to admin;
 ordinary sync requires the matching `X-Component-Vault-Account-Id` header so old
 clients cannot accidentally upload an existing workspace to a new user key.
 This header is a client compatibility check, not an authentication credential.
-See [implementation plan and recovery boundaries](account-isolation-plan.md).
+See [account operations and recovery boundaries](accounts.md). Back up the entire
+`/data`, including the account registry and `users/`; older releases without
+account support cannot authenticate ordinary users after a downgrade.
 
 Web language preference uses browser-local `component-vault.language` with
 `system`, `zh-CN` or `en`. It is a personal display choice, independent of server
@@ -154,41 +156,25 @@ payloads. Legacy components without allocations fall back to their stored
 location; an empty location is selectable as unassigned. Export is read-only and
 captures the selected rows and columns before opening the destination picker.
 
-Catalog routing prefers domestic LCSC for Chinese and international LCSC for
-English. Android reads its saved app language; Windows uses its current UI
-culture. A successful primary result is not overwritten by a secondary lookup.
-Blocked/unavailable/unmatched/invalid responses retain explicit fallback reasons.
-International keyword search is unavailable in the current public-page adapter,
-so that path explicitly identifies its use of domestic search. No server or
-OpenAPI key is introduced by this routing change.
+Catalog requests are language-scoped: Chinese uses the domestic EasyEDA catalog,
+while English uses international LCSC exact-SKU lookup and international EasyEDA
+keyword search. Neither mode automatically falls back to the other region.
+Android reads its saved app language; Windows uses its current UI culture.
+Failures remain visible for retry or manual editing; no server, Cookie or OpenAPI
+key is required. The retained domestic-mall adapter is not the normal Chinese
+lookup path. See [catalog and reference prices](#国内-eda-资料与参考价格).
 
-Domestic lookup first parses valid product data before checking verification-page
-markers. An app-session gate pauses further domestic attempts after a verification
-block (120 seconds), a network failure (30 seconds), or a bounded Retry-After rate
-limit. Different SKUs can still use the international fallback; explicit retry
-clears the pause. Browser sessions are independent and browser verification does
-not guarantee that native requests will be accepted. No challenge bypass is used.
-
-Android label preview includes an opt-in Bluetooth diagnostic dialog with service
-discovery and M1 connection modes. It lists nearby BLE and system-paired devices.
-M1 mode uses a paired Classic/dual-mode device and an RFCOMM SPP socket to query
-the model, then status only after a recognised M1 reply. Socket I/O runs off the UI
-thread; cancellation, timeout and leaving the foreground close the socket and
-discard obsolete session callbacks. The read-only query action sends no print
-commands. A separate, explicitly confirmed test-label action rechecks the model
-and status, then sends one fixed 203-dpi raster in complete-row blocks of at most
-1024 raw bytes (20 complete-row frames for 320×480, matching the observed Hanma
-3.3.4 M1 runtime geometry). Blocks use independently implemented literal-only LZO1X and the
-M1 POLI header, preceded by right alignment and followed by a single label feed.
-Explicit, non-persistent diagnostic choices omit only that final feed or replace
-it with the upstream short-feed command; neither changes the raster or is the
-default printing mode. Reports distinguish the requested feed mode from the numbers
-of label-feed and short-feed commands successfully written. No vendor binary or JNI is used.
-The existing 40 × 10 / 40 × 30 mm templates supply defaults for a device-local
-test paper profile with dimensions, rotation and image offsets. It changes the
-raster only; no firmware paper-type or calibration commands are sent. Normal
-Android component-label printing has a separate foreground print center, reached
-from label preview or inventory batch printing. `M1ComponentLabelRenderer` uses
+Android component labels, free-label templates, preview, export and Bluetooth
+printing share `BluetoothLabelPrintScreen`; the independent preview/diagnostic
+dialog is no longer a normal navigation destination. M1 uses a paired Classic
+or dual-mode device and an RFCOMM SPP socket, verifying model and status before
+printing. Bitmap blocks contain complete rows, at most 1024 raw bytes per block
+(20 frames for 320×480), with literal-only LZO1X and M1 POLI headers, right
+alignment and a single normal label feed. No vendor binary or JNI is used.
+Older no-feed/short-feed trials are historical diagnostic evidence, not the
+default user flow. Paper size, rotation and offsets are local raster options;
+the app does not write firmware paper-type or calibration settings.
+`M1ComponentLabelRenderer` uses
 the existing QR payload codec and text field rules with integer QR modules at
 203 dpi; this paper raster is used for both preview and transmission. Paper
 dimensions, rotation and offsets are local rendering options, not firmware writes.
@@ -226,9 +212,8 @@ names, addresses, serial numbers and raw replies; a model match is recorded only
 as the fixed value M1. See [device test steps](printer-compatibility.md) and
 [the APK-derived protocol evidence](m1-apk-analysis.md).
 
-Android catalog cache keys include the preferred source. Only a primary-source
-success is persisted; fallback results never suppress a subsequent attempt at
-the preferred site. Metadata cache round-trips description, parameters and
+Android catalog cache keys include the selected source. A cached result does not
+switch the language-specific region. Metadata cache round-trips description, parameters and
 datasheet links. Changing app language clears only lookup entries; startup
 removes legacy unscoped, malformed and expired entries from that same prefix.
 
@@ -261,14 +246,16 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Navigation centers on four adaptive top-level destinations: `Home`,
   `Inventory`, `Records`, and `Settings`. Home presents the summary; settings
   has one main entry with section drill-down and direct sync-section routing.
-  Inventory's Import and scan bottom sheet groups single-item lookup,
-  batch JLC inbound, separate Project BOM and data migration routes, and manual entry. Settings > Inventory
+  Inventory's Import and scan bottom sheet has Add component, Batch JLC inbound
+  and Project materials. Add component includes lookup, scanning and manual entry;
+  Project materials unifies BOM and manual picking. Data migration is not a
+  separate Android menu item. Settings > Inventory
   and data owns location management and Excel backup/restore. These secondary
   routes consume system Back and return to their parent. Batch review uses a
   bounded LazyColumn with collapsible summaries and fixed confirmation actions;
-  editor fields scroll independently inside their dialog. See the
-  [native UI layout contract](native-ui-redesign.md) and
-  [cross-platform UI audit and phased plan](ui-ux-audit-2026-09-16.md).
+  editor fields scroll independently inside their dialog. Current user workflows
+  are documented in [README](../README.md); historical UI evidence is kept in
+  [the implementation report](ui-consistency-implementation.md).
 - `SecondaryPageScaffold` provides shared app bars, insets and busy-aware Back
   handling for location management, backup, BOM and batch pages. The import
   chooser overlays the existing inventory route and dismisses back to it.
@@ -330,8 +317,8 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   small-label mode with higher analysis resolution, ML Kit
   potential-barcode detection, zoom suggestions, and tap-to-focus to improve
   read rates on narrow printed labels.
-- `Inventory` now routes primary create flows through a unified add-entry sheet
-  so the main action consistently branches into `Import` or `Manual add`.
+- `Inventory` routes create flows through the Import and scan sheet; manual
+  entry is part of Add component rather than a duplicate top-level option.
   Component create/import forms stay open on save failure, surface repository
   errors inline, and reselect the saved component after a successful local
   reload so compact detail flows do not lose context.
@@ -398,7 +385,8 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   `docs/CHANGELOG.md latest heading -> changelog_release.py -> stable metadata sync if needed -> version tag -> reusable release.yml build and GitHub Release publish`
 - Dev tags (`vX.Y.Z-dev.N`) build the same `master` code as prereleases, injecting
   artifact version names and monotonically ordered Android version codes. They
-  do not advance the stable changelog or publish Docker Hub images. Windows
+  do not advance stable metadata or move stable Docker tags. The separate Docker
+  workflow publishes dev/web-dev/updater-dev and matching fixed tags. Windows
   displays the informational version, including the dev suffix, while keeping
   numeric assembly metadata. See [release channels](runbook.md#stable-and-dev-publishing).
 - CI explicitly includes branch pushes alongside pull requests. The reusable
