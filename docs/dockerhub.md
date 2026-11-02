@@ -2,6 +2,13 @@
 
 当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
 
+2026-11-02 已实际核对 **0.7.9-dev.5**：API `dev / 0.7.9-dev.5` 为
+`sha256:20b198f5ee3c9e48c96b3321875445992d4587389d73c1e4081b1fe036a12006`，
+Web `web-dev / web-0.7.9-dev.5` 为
+`sha256:52ae58c98c63b7171efdaef14105bf0d8340f354f8eb8d3bd536a1cfa406c213`。
+两组均有 amd64/arm64，实际 amd64 OCI 配置中的 version/revision 配套；正式 latest/web-latest
+仍为下文 0.7.8 摘要，没有被 dev 发布替换。[发布与 Docker 任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383455452)成功。
+
 普通部署者请先看 [Docker 快速部署与 API Token 查找](docker-quickstart.md)。拉取公开镜像不需要 Docker Hub 登录、Docker Hub Token 或 GitHub PAT；快速入门包含生成、查找和忘记 `API_TOKEN` 时的处理方法。
 
 本文保留仓库维护者的发布配置、发布验证，以及部署者的升级、迁移和备份细节。

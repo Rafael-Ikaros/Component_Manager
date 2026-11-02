@@ -1,11 +1,14 @@
-# 2026-11-02 服务端批量删除与 Docker 渠道（dev.5 候选）
+# 2026-11-02 服务端批量删除与 Docker 渠道（0.7.9-dev.5 已发布）
 
 - Web 库存新增当前页多选批量删除，确认框列出数量和 SKU，后端沿用账户隔离、Web 写入开关、软删除与同步墓碑。每批 1–100 个唯一目标和版本，一批短事务全部成功或全部回滚，相同回执可重试。保留数量、分配及历史流水，不碰原有数据目录。
 - Docker CI 从普通 CI 拆出，Docker Images 独立发布，changelog 后并行调用 Docker 与原生附件。dev 固定/浮动镜像仅更新开发标签，正式版才更新 latest/web-latest；支持独立重跑 Docker，不需重建客户端。
 - 增加官方 Compose 切换助手：读取原项目、工作目录和全部配置组合，先拉取配套 API/Web，再备份 `.env` 和重建；保留端口、卷与 Watchtower override。Web 关于卡片可选择版本检测渠道，偏好按 API 地址保存在浏览器，检测不会替换容器。
 - 相关后端删除 7 项、更新检测 11 项、已有 pending-request 6 项测试及 Web 构建通过。5 份 YAML / 41 段 Bash 语法、渠道标签与版本格式校验通过。助手以 Git Bash 和假 Docker 覆盖匹配/不匹配镜像、失败、预览、路径空格、旧导出变量与原 Watchtower 配置保留；本机无 Docker CLI，尚未做真实 NAS 切换，远端 Docker CI 与发布仍待执行。
 - 浏览器隔离库存已实际验证两项选择、取消保持 3 项、确认后仅剩未选的 1 项，界面显示删除 2 项；实际 `/sync/pull` 返回两项墓碑，名称、数量、分配、备注、库位与流水比对保持不变。开发/正式渠道实际查询 GitHub 分别返回 dev.4 / 0.7.8，刷新保留偏好，中英文新文案可见。原应用、业务数据库与用户附件未操作。
-- 实现 `195dbe040a05ca9b408725d53cdf6a50a650cfbe` 的 [Docker CI 41383073824](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073824) 成功完成真实构建、Compose 渲染与容器启动验证；[主 CI 41383073611](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073611) 各 job 通过。正在发布 dev.5，正式 latest/web-latest 已记录发布前摘要，将核对开发发布没有移动正式标签。
+- 实现 `195dbe040a05ca9b408725d53cdf6a50a650cfbe` 的 [Docker CI 41383073824](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073824) 成功完成真实构建、Compose 渲染与容器启动验证；[主 CI 41383073611](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383073611) 通过。
+- [v0.7.9-dev.5](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.5) 已公开预发布，Android/Windows/Web 三附件齐全。发布源 `16de154e8d26c933d8c8cf740febf0d815e80434` 的 [CI 41383455468](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383455468) 和 [Release 41383455452](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383455452) 均成功，其中 Docker 与原生附件并行完成。本轮未改原生业务代码，未重新操作手机或覆盖其应用。
+- 实际读取 Docker Hub 标签和 registry OCI 配置：API dev/0.7.9-dev.5 摘要同为 `sha256:20b198f5ee3c9e48c96b3321875445992d4587389d73c1e4081b1fe036a12006`；Web web-dev/web-0.7.9-dev.5 同为 `sha256:52ae58c98c63b7171efdaef14105bf0d8340f354f8eb8d3bd536a1cfa406c213`。两组清单均含 amd64/arm64；实际 amd64 配置的 version=0.7.9-dev.5、revision=发布源，两镜像一致。latest/web-latest 发布前后摘要与 0.7.8 正式镜像相同，未移动。
+- 隔离 API/Web 进程和测试浏览器已退出，原始截图、测试库和 manifest 证据仅留本机忽略目录，`server/data/` 与用户附件保持未提交。真实 NAS 切换未执行；不能把 CI 启动与假 Docker 助手检查称为已完成用户部署升级。
 
 # 2026-11-01 国内 EDA 资料与参考价（0.7.9-dev.4 已发布）
 
