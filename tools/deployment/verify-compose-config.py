@@ -15,14 +15,18 @@ COMPOSE_FILES = (ROOT / "docker-compose.yml", ROOT / "docker-compose.hub.yml")
 ENV_KEYS = ("API_TOKEN", "ADMIN_WEB_ORIGINS", "WEB_INVENTORY_ENABLED")
 IMAGE_ENV_KEYS = (
     "COMPONENT_VAULT_DOCKER_CHANNEL", "COMPONENT_VAULT_IMAGE", "COMPONENT_VAULT_WEB_IMAGE",
+    "COMPONENT_VAULT_UPDATER_IMAGE", "COMPONENT_VAULT_DEPLOY_DIR", "COMPOSE_PROJECT_NAME",
 )
 
 
-def render(compose_file: Path, env_file: str, overrides: dict[str, str] | None = None) -> dict:
+def render(compose_file: Path, env_file: str, overrides: dict[str, str] | None = None,
+           extra_files: tuple[Path, ...] = ()) -> dict:
     command = [
         "docker", "compose", "--profile", "*", "--env-file", env_file,
-        "-f", str(compose_file), "config", "--format", "json",
     ]
+    for path in (compose_file, *extra_files):
+        command.extend(("-f", str(path)))
+    command.extend(("config", "--format", "json"))
     environment = os.environ.copy()
     for key in (*ENV_KEYS, *IMAGE_ENV_KEYS):
         environment.pop(key, None)
@@ -87,6 +91,25 @@ def main() -> None:
                 })
                 assert pinned["services"]["api"]["image"] == "example/inventory:0.7.9"
                 assert pinned["services"]["admin-web"]["image"] == "example/inventory:web-0.7.9"
+                managed = render(compose_file, os.devnull, {
+                    "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
+                    "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
+                    "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
+                }, (ROOT / "docker-compose.watchtower.yml", ROOT / "docker-compose.web-update.yml"))
+                services = managed["services"]
+                assert services["api"]["environment"]["UPDATER_URL"] == "http://updater:8790"
+                assert services["api"]["environment"]["UPDATE_TOKEN_FILE"] == "/data/.updater-token"
+                for service in ("api", "admin-web"):
+                    assert services[service]["labels"]["com.centurylinklabs.watchtower.enable"] == "false"
+                    assert not any(volume["target"] == "/var/run/docker.sock" for volume in services[service].get("volumes", []))
+                updater = services["updater"]
+                assert not updater.get("ports")
+                assert updater["image"] == "rafaelikaros/component_manager:updater-dev"
+                assert updater["environment"]["UPDATE_PROJECT_NAME"] == "component-vault-compose-ci"
+                assert updater["environment"]["UPDATE_TOKEN_FILE"] == "/data/.updater-token"
+                assert any(volume["target"] == "/data" and volume.get("read_only") for volume in updater["volumes"])
+                assert any(volume["target"] == "/var/run/docker.sock" for volume in updater["volumes"])
+                assert any(volume["target"] == str(ROOT) and volume["source"] == str(ROOT) for volume in updater["volumes"])
     print("Compose first-run configuration schema: OK")
 
 

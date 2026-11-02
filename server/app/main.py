@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .admin.api import router as admin_router
 from .admin.about import router as about_router
+from .admin.update_agent import router as update_agent_router
 from .admin.spec_enrichment import EnrichmentJobs
 from .account_api import router as account_router
 from .bom_presets import router as bom_preset_router
@@ -134,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(photo_router)
     app.include_router(admin_router)
     app.include_router(about_router)
+    app.include_router(update_agent_router)
 
     @app.middleware("http")
     async def application_request_log(request: Request, call_next):

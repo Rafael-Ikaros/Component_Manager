@@ -95,6 +95,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Set up Python for updater checks
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: updater/requirements*.txt
+
+      - name: Verify updater jobs and deployment helper
+        run: |
+          python -m venv updater/.venv
+          updater/.venv/bin/python -m pip install -r updater/requirements-dev.txt
+          updater/.venv/bin/python -m unittest updater.test_app updater.test_helper -v
+
       - name: Build image for startup validation
         uses: docker/build-push-action@v7
         with:
@@ -120,6 +133,72 @@ jobs:
 
       - name: Verify Compose first-run configuration schema
         run: python tools/deployment/verify-compose-config.py
+
+      - name: Build updater image for startup validation
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: updater/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: component-vault-updater:ci
+          cache-from: type=gha,scope=updater-image
+          cache-to: type=gha,mode=max,scope=updater-image
+
+      - name: Verify updater startup, authentication and persisted failed jobs
+        run: |
+          mkdir -p "$RUNNER_TEMP/updater-data" "$RUNNER_TEMP/updater-state"
+          printf '%s' 'ci-updater-token' > "$RUNNER_TEMP/updater-data/.updater-token"
+          docker run -d --name component-vault-updater-ci \
+            -p 127.0.0.1:18790:8790 \
+            -e UPDATE_PROJECT_NAME=isolated-missing-project \
+            -v "$RUNNER_TEMP/updater-data:/data:ro" \
+            -v "$RUNNER_TEMP/updater-state:/state" \
+            component-vault-updater:ci
+          trap 'docker logs component-vault-updater-ci; docker rm -f component-vault-updater-ci' EXIT
+          curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
+            --output /dev/null http://127.0.0.1:18790/health
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+
+          base = 'http://127.0.0.1:18790'
+          def request(path, data=None, authenticated=True):
+              headers = {'Authorization': 'Bearer ci-updater-token'} if authenticated else {}
+              if data is not None:
+                  headers['Content-Type'] = 'application/json'
+              body = json.dumps(data).encode() if data is not None else None
+              with urllib.request.urlopen(urllib.request.Request(base + path, data=body, headers=headers), timeout=5) as response:
+                  return json.load(response)
+          try:
+              request('/status', authenticated=False)
+              raise AssertionError('Updater must require its shared token.')
+          except urllib.error.HTTPError as error:
+              assert error.code == 401
+          assert request('/status')['active_job'] is None
+          job = request('/jobs', {'channel': 'dev', 'request_id': 'ci-no-docker-socket'})
+          assert job['status'] in ('queued', 'running')
+          for _ in range(40):
+              job = request('/jobs/ci-no-docker-socket')
+              if job['status'] == 'failed':
+                  break
+              time.sleep(0.5)
+          assert job['status'] == 'failed' and job['message'], job
+          PY
+          docker restart component-vault-updater-ci
+          curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
+            -H 'Authorization: Bearer ci-updater-token' \
+            --output "$RUNNER_TEMP/updater-status.json" http://127.0.0.1:18790/status
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          status = json.loads((Path(os.environ['RUNNER_TEMP']) / 'updater-status.json').read_text())
+          assert status['latest_job']['id'] == 'ci-no-docker-socket', status
+          assert status['latest_job']['status'] == 'failed', status
+          PY
 
       - name: Verify server first-run setup and persistence
         run: bash tools/deployment/verify-first-run.sh component-vault-server:ci
@@ -254,3 +333,43 @@ jobs:
             org.opencontainers.image.revision=${{ steps.build_identity.outputs.revision }}
           cache-from: type=gha,scope=web-image
           cache-to: type=gha,mode=max,scope=web-image
+
+      - name: Resolve updater image tags
+        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        id: updater_tags
+        env:
+          IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          channel=latest
+          if [[ "$version" == *-dev.* ]]; then channel=dev; fi
+          {
+            echo 'tags<<EOF'
+            echo "$IMAGE:updater-$version"
+            echo "$IMAGE:updater-$channel"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish multi-platform updater image
+        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: updater/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.updater_tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
+            org.opencontainers.image.revision=${{ steps.build_identity.outputs.revision }}
+          cache-from: type=gha,scope=updater-image
+          cache-to: type=gha,mode=max,scope=updater-image
+
+      - name: Verify real Web-triggered Compose update and data preservation
+        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        timeout-minutes: 12
+        env:
+          UPDATE_CHANNEL: ${{ contains(env.RELEASE_TAG, '-dev.') && 'dev' || 'stable' }}
+          EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
+        run: bash tools/deployment/verify-web-update.sh

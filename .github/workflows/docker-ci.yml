@@ -7,6 +7,8 @@ on:
     paths:
       - 'server/**'
       - 'admin-web/**'
+      - 'updater/**'
+      - '.dockerignore'
       - 'docker-compose*.yml'
       - 'tools/deployment/**'
       - '.github/workflows/docker-ci.yml'
@@ -15,6 +17,8 @@ on:
     paths:
       - 'server/**'
       - 'admin-web/**'
+      - 'updater/**'
+      - '.dockerignore'
       - 'docker-compose*.yml'
       - 'tools/deployment/**'
       - '.github/workflows/docker-ci.yml'

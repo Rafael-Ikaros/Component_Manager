@@ -13,6 +13,8 @@ Switch the existing Compose project's API and deployed Web console together.
   --channel stable|dev  Stable uses latest/web-latest; dev uses dev/web-dev.
                         When omitted, an interactive terminal offers a menu.
   --dry-run             Show the plan without changing files or containers.
+  --result-file PATH    Write version/revision/Web metadata after success (for the updater).
+  --require-web-update  Require the target API/Web to retain Web update support.
   -h, --help            Show this help.
 
 The original Compose files and working directory are read from the API
@@ -28,17 +30,21 @@ fail() { printf '%s\n' "Error: $*" >&2; exit 1; }
 project=
 channel=
 dry_run=false
+result_file=
+require_web_update=false
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --project-name|--channel)
+        --project-name|--channel|--result-file)
             [ "$#" -ge 2 ] || fail "$1 requires a value; see --help."
             case "$1" in
                 --project-name) project=$2 ;;
                 --channel) channel=$2 ;;
+                --result-file) result_file=$2 ;;
             esac
             shift 2
             ;;
         --dry-run) dry_run=true; shift ;;
+        --require-web-update) require_web_update=true; shift ;;
         -h|--help) usage; exit 0 ;;
         *) fail "Unknown option: $1; see --help." ;;
     esac
@@ -59,6 +65,7 @@ case "$channel" in
     dev) image_channel=dev ;;
     *) fail '--channel must be stable or dev.' ;;
 esac
+if [ "$dry_run" = false ] && [ -n "$result_file" ]; then rm -f "$result_file"; fi
 command -v docker >/dev/null 2>&1 || fail 'Docker CLI is required on the deployment host.'
 docker compose version >/dev/null || fail 'Docker Compose v2 is required (docker compose).'
 
@@ -121,7 +128,11 @@ if [ "$dry_run" = true ]; then
 fi
 
 candidate=$(mktemp "$working_dir/.env.channel.XXXXXX")
-cleanup() { if [ -n "$candidate" ]; then rm -f "$candidate"; fi; }
+completed=false
+cleanup() {
+    if [ -n "$candidate" ]; then rm -f "$candidate"; fi
+    if [ "$completed" = false ] && [ -n "$result_file" ]; then rm -f "$result_file"; fi
+}
 trap cleanup 0
 trap 'exit 129' HUP
 trap 'exit 130' INT
@@ -139,12 +150,28 @@ awk -v channel="$image_channel" -v api="$api_image" -v web="$web_image" '
 ' "$env_file" > "$candidate"
 # Compose gives process environment precedence over --env-file.
 unset COMPONENT_VAULT_DOCKER_CHANNEL COMPONENT_VAULT_IMAGE COMPONENT_VAULT_WEB_IMAGE
+api_images=$("$@" --env-file "$candidate" config --images api) || fail 'Could not resolve the original API Compose configuration.'
+printf '%s\n' "$api_images" | grep -F -x "$api_image" >/dev/null || fail 'The API image is hardcoded in the original Compose project. Change image to use COMPONENT_VAULT_IMAGE as described in the one-time updater setup; .env and containers were not changed.'
+if [ "$has_web" = true ]; then
+    web_images=$("$@" --env-file "$candidate" config --images admin-web) || fail 'Could not resolve the original Web Compose configuration.'
+    printf '%s\n' "$web_images" | grep -F -x "$web_image" >/dev/null || fail 'The Web image is hardcoded in the original Compose project. Change image to use COMPONENT_VAULT_WEB_IMAGE as described in the one-time updater setup; .env and containers were not changed.'
+fi
+printf 'Stage: pulling\n' >&2
 if [ "$has_web" = true ]; then
     "$@" --env-file "$candidate" pull api admin-web || fail 'Image pull failed; .env and containers were not changed. Retry the same command.'
 else
     "$@" --env-file "$candidate" pull api || fail 'Image pull failed; .env and containers were not changed. Retry the same command.'
 fi
-if [ "$has_web" = true ]; then
+if [ "$require_web_update" = true ]; then
+    api_capability=$(docker image inspect --format '{{ index .Config.Labels "io.componentvault.server-update" }}' "$api_image")
+    [ "$api_capability" = 1 ] || fail 'TARGET_WEB_UPDATE_UNSUPPORTED: The target API does not support Web updates. Choose a compatible release; use the CLI without --require-web-update for an intentional manual downgrade. .env and containers were not changed.'
+    if [ "$has_web" = true ]; then
+        web_capability=$(docker image inspect --format '{{ index .Config.Labels "io.componentvault.server-update" }}' "$web_image")
+        [ "$web_capability" = 1 ] || fail 'TARGET_WEB_UPDATE_UNSUPPORTED: The target Web console does not support Web updates. Choose a compatible release; use the CLI for an intentional manual downgrade. .env and containers were not changed.'
+    fi
+fi
+if [ "$has_web" = true ] || [ -n "$result_file" ]; then
+    printf 'Stage: validating\n' >&2
     image_identity() {
         version=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$1")
         revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$1")
@@ -157,15 +184,22 @@ if [ "$has_web" = true ]; then
         printf '%s %s\n' "$version" "$revision"
     }
     api_identity=$(image_identity "$api_image")
+fi
+if [ "$has_web" = true ]; then
     web_identity=$(image_identity "$web_image")
     [ "$api_identity" = "$web_identity" ] || fail 'API/Web image versions or revisions differ. Publishing may still be in progress; retry after it completes, or deploy matching fixed versions. .env and containers were not changed.'
 fi
 backup=$env_file.before-channel-$(date +%Y%m%dT%H%M%S).$$
 cp -p "$env_file" "$backup" || fail 'Could not back up .env; containers were not changed.'
 mv "$candidate" "$env_file"
+printf 'Stage: recreating\n' >&2
 if [ "$has_web" = true ]; then
     "$@" --env-file "$env_file" up -d --no-deps --no-build --pull never api admin-web || fail "Service recreation failed; retry the same command. Previous .env backup: $backup"
 else
     "$@" --env-file "$env_file" up -d --no-deps --no-build --pull never api || fail "Service recreation failed; retry the same command. Previous .env backup: $backup"
 fi
+if [ -n "$result_file" ]; then
+    printf '%s\n%s\n%s\n' "${api_identity%% *}" "${api_identity#* }" "$has_web" > "$result_file"
+fi
+completed=true
 printf 'Channel switched to %s. Previous .env backup: %s\n' "$channel" "$backup" >&2

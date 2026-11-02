@@ -1,5 +1,9 @@
 # Docker Hub 镜像发布与部署教程
 
+希望群晖日常无需 SSH，可一次配置[网页更新服务](server-web-update.md)。此功能通过管理员作业和独立
+updater 保留更新进度，镜像标签为 updater-dev / updater-latest；当前旧正式版尚不支持网页更新，
+在线更新会检查目标能力。下方 CLI / Watchtower 方案继续可选，同一服务不要同时由两个更新器管理。
+
 当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
 
 2026-11-02 已实际核对 **0.7.9-dev.5**：API `dev / 0.7.9-dev.5` 为

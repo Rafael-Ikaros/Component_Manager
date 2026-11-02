@@ -1,5 +1,16 @@
 # Integration Guide
 
+## 网页更新作业（管理员）
+
+`GET /admin-api/server-update/status` 返回 enabled/current_version/current_channel/active_job/latest_job。
+未配置 UPDATER_URL 时 enabled=false，不创建内部令牌或执行更新。
+`POST /admin-api/server-update/jobs` 接受 `{ "channel": "dev", "request_id": "unique-job-id" }`，
+返回202作业；`GET /admin-api/server-update/jobs/{id}` 查询，`POST .../{id}/retry` 重试失败作业。
+全部要求管理员及现有 Cookie/CSRF 或账户密钥认证；普通账户403。作业含 id/channel/status/stage/message/
+created_at/updated_at/target_version，可按id或最新状态恢复。网络未知时重试原request_id，别重复创建。
+状态为queued/running/succeeded/failed，TARGET_WEB_UPDATE_UNSUPPORTED 表示目标不保留网页更新能力，
+已在修改配置及容器前取消。详情见[部署说明](server-web-update.md)，不改变库存同步格式。
+
 ## 管理台批量删除与版本渠道
 
 `POST /admin-api/components/bulk-delete` 沿用账户密钥或 Web 会话/CSRF 认证及 Web 写入开关。

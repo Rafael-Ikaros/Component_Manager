@@ -1,4 +1,5 @@
 FROM python:3.12-slim
+LABEL io.componentvault.server-update="1"
 
 ARG APP_VERSION=source
 ARG APP_REVISION=unknown

@@ -1,0 +1,31 @@
+# Optional Web-triggered updates for an existing official Hub Compose project.
+# Set COMPONENT_VAULT_DEPLOY_DIR to its absolute host directory, at the same path
+# inside the updater. Keep the original Compose project name and data volume.
+services:
+  api:
+    environment:
+      UPDATER_URL: http://updater:8790
+      UPDATE_TOKEN_FILE: /data/.updater-token
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  admin-web:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  updater:
+    image: ${COMPONENT_VAULT_UPDATER_IMAGE:-rafaelikaros/component_manager:updater-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    environment:
+      UPDATE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:?Keep the existing Compose project name in COMPOSE_PROJECT_NAME}
+      UPDATE_TOKEN_FILE: /data/.updater-token
+    expose:
+      - "8790"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - component_vault_data:/data:ro
+      - component_vault_updater_state:/state
+      - ${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:rw
+    restart: unless-stopped
+
+volumes:
+  component_vault_updater_state:

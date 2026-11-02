@@ -1,5 +1,13 @@
 # Runbook
 
+## 可选网页更新
+
+通过原群晖/Compose项目加入 `docker-compose.web-update.yml`，沿用原数据和网络，首次需配套支持版本。
+步骤见[网页更新配置](server-web-update.md)。Docker Images 同时构建并发布 updater：开发标签 updater-dev，
+正式标签 updater-latest，另有 updater-版本号；dev不移动正式标签。updater仅内部端口，socket不授予API/Web。
+该流程与Watchtower对同一服务互斥；CLI仍保留用于人工恢复。当前旧正式版不支持新入口，在线目标会被能力检查拒绝，
+不要为了让它可切换而跳过dev验收发布正式版。独立任务状态保存在updater卷；API无法恢复时从NAS界面查看日志。
+
 ## 独立 Docker CI 与发布渠道
 
 Docker 构建检查由 `docker-ci.yml` 单独运行。`Docker Images` (`server-image.yml`) 可手动补发：填写已有 `release_tag`，开启 `push_image`；source_ref 留空使用该 tag，显式填写时必须对应同一提交。使用既有 DOCKERHUB_USERNAME / DOCKERHUB_IMAGE Variables 和 DOCKERHUB_TOKEN Secret。

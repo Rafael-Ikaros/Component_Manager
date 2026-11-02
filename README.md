@@ -11,6 +11,7 @@ Component Vault 面向电子元器件的入库、出库、查找与盘点。Andr
 | 下载 Android APK 或 Windows 便携版 | [GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases/latest)；安装与更新说明见[应用更新](docs/app-updates.md) |
 | 在 Docker 或群晖上部署服务 | [Docker 快速部署](docs/docker-quickstart.md) |
 | Docker 正式版／开发版切换，不手改标签 | [部署切换助手与渠道教程](docs/docker-channels.md) |
+| 群晖一次配置后直接在网页更新 | [网页更新服务配置](docs/server-web-update.md) |
 | 使用 BOM、批量扫码、库位或备份 | 下方的[使用指南](#使用指南) |
 | 开发或集成客户端 | [开发与集成](#开发与集成) |
 
@@ -36,6 +37,8 @@ Android、Windows 的中文查询使用国内嘉立创 EDA 公开元件库，不
 Web 库存页的“国内资料批量更新”可扫描当前账户全部库存，预览并选择更新中文分类、封装、参数组和参考价，保留名称、图片、自由备注、数量与库位。分析不修改库存；启用 Web 库存操作后才可应用，设备再次同步即可获取修改。失败可重试，冲突项需重新分析；详情见[旧库存资料更新](docs/parameter-enrichment.md)。
 
 Web 库存页支持选择当前页的多个元件，复核 SKU 与数量后批量删除。沿用软删除与同步墓碑，保留历史流水；一批全部成功或全部回滚，不影响其他账户。设置“关于服务端”可选择正式/开发版本检测渠道；实际 Docker 渠道由部署助手或 Compose 配置切换。Docker CI 与客户端 CI、原生发布附件已分离，dev 只更新 `dev / web-dev`，正式版才更新 `latest / web-latest`。
+
+可选网页更新服务允许管理员直接选择渠道并确认更新，查看持久进度、断线重连和失败重试。群晖在原 Compose 项目中配置 updater、共享数据与原部署目录一次后，日常更新不需要 SSH。只更新本项目 API/Web，保留原端口与挂载；目标必须支持网页更新，当前旧正式版 0.7.8 会在替换前被拒绝。详见[网页更新说明](docs/server-web-update.md)。
 
 主要工作流包括按 SKU 查找元件、入库与出库、库存流水、多库位分配与转移、嘉立创料号查询、BOM 匹配和缺料导出。Android 与 Windows 支持选择多个元件、复核数量后按库位一次批量转移，库存总量不变；Android 左滑直接展开入库、出库、转移、删除四个按钮，可对单个 SKU 快速操作；数量与库位在当前列表弹层内填写，删除仍需确认。客户端支持 Excel 备份与恢复，恢复前会预览冲突。活动元件的 SKU 唯一，库存数量和最低库存不能为负数。
 
