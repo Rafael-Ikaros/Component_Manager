@@ -25,6 +25,7 @@ bump: patch
 - 新增 `docker-compose.hub-web-update.yml` 完整单文件模板，群晖项目无需手动合并 Hub 与 updater 多份配置，Web 默认启动。旧项目仍需一次在 GUI 中保留原数据来源、端口、网络并启用更新组件，之后日常操作在网页进行。
 - 增加模板渲染一致性检查及 POSIX 权限回归，继续使用真实临时 Compose 项目的发布后更新门禁。dev.6 三镜像虽然已推送，最终更新验收因权限缺陷失败，不建议使用；以本版最终 CI 结果为准。
 - 不更改库存 schema、同步协议或原生业务；仅发布 dev 镜像，不移动正式 `latest / web-latest`。验证结果和发布摘要见[工作记录](current-work.md)。
+- [主CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059523)、[Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059508)和[发布](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059575)全部成功。真实临时项目的管理员更新流程已验证API/Web替换、updater保持、库存/库位/挂载/端口及宿主配置可读性保留；三组开发镜像已核对为本版，包含amd64/arm64。未在真实群晖上操作。
 
 ## [0.7.9-dev.6] - 2026-11-02
 

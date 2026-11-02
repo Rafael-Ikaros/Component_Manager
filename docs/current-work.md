@@ -1,8 +1,12 @@
-# 2026-11-02 网页更新权限修正与单文件配置（dev.7 候选）
+# 2026-11-02 网页更新权限修正与单文件配置（0.7.9-dev.7 已发布）
 
 - dev.6 发布源 `03c685cee457b1e620107df3263cdcb8162e9447` 的主CI 41389349977成功；Release 41389349950中的原生/Web附件和三镜像已发布，但真正更新门禁失败。日志明确为替换后宿主读取`.env` permission denied，属于helper未保留原owner/mode的实际缺陷，不是把测试改松即可忽略的问题。dev.6不推荐启用，不重写其tag。
 - helper候选文件通过`cp -p`继承原uid/gid/mode后才写入与原子替换；备份保持属性，属性复制失败时不执行pull/替换。补充POSIX权限及失败无变更检查。Windows本机6项通过，POSIX项明确skip，等待Linux CI；没有通过chmod放宽权限掩盖问题。
 - 用户希望首次部署也更简单，新增`docker-compose.hub-web-update.yml`完整单文件，默认启动Web，无需自行合并文件；CI核对它与基础Hub加override渲染一致（仅Web默认启用）。保留一次GUI授权与原项目/数据来源要求，不把旧无管理权限容器宣传为能自行补挂载。
+- 修复源 `6567a3d0faeeab3f50bfab8d5fa64d10729c4a4d` 的[主CI 41392059523](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059523)、[Docker CI 41392059508](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059508)以及[发布 41392059575](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059575)全部成功。Linux已执行权限回归和完整单文件Compose渲染一致性检查。
+- 发布任务真实建立唯一临时Compose项目，管理员API提交更新，updater拉取刚发布镜像并重建API/Web；明确检查两容器ID变化、updater ID不变、目标版本/revision正确、Web可访问、synthetic元件与库位内容、/data来源及原端口不变。日志输出“Real Web update: API/Web replaced, updater retained, selected release healthy, fixture and /data preserved.”；宿主仍能读取更新后的.env，临时项目正常清理。此项是实际Docker更新，不是之前浏览器模拟，但仍不是用户群晖实测。
+- [v0.7.9-dev.7](https://github.com/Rafael-Ikaros/Component_Manager/releases/tag/v0.7.9-dev.7)公开预发布已确认，Android/Windows/Web三附件齐全。Docker Hub实际读回API dev/0.7.9-dev.7摘要`sha256:62a22716adde13eeb53f9a38f5f9bdefe3c90556cd380a84ba02812eef59d927`，Web web-dev/web-0.7.9-dev.7摘要`sha256:c3439c6899423a8c6bd7cae7cedde99038b7356a22e696f8ab1e87354d2ca0b7`，updater-dev/updater-0.7.9-dev.7摘要`sha256:7580fc873c774fbfad4e82e41ee46b68c83441b58ff34f508f7ee85d020633c2`。三组均含amd64/arm64，实际amd64 OCI version=0.7.9-dev.7、revision=修复源；API/Web能力标签为1。
+- 发布前后latest/web-latest仍为0.7.8原摘要，未移动；updater-latest未在dev发布创建。当前旧正式目标会在替换前拒绝，待用户批准含该能力的正式版后再在线切换。没有对用户NAS、手机、平板或业务数据执行更新；隔离API/Web/模拟updater进程及浏览器均已退出，原截图与诊断只留忽略目录。
 
 # 2026-11-02 可选网页更新服务（dev.6 实现记录；最终验收失败，见上方修正）
 

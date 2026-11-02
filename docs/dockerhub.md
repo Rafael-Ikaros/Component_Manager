@@ -6,12 +6,21 @@ updater 保留更新进度，镜像标签为 updater-dev / updater-latest；当�
 
 当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
 
-2026-11-02 已实际核对 **0.7.9-dev.5**：API `dev / 0.7.9-dev.5` 为
-`sha256:20b198f5ee3c9e48c96b3321875445992d4587389d73c1e4081b1fe036a12006`，
-Web `web-dev / web-0.7.9-dev.5` 为
-`sha256:52ae58c98c63b7171efdaef14105bf0d8340f354f8eb8d3bd536a1cfa406c213`。
-两组均有 amd64/arm64，实际 amd64 OCI 配置中的 version/revision 配套；正式 latest/web-latest
-仍为下文 0.7.8 摘要，没有被 dev 发布替换。[发布与 Docker 任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41383455452)成功。
+2026-11-02 已实际核对 **0.7.9-dev.7**（首次启用网页更新请使用本版或更高兼容版本）：
+
+| 镜像标签 | 固定标签 | 实际清单摘要 |
+| --- | --- | --- |
+| `dev` | `0.7.9-dev.7` | `sha256:62a22716adde13eeb53f9a38f5f9bdefe3c90556cd380a84ba02812eef59d927` |
+| `web-dev` | `web-0.7.9-dev.7` | `sha256:c3439c6899423a8c6bd7cae7cedde99038b7356a22e696f8ab1e87354d2ca0b7` |
+| `updater-dev` | `updater-0.7.9-dev.7` | `sha256:7580fc873c774fbfad4e82e41ee46b68c83441b58ff34f508f7ee85d020633c2` |
+
+三组均有 amd64/arm64，实际 amd64 OCI version 为 0.7.9-dev.7、revision 为
+`6567a3d0faeeab3f50bfab8d5fa64d10729c4a4d`；API/Web 具有网页更新能力标签。
+[发布与 Docker 任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059575)成功，
+包括真实临时项目经管理员 API 更新、API/Web 替换与数据/端口/挂载保留验收。
+正式 latest/web-latest 仍为下文 0.7.8 摘要，没有被 dev 发布替换；尚无正式 updater-latest。
+dev.6 虽已推镜像，发布末尾验收暴露 `.env` 属性丢失，本版已修正，请勿再采用 dev.6 启用更新。
+群晖可用[完整单文件配置](../docker-compose.hub-web-update.yml)避免手动合并；真实 NAS 尚未执行验收。
 
 普通部署者请先看 [Docker 快速部署与 API Token 查找](docker-quickstart.md)。拉取公开镜像不需要 Docker Hub 登录、Docker Hub Token 或 GitHub PAT；快速入门包含生成、查找和忘记 `API_TOKEN` 时的处理方法。
 
@@ -37,7 +46,7 @@ Web `web-dev / web-0.7.9-dev.5` 为
 
 | 用途 | 值 |
 | --- | --- |
-| GitHub 账号与仓库 | `Rafael-ban/Component_Manager` |
+| GitHub 账号与仓库 | `Rafael-Ikaros/Component_Manager` |
 | Docker Hub namespace | `rafaelikaros` |
 | Docker Hub repository | `component_manager` |
 | 完整镜像名 | `rafaelikaros/component_manager` |
@@ -87,7 +96,7 @@ Docker 官方说明见 [Personal access tokens](https://docs.docker.com/security
 
 ## 三、核对 GitHub Actions Variables
 
-打开 [GitHub 仓库 Actions 配置](https://github.com/Rafael-ban/Component_Manager/settings/secrets/actions)，对应路径为：
+打开 [GitHub 仓库 Actions 配置](https://github.com/Rafael-Ikaros/Component_Manager/settings/secrets/actions)，对应路径为：
 
 **Settings → Secrets and variables → Actions → Variables**
 
