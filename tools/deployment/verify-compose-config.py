@@ -13,16 +13,20 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILES = (ROOT / "docker-compose.yml", ROOT / "docker-compose.hub.yml")
 ENV_KEYS = ("API_TOKEN", "ADMIN_WEB_ORIGINS", "WEB_INVENTORY_ENABLED")
+IMAGE_ENV_KEYS = (
+    "COMPONENT_VAULT_DOCKER_CHANNEL", "COMPONENT_VAULT_IMAGE", "COMPONENT_VAULT_WEB_IMAGE",
+)
 
 
-def render(compose_file: Path, env_file: str) -> dict:
+def render(compose_file: Path, env_file: str, overrides: dict[str, str] | None = None) -> dict:
     command = [
         "docker", "compose", "--profile", "*", "--env-file", env_file,
         "-f", str(compose_file), "config", "--format", "json",
     ]
     environment = os.environ.copy()
-    for key in ENV_KEYS:
+    for key in (*ENV_KEYS, *IMAGE_ENV_KEYS):
         environment.pop(key, None)
+    environment.update(overrides or {})
     result = subprocess.run(
         command,
         cwd=ROOT,
@@ -45,7 +49,7 @@ def main() -> None:
             encoding="utf-8",
         )
         for compose_file in COMPOSE_FILES:
-            empty = render(compose_file, "/dev/null")
+            empty = render(compose_file, os.devnull)
             overridden = render(compose_file, str(fake_env))
             api_empty = empty["services"]["api"]
             api_override = overridden["services"]["api"]
@@ -63,6 +67,26 @@ def main() -> None:
             if compose_file.name == "docker-compose.hub.yml":
                 web = empty["services"]["admin-web"]
                 assert web.get("image") and "web" in web.get("profiles", [])
+                for channel in ("latest", "dev"):
+                    selected = render(compose_file, os.devnull, {
+                        "COMPONENT_VAULT_DOCKER_CHANNEL": channel,
+                    })
+                    assert selected["services"]["api"]["image"] == (
+                        f"rafaelikaros/component_manager:{channel}"
+                    )
+                    assert selected["services"]["admin-web"]["image"] == (
+                        f"rafaelikaros/component_manager:web-{channel}"
+                    )
+                    assert selected["services"]["api"]["volumes"] == api_empty["volumes"]
+                assert api_empty["image"] == "rafaelikaros/component_manager:latest"
+                assert web["image"] == "rafaelikaros/component_manager:web-latest"
+                pinned = render(compose_file, os.devnull, {
+                    "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
+                    "COMPONENT_VAULT_IMAGE": "example/inventory:0.7.9",
+                    "COMPONENT_VAULT_WEB_IMAGE": "example/inventory:web-0.7.9",
+                })
+                assert pinned["services"]["api"]["image"] == "example/inventory:0.7.9"
+                assert pinned["services"]["admin-web"]["image"] == "example/inventory:web-0.7.9"
     print("Compose first-run configuration schema: OK")
 
 

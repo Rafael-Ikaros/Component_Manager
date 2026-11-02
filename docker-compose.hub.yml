@@ -1,9 +1,11 @@
 # Pull the published API image instead of building from source.
 # Defaults to the floating latest/web-latest API and Web tags.
+# Set COMPONENT_VAULT_DOCKER_CHANNEL=dev for dev/web-dev; latest restores stable.
+# Full image overrides take precedence over the channel.
 # Pull before updating; check Docker Hub tags before selecting fixed release tags.
 services:
   api:
-    image: ${COMPONENT_VAULT_IMAGE:-rafaelikaros/component_manager:latest}
+    image: ${COMPONENT_VAULT_IMAGE:-rafaelikaros/component_manager:${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
     ports:
       - "8787:8787"
     environment:
@@ -36,7 +38,7 @@ services:
   admin-web:
     profiles:
       - web
-    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-latest}
+    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
     depends_on:
       - api
     ports:

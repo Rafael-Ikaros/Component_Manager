@@ -21,6 +21,8 @@ from ..part_lookup import (
 )
 from ..schemas import (
     AdminComponentDetail,
+    AdminComponentBulkDelete,
+    AdminComponentBulkDeleteResult,
     AdminComponentCreate,
     AdminComponentDelete,
     AdminComponentDeleteResult,
@@ -48,6 +50,7 @@ from .data import (
 from .operations import (
     AdminOperationConflict,
     AdminOperationNotFound,
+    bulk_delete_components,
     create_component,
     create_storage_location,
     delete_component,
@@ -368,6 +371,23 @@ def post_component(
     return _run_admin_operation(
         AdminComponentDetail,
         lambda: create_component(connection, _account_settings(settings, account), draft),
+    )
+
+
+@router.post(
+    "/components/bulk-delete",
+    response_model=AdminComponentBulkDeleteResult,
+)
+def bulk_delete_components_route(
+    draft: AdminComponentBulkDelete,
+    settings: Settings = Depends(get_settings),
+    connection: sqlite3.Connection = Depends(get_db),
+    account: Account = Depends(require_token),
+) -> AdminComponentBulkDeleteResult:
+    _require_web_inventory(settings)
+    return _run_admin_operation(
+        AdminComponentBulkDeleteResult,
+        lambda: bulk_delete_components(connection, _account_settings(settings, account), draft),
     )
 
 

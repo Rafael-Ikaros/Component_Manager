@@ -1,5 +1,12 @@
 # Architecture Notes
 
+## 服务端批量删除与 Docker 渠道
+
+- `POST /admin-api/components/bulk-delete` 使用认证账户的 SQLite、Web 写入开关和同一批次 request_id；每批 1–100 个唯一 ID 与版本。单个短事务复用单删墓碑、同步变更及 MQTT outbox，冲突/缺失全部回滚；数量、分配和历史流水保留，不硬删除业务行。
+- `POST /admin-api/about/check-update?channel=stable|dev` 默认 stable。stable 只接受正式版；dev 按语义版本比较有效正式/开发发布（不含草稿）。浏览器按 API 地址保存检测偏好，接口不拉镜像或操作宿主机。
+- `docker-ci.yml` 按相关路径独立检查 API/Web 镜像；`server-image.yml` 独立发布多架构镜像，接受 dev 和正式 tag。`release-from-changelog.yml` 在 sync/tag 后并行调用 Docker 与原生附件流程，不依赖机器人创建 tag 再触发工作流。Docker 凭据/失败不再阻断原生附件 job。
+- Hub Compose 默认 latest/web-latest，`COMPONENT_VAULT_DOCKER_CHANNEL=dev` 改用 dev/web-dev；完整镜像覆盖仍优先。部署助手复用原项目和 Compose 文件，拉取配套镜像后更新 `.env` 和重建，不引入 Docker socket 到 API/Web。详见 [渠道教程](docker-channels.md)。
+
 应用品牌母版位于 `docs/design/branding/component-vault-logo-ikaros.png`。`tools/branding/generate_icons.py` 使用 Pillow 生成现有路径的派生资源；Android 使用应用自有 mipmap 与自适应前景/白色背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。
 
 > 标签界面：Android 的单元件标签与批量打印统一进入 `BluetoothLabelPrintScreen`，原独立预览页及诊断弹窗已移除。可编辑 `LabelDesign` 与原元件 `ComponentLabelSeed` 分开保存；前者决定显示文字和纸面位置，后者决定二维码身份。队列 v3 按张保存设计快照和元件/自由标签来源，兼容读取旧 v1/v2 元件队列。自由标签没有库存身份，元件二维码仍从 ComponentLabelSeed 生成。预览、导出和打印共用 M1 纸面渲染器，底层分帧与走纸协议保持不变。开发版功能以对应 Release 说明为准。

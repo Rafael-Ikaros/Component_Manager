@@ -315,6 +315,41 @@ class AdminComponentDeleteResult(BaseModel):
     deleted: bool
 
 
+class AdminComponentDeleteSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=120)
+    expected_updated_at: datetime
+
+
+class AdminComponentBulkDelete(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str = Field(min_length=8, max_length=120)
+    items: list[AdminComponentDeleteSelection] = Field(min_length=1, max_length=100)
+
+    @field_validator("request_id")
+    @classmethod
+    def normalize_request_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Value must not be blank.")
+        return normalized
+
+    @field_validator("items")
+    @classmethod
+    def require_unique_components(
+        cls, items: list[AdminComponentDeleteSelection]
+    ) -> list[AdminComponentDeleteSelection]:
+        if len({item.id for item in items}) != len(items):
+            raise ValueError("Select each component only once.")
+        return items
+
+
+class AdminComponentBulkDeleteResult(BaseModel):
+    items: list[AdminComponentDeleteResult]
+
+
 class AdminStockMovementCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

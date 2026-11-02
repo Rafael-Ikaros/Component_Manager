@@ -15,12 +15,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  server-container:
-    uses: ./.github/workflows/server-image.yml
-    with:
-      source_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      push_image: false
-
   version-check:
     runs-on: ubuntu-latest
     steps:

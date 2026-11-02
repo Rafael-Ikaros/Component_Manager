@@ -1,5 +1,7 @@
 # Docker Hub 镜像发布与部署教程
 
+当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
+
 普通部署者请先看 [Docker 快速部署与 API Token 查找](docker-quickstart.md)。拉取公开镜像不需要 Docker Hub 登录、Docker Hub Token 或 GitHub PAT；快速入门包含生成、查找和忘记 `API_TOKEN` 时的处理方法。
 
 本文保留仓库维护者的发布配置、发布验证，以及部署者的升级、迁移和备份细节。
@@ -269,7 +271,7 @@ docker compose -p 原项目名 -f docker-compose.hub.yml up -d
 
 ## 可选 Watchtower 自动更新
 
-默认 `docker-compose.hub.yml` **不运行自动更新器**。Web “检查更新”只是手动向 GitHub 查询正式版信息，`POST /admin-api/about/check-update` 不拉取镜像、不重建容器。需要自动跟随 Docker Hub 的 API `latest` 和 Web `web-latest` 时，可显式启用仓库根目录的 [`docker-compose.watchtower.yml`](../docker-compose.watchtower.yml)。固定版本标签不会因出现新版本号而自动切换；启用前确认 `.env` 中 `COMPONENT_VAULT_IMAGE` 与 `COMPONENT_VAULT_WEB_IMAGE` 是配套的浮动标签，并在 Docker Hub 核对它们当前实际版本。
+默认 `docker-compose.hub.yml` **不运行自动更新器**。Web “检查更新”按所选正式/开发渠道查询 GitHub，接口不拉镜像或重建容器。需要自动跟随当前镜像渠道时，可显式启用根目录的 [`docker-compose.watchtower.yml`](../docker-compose.watchtower.yml)。正式使用 latest/web-latest，开发使用 dev/web-dev；固定标签不会自行跨版本。启用前核对 Compose 实际使用的镜像是否配套：完整镜像覆盖优先，否则使用 `COMPONENT_VAULT_DOCKER_CHANNEL`。操作见[渠道教程](docker-channels.md)。
 
 [原项目 `containrrr/watchtower`](https://github.com/containrrr/watchtower) 已于 2025-12-17 归档。示例明确选用仍维护的社区 fork [`nicholas-fedor/watchtower`](https://github.com/nicholas-fedor/watchtower)，对应镜像 `nickfedor/watchtower:latest`。该 fork 的说明称默认协商 Docker API；[Docker 官方兼容表](https://docs.docker.com/reference/api/engine/)显示例如 Engine 29.0–29.2 的最低 API 为 1.44，故老 Watchtower 镜像可能连接失败。先用 `docker version` 和 Watchtower 日志核对本机兼容性，不在示例中无理由强制 `DOCKER_API_VERSION`。fork 的[容器选择文档](https://watchtower.nickfedor.com/v1.21.0/getting-started/container-selection/)说明：`WATCHTOWER_LABEL_ENABLE=true` 时，只管理带 `com.centurylinklabs.watchtower.enable=true` 的容器。
 

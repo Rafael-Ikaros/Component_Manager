@@ -1,0 +1,32 @@
+name: Docker CI
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'server/**'
+      - 'admin-web/**'
+      - 'docker-compose*.yml'
+      - 'tools/deployment/**'
+      - '.github/workflows/docker-ci.yml'
+      - '.github/workflows/server-image.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'admin-web/**'
+      - 'docker-compose*.yml'
+      - 'tools/deployment/**'
+      - '.github/workflows/docker-ci.yml'
+      - '.github/workflows/server-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    uses: ./.github/workflows/server-image.yml
+    with:
+      source_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      push_image: false

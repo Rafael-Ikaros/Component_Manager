@@ -684,3 +684,131 @@ def test_old_database_initialization_preserves_data_and_adds_receipts(
             "SELECT COUNT(*) FROM admin_operation_receipts"
         ).fetchone()[0] == 0
     get_settings.cache_clear()
+
+
+def _bulk_payload(*components: dict, request_id: str = "bulk-delete-request-001") -> dict:
+    return {
+        "request_id": request_id,
+        "items": [
+            {"id": item["id"], "expected_updated_at": item["updated_at"]}
+            for item in components
+        ],
+    }
+
+
+def test_bulk_delete_keeps_managed_and_legacy_tombstones_and_replays(
+    tmp_path: Path, monkeypatch
+) -> None:
+    with _client(tmp_path, monkeypatch, True) as client:
+        _create_location(client)
+        component = _create_component(client).json()
+        managed = client.post(
+            f"/admin-api/components/{component['id']}/movements",
+            headers=HEADERS, json=_movement(component),
+        ).json()
+        legacy = {
+            "id": "legacy-bulk", "sku": "LEGACY-BULK", "name": "Legacy part",
+            "category": "Test", "package_name": "SMD", "location": "A",
+            "quantity": 9, "min_stock": 1, "updated_at": "2026-01-01T00:00:00Z",
+        }
+        assert client.post("/sync/push", headers=HEADERS, json={
+            "device_id": "test", "components": [legacy],
+        }).status_code == 200
+        before = client.get("/sync/pull", headers=HEADERS).json()["sync_cursor"]
+        payload = _bulk_payload(managed, legacy)
+        deleted = client.post("/admin-api/components/bulk-delete", headers=HEADERS, json=payload)
+        assert deleted.status_code == 200, deleted.text
+        assert {item["id"] for item in deleted.json()["items"]} == {managed["id"], legacy["id"]}
+        assert all(item["deleted"] for item in deleted.json()["items"])
+        assert client.get("/admin-api/components", headers=HEADERS).json()["total"] == 0
+        pulled = client.get(f"/sync/pull?cursor={before}", headers=HEADERS).json()
+        tombstones = {item["id"]: item for item in pulled["components"]}
+        assert len(tombstones) == 2
+        assert tombstones[managed["id"]]["quantity"] == 5
+        assert tombstones[managed["id"]]["allocations"] == managed["allocations"]
+        assert tombstones[legacy["id"]]["quantity"] == 9
+        assert all(item["deleted"] for item in tombstones.values())
+        assert client.get("/sync/pull", headers=HEADERS).json()["stock_movements"]
+        replay = client.post("/admin-api/components/bulk-delete", headers=HEADERS, json=payload)
+        assert replay.status_code == 200
+        assert replay.json() == deleted.json()
+        assert client.get("/sync/pull", headers=HEADERS).json()["sync_cursor"] == pulled["sync_cursor"]
+        changed_payload = _bulk_payload(managed)
+        assert client.post("/admin-api/components/bulk-delete", headers=HEADERS, json=changed_payload).status_code == 409
+
+
+def test_bulk_delete_conflicts_or_missing_targets_roll_back_entire_batch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    with _client(tmp_path, monkeypatch, True) as client:
+        _create_location(client)
+        first = _create_component(client).json()
+        second = _create_component(client, {
+            **COMPONENT, "request_id": "component-request-002", "sku": "WEB-002",
+        }).json()
+        assert client.post(
+            f"/admin-api/components/{second['id']}/movements",
+            headers=HEADERS, json=_movement(second),
+        ).status_code == 200
+        before = client.get("/sync/pull", headers=HEADERS).json()["sync_cursor"]
+        for target, expected_status in ((second, 409), ({**second, "id": "missing"}, 404)):
+            response = client.post(
+                "/admin-api/components/bulk-delete", headers=HEADERS,
+                json=_bulk_payload(first, target),
+            )
+            assert response.status_code == expected_status, response.text
+            assert client.get(f"/admin-api/components/{first['id']}", headers=HEADERS).status_code == 200
+            assert client.get("/sync/pull", headers=HEADERS).json()["sync_cursor"] == before
+        with sqlite3.connect(tmp_path / "sync.db") as connection:
+            assert connection.execute(
+                "SELECT COUNT(*) FROM admin_operation_receipts WHERE operation = 'bulk_delete_components'"
+            ).fetchone()[0] == 0
+
+
+def test_bulk_delete_validates_selection_auth_and_web_write_switch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    item = {"id": "one", "updated_at": "2026-01-01T00:00:00Z"}
+    payload = _bulk_payload(item)
+    with _client(tmp_path, monkeypatch, True) as client:
+        assert client.post("/admin-api/components/bulk-delete", json=payload).status_code == 401
+        for items in ([], [payload["items"][0]] * 2, [
+            {**payload["items"][0], "id": str(index)} for index in range(101)
+        ]):
+            assert client.post(
+                "/admin-api/components/bulk-delete", headers=HEADERS,
+                json={**payload, "items": items},
+            ).status_code == 422
+    with _client(tmp_path, monkeypatch, False) as client:
+        assert client.post("/admin-api/components/bulk-delete", headers=HEADERS, json=payload).status_code == 403
+
+
+def test_bulk_delete_uses_only_authenticated_accounts_inventory(
+    tmp_path: Path, monkeypatch
+) -> None:
+    with _client(tmp_path, monkeypatch, True) as client:
+        users = [client.post("/admin-api/accounts", headers=HEADERS, json={"name": name}).json()
+                 for name in ("Alice", "Bob")]
+        item = {
+            "id": "shared-id", "sku": "SHARED", "name": "Part", "category": "Test",
+            "package_name": "SMD", "location": "Shelf", "quantity": 3,
+            "min_stock": 1, "updated_at": "2026-01-01T00:00:00Z",
+        }
+        headers = [{"Authorization": f"Bearer {user['api_token']}",
+                    "X-Component-Vault-Account-Id": user["account_id"]} for user in users]
+        for user_headers in headers:
+            assert client.post("/sync/push", headers=user_headers, json={
+                "device_id": "test", "components": [item],
+            }).status_code == 200
+        assert client.post("/sync/push", headers=headers[0], json={
+            "device_id": "test", "components": [{**item, "id": "alice-only", "sku": "ALICE"}],
+        }).status_code == 200
+        missing = client.post("/admin-api/components/bulk-delete", headers=headers[1], json=_bulk_payload(
+            item, {**item, "id": "alice-only"},
+        ))
+        assert missing.status_code == 404
+        assert client.get("/admin-api/components/shared-id", headers=headers[1]).status_code == 200
+        assert client.post("/admin-api/components/bulk-delete", headers=headers[0], json=_bulk_payload(item)).status_code == 200
+        assert client.get("/admin-api/components/shared-id", headers=headers[0]).status_code == 404
+        assert client.get("/admin-api/components/shared-id", headers=headers[1]).status_code == 200
+        assert client.get("/admin-api/components/alice-only", headers=headers[0]).status_code == 200

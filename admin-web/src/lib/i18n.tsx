@@ -9,6 +9,17 @@ function readPreference(): LanguagePreference {
 }
 
 export const en = {
+  "请关闭确认框，刷新库存核对当前状态后重新选择。": "Close this dialog, refresh inventory to verify its current state, then select again.",
+  "版本检测渠道": "Release channel to check",
+  "正式版（推荐）": "Stable (recommended)",
+  "开发版（含预发布）": "Development (includes prereleases)",
+  "检测渠道仅保存在此浏览器，不会替换正在运行的容器。开发渠道也会包含比开发版更新的正式版。": "This preference is saved in this browser and does not replace running containers. The development channel also includes newer stable releases.",
+  "Docker 渠道切换": "Switch Docker channel",
+  "在原部署目录运行切换助手，选择渠道后自动拉取并重建 API 和 Web。沿用原项目名、端口和数据挂载，不需要手动修改镜像标签。": "Run the switch assistant in the original deployment directory. It pulls and recreates the API and Web services for the selected channel, keeping the project, ports and data mounts. No manual image-tag editing is needed.",
+  "将 PROJECT_NAME 替换为原 Compose 项目名。群晖可通过 SSH 运行；不使用 SSH 时按部署教程在 Container Manager 中切换。": "Replace PROJECT_NAME with the original Compose project name. On Synology, run it over SSH or follow the Container Manager instructions in the deployment guide.",
+  "Watchtower 跟随容器当前的镜像渠道，不会自行跨渠道。切换前备份完整 /data；切回正式版不能代替数据回滚。": "Watchtower follows each container's current image channel and does not switch channels. Back up all of /data before switching; switching to stable is not a data rollback.",
+  "源码构建无法自动比较版本。所选渠道最新版本：": "Cannot compare a source build automatically. Latest in the selected channel: ",
+  "当前版本不低于所选渠道最新版本：": "The current version is not older than the latest in the selected channel: ",
   "元件照片": "Component photo", "查看元件照片": "View component photo",
   "照片尚未上传到服务端，请在保存原图的设备上同步。": "The photo is not on the server yet. Sync the device that has the original.",
   "照片加载失败，请重试。": "Could not load the photo. Please retry.",
@@ -67,6 +78,10 @@ export const en = {
   "服务端配置页": "Server setup page",
   "新 API Token": "New API token", "Web 管理台实际访问地址": "Admin console URL", "允许访问 API 的管理台来源": "Allowed admin origins",
   "浏览器无法保存恢复信息，请保持本页打开并使用原表单重试。": "The browser could not save recovery data. Keep this page open and retry with the same form.", "共": "Total ", " 项": " items", "第": "Page ", " 页": "", "已创建": "Created", "，初始库存为 0。": " with initial stock of 0.", "完成，当前库存": " complete. Current stock: ", "已通过原请求编号核对操作结果，当前库存": "Checked the original request result. Current stock: ", "。": ".",
+  "本页已选：": "Selected on this page: ", "仅选择当前页；翻页或更改筛选会清空选择。": "Selection applies to this page only and clears when changing page or filters.",
+  "选择本页": "Select this page", "取消本页选择": "Deselect this page", "清空选择": "Clear selection", "选择元器件": "Select component", "删除所选": "Delete selected", "恢复批量删除": "Recover bulk deletion", "重试原批次": "Retry original batch",
+  "确认批量删除": "Confirm bulk deletion", "即将从当前账户删除所选元器件：": "Components to delete from this account: ", "删除会同步到客户端，历史流水仍会保留。本批次全部成功或全部取消。": "Deletion syncs to clients and preserves movement history. The whole batch succeeds or is rolled back.",
+  "批量删除未完成": "Bulk deletion did not finish", "批量删除已完成": "Bulk deletion complete", "已删除所选元器件：": "Selected components deleted: ", "请重试原批次以确认结果；重试不会重复删除。": "Retry the original batch to confirm the result; retries do not repeat deletion.", "本次请求未执行删除。请关闭确认框，刷新库存后重新选择。": "This request performed no deletion. Close this dialog, refresh inventory and select again.",
   "删除元器件": "Delete component", "确认删除": "Confirm deletion", "正在删除…": "Deleting…", "删除后，此元件将从当前账户的库存列表中移除，并同步到客户端。历史流水仍会保留。": "This component will be removed from this account's inventory and synced to clients. Movement history will remain.",
   "补全旧元件参数": "Complete legacy component parameters", "预览候选": "Preview candidates", "收起预览": "Hide preview", "仅从官方资料补全已有元件的描述与参数；名称、库存和库位保持不变。范围限当前账户。": "Complete existing descriptions and parameters using official data only. Names, stock and locations stay unchanged. Scope is the current account.",
   "请先在服务端设置中启用 Web 库存操作，再启动参数补全。": "Enable Web inventory editing in server settings before starting parameter completion.", "正在预览候选…": "Loading candidates…", "无法预览候选": "Could not preview candidates", "当前账户待补全": "Candidates in this account: ", "以下显示前 50 项；确认后处理全部候选。": "Preview shows the first 50 items; confirmation processes all candidates.", "正在启动…": "Starting…", "确认补全全部候选": "Confirm completion for all candidates", "暂无需要补全的旧元件。": "No legacy components need parameter completion.", "重新预览": "Refresh preview",

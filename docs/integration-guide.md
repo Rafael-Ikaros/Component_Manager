@@ -1,5 +1,13 @@
 # Integration Guide
 
+## 管理台批量删除与版本渠道
+
+`POST /admin-api/components/bulk-delete` 沿用账户密钥或 Web 会话/CSRF 认证及 Web 写入开关。
+请求 `{ "request_id": "unique-batch-id", "items": [{ "id": "component-id", "expected_updated_at": "2026-11-02T00:00:00Z" }] }`，每批 1–100 项且 ID 唯一；响应 `{ "items": [{ "id": "component-id", "updated_at": "...", "deleted": true }] }`。
+401 未登录、403 写入未启用、404 缺少目标、409 版本/请求号冲突、422 参数错误。整批事务回滚；未知网络结果时使用相同 request_id 和内容重试。删除墓碑通过原 `/sync/pull` 返回，名称、数量、分配和历史流水不被物理删除。
+
+`POST /admin-api/about/check-update?channel=stable|dev` 默认 stable，返回原版本字段及 `channel / image_tag / web_image_tag`；dev 包含有效开发版与更新的正式版，排除草稿，数值比较 dev.10 与 dev.9。`automatic_update` 仍为 false；接口不变更 Docker 或业务数据。
+
 ## Base URL
 
 The self-hosted server exposes HTTP endpoints under the configured base URL.

@@ -12,6 +12,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ComponentPhoto } from "@/components/component-photo";
+import { InventoryBulkDelete } from "@/components/inventory-bulk-delete";
 import { InventoryActions } from "@/components/inventory-actions";
 import { OrderMetadataPanel } from "@/components/order-metadata-panel";
 import { SpecEnrichmentPanel } from "@/components/spec-enrichment-panel";
@@ -44,6 +45,7 @@ export function InventoryPage() {
   const requestedPage = Number.parseInt(searchParams.get("page") ?? "1", 10);
   const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const [input, setInput] = useState(query);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchInputId = useId();
   const stockFilterId = useId();
@@ -73,6 +75,20 @@ export function InventoryPage() {
   };
 
   useEffect(() => setInput(query), [query]);
+  useEffect(() => setSelectedIds(new Set()), [path]);
+  useEffect(() => {
+    if (!data) return;
+    setSelectedIds((previous) => new Set(data.items.filter((item) => previous.has(item.id)).map((item) => item.id)));
+  }, [data]);
+
+  function toggleSelection(id: string) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   useEffect(() => {
     if (!detail.data) return;
     detailHeading.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -173,6 +189,21 @@ export function InventoryPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {inventoryEnabled ? <InventoryBulkDelete
+            selected={data?.items.filter((item) => selectedIds.has(item.id)) ?? []}
+            disabled={loading}
+            allSelected={!!data?.items.length && data.items.every((item) => selectedIds.has(item.id))}
+            onSelectAll={() => setSelectedIds(new Set(data?.items.map((item) => item.id) ?? []))}
+            onClear={() => setSelectedIds(new Set())}
+            onRefresh={() => { setSelectedIds(new Set()); void reload(); }}
+            onDeleted={(ids) => {
+              setSelectedIds(new Set());
+              if (selectedId && ids.includes(selectedId)) setSelectedId(null);
+              if (data && ids.length === data.items.length && page > 1) {
+                setSearchParams(buildPageParams(query, stockFilter, page - 1));
+              } else void reload();
+            }}
+          /> : null}
           {!loading && data?.items.length === 0 ? (
             <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
               {t("没有符合条件的元器件。请调整搜索词或库存状态。")}
@@ -180,6 +211,7 @@ export function InventoryPage() {
           ) : data ? (<>
             <div className="grid gap-3 md:hidden" aria-label={t("库存结果")}>
               {data.items.map((item) => <article key={item.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                {inventoryEnabled ? <label className="mb-2 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-red-600" disabled={loading} checked={selectedIds.has(item.id)} onChange={() => toggleSelection(item.id)} />{t("选择元器件")} {item.sku}</label> : null}
                 <div className="flex items-start justify-between gap-3">
                   <div><button className="min-h-11 text-left font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => selectComponent(event, item.id)}>{item.sku}</button><p className="text-sm text-slate-700">{item.name}</p><ComponentPhoto photoKey={item.photo_key} name={item.name} compact /></div>
                   <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${item.low_stock ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{item.low_stock ? t("低库存") : t("库存充足")}</span>
@@ -190,13 +222,15 @@ export function InventoryPage() {
             <div className="hidden overflow-x-auto md:block" tabIndex={0} aria-label={t("库存结果")}>
               <Table>
                 <TableHeader><TableRow>
+                  {inventoryEnabled ? <TableHead className="w-12"><span className="sr-only">{t("选择元器件")}</span></TableHead> : null}
                   <TableHead>{t("料号")}</TableHead><TableHead>{t("名称")}</TableHead>
                   <TableHead className="hidden md:table-cell">{t("分类")}</TableHead>
                   <TableHead>{t("库位")}</TableHead><TableHead>{t("库存 / 最低")}</TableHead>
                   <TableHead className="hidden lg:table-cell">{t("更新时间")}</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>{data.items.map((item) => (
-                  <TableRow key={item.id} data-state={selectedId === item.id ? "selected" : undefined}>
+                  <TableRow key={item.id} data-state={selectedIds.has(item.id) || selectedId === item.id ? "selected" : undefined}>
+                    {inventoryEnabled ? <TableCell className="p-0"><label className="flex min-h-11 min-w-11 items-center justify-center"><input type="checkbox" className="h-4 w-4 accent-red-600" aria-label={`${t("选择元器件")} ${item.sku}`} disabled={loading} checked={selectedIds.has(item.id)} onChange={() => toggleSelection(item.id)} /></label></TableCell> : null}
                     <TableCell><button className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => selectComponent(event, item.id)}>{item.sku}</button></TableCell>
                     <TableCell>{item.name}<ComponentPhoto photoKey={item.photo_key} name={item.name} compact /></TableCell>
                     <TableCell className="hidden md:table-cell">{locale === "zh-CN" ? displayCategory(item.category) : item.category}</TableCell>

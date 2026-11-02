@@ -1,5 +1,13 @@
 # Runbook
 
+## 独立 Docker CI 与发布渠道
+
+Docker 构建检查由 `docker-ci.yml` 单独运行。`Docker Images` (`server-image.yml`) 可手动补发：填写已有 `release_tag`，开启 `push_image`；source_ref 留空使用该 tag，显式填写时必须对应同一提交。使用既有 DOCKERHUB_USERNAME / DOCKERHUB_IMAGE Variables 和 DOCKERHUB_TOKEN Secret。
+
+changelog 发布在 sync/tag 后并行生成原生附件和 Docker 镜像；两个 job 分别报告成功/失败。Docker 失败时修复后重跑独立流程，不需要重建 Android/Windows。dev 更新版本标签、dev/web-dev，正式版更新版本标签、latest/web-latest。每次都核对 API/Web 两标签的版本、revision 和 amd64/arm64 manifest，不能只看 GitHub Release。
+
+部署切换使用 [渠道助手教程](docker-channels.md)，保留项目名及完整 `/data`。Web 检测渠道不替换容器；Watchtower 跟随已选镜像，不会跨渠道。该助手的本机验证采用假 Docker，真实容器构建与启动由独立 GitHub CI 验证，NAS 操作仍需部署者确认。
+
 ## 0.7.8 正式版部署
 
 0.7.8 汇总前期 dev 的 BOM 预设同步、原图同步及订单资料更新。正式版配套发布 API `rafaelikaros/component_manager:0.7.8`（浮动标签 `latest`）和 Web `:web-0.7.8`（`web-latest`）。先核对发布流水线及 Docker Hub 对应标签，再升级原有项目；不要新建数据卷或清空配置。

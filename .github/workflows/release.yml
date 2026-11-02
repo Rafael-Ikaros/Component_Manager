@@ -28,8 +28,6 @@ on:
         default: true
         type: boolean
     secrets:
-      DOCKERHUB_TOKEN:
-        required: false
       ANDROID_KEYSTORE_BASE64:
         required: true
       ANDROID_KEYSTORE_PASSWORD:
@@ -84,7 +82,6 @@ jobs:
       release_name: ${{ steps.resolve.outputs.release_name }}
       publish_github_release: ${{ steps.resolve.outputs.publish_github_release }}
       release_notes: ${{ steps.resolve.outputs.release_notes }}
-      publish_docker_image: ${{ steps.dockerhub.outputs.enabled }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
       component_version: ${{ steps.resolve.outputs.component_version }}
       android_version_code: ${{ steps.resolve.outputs.android_version_code }}
@@ -96,20 +93,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
-      - name: Check optional Docker Hub publishing configuration
-        id: dockerhub
-        env:
-          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
-          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_IMAGE" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
-            echo 'enabled=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::Docker Hub configuration is incomplete. Native/Web artifacts will be published; no Docker Hub image will be pushed. Configure DOCKERHUB_USERNAME, DOCKERHUB_IMAGE and DOCKERHUB_TOKEN, then run Server Docker Image to publish the release image.'
-          fi
 
       - name: Resolve release inputs
         id: resolve
@@ -515,15 +498,3 @@ jobs:
                 --generate-notes
             fi
           fi
-
-  dockerhub-release:
-    needs:
-      - prepare
-      - github-release
-    if: needs.prepare.outputs.publish_github_release == 'true' && needs.prepare.outputs.publish_docker_image == 'true' && needs.prepare.outputs.prerelease != 'true'
-    uses: ./.github/workflows/server-image.yml
-    secrets: inherit
-    with:
-      source_ref: ${{ needs.prepare.outputs.source_ref }}
-      release_tag: ${{ needs.prepare.outputs.release_tag }}
-      push_image: true

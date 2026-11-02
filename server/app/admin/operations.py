@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from ..config import Settings
 from ..repositories import save_sync_payload_in_transaction
 from ..schemas import (
+    AdminComponentBulkDelete,
     AdminComponentCreate,
     AdminComponentDelete,
     AdminComponentUpdate,
@@ -221,33 +222,8 @@ def delete_component(
             )
             if retry_target is not None:
                 return _deleted_component(connection, retry_target)
-            row = _component_row(connection, component_id)
-            _require_version(row, draft.expected_updated_at)
-            managed = bool(row["inventory_managed"])
-            now = _now_datetime_after(str(row["updated_at"]))
-            component = ComponentPayload(
-                id=component_id,
-                sku=str(row["sku"]),
-                name=str(row["name"]),
-                category=str(row["category"]),
-                package_name=str(row["package_name"]),
-                location=str(row["location"]),
-                description=row["description"],
-                quantity=int(row["quantity"]),
-                min_stock=int(row["min_stock"]),
-                updated_at=now,
-                deleted=True,
-                allocations=load_allocations(connection, component_id) if managed else None,
-                base_updated_at=draft.expected_updated_at if managed else None,
-            )
-            _save_payload(
-                connection,
-                settings,
-                PushRequest(
-                    device_id="admin-web",
-                    inventory_protocol=1 if managed else 0,
-                    components=[component],
-                ),
+            now = _delete_component_in_transaction(
+                connection, settings, component_id, draft.expected_updated_at
             )
             _save_receipt(
                 connection, draft.request_id, "delete_component", component_id,
@@ -260,6 +236,73 @@ def delete_component(
         if isinstance(error, AdminOperationConflict):
             raise
         raise AdminOperationConflict(str(error)) from error
+
+
+def bulk_delete_components(
+    connection: sqlite3.Connection,
+    settings: Settings,
+    draft: AdminComponentBulkDelete,
+) -> dict[str, object]:
+    payload_json = _canonical_payload(draft)
+    try:
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            replay = _retry_target(
+                connection, draft.request_id, "bulk_delete_components", "", payload_json
+            )
+            if replay is None:
+                for item in draft.items:
+                    _delete_component_in_transaction(
+                        connection, settings, item.id, item.expected_updated_at
+                    )
+                _save_receipt(
+                    connection, draft.request_id, "bulk_delete_components", "",
+                    payload_json, _now(),
+                )
+            return {"items": [_deleted_component(connection, item.id) for item in draft.items]}
+    except sqlite3.IntegrityError as error:
+        raise AdminOperationConflict("Components could not be deleted.") from error
+    except ValueError as error:
+        if isinstance(error, AdminOperationConflict):
+            raise
+        raise AdminOperationConflict(str(error)) from error
+
+
+def _delete_component_in_transaction(
+    connection: sqlite3.Connection,
+    settings: Settings,
+    component_id: str,
+    expected_updated_at: datetime,
+) -> datetime:
+    row = _component_row(connection, component_id)
+    _require_version(row, expected_updated_at)
+    managed = bool(row["inventory_managed"])
+    now = _now_datetime_after(str(row["updated_at"]))
+    component = ComponentPayload(
+        id=component_id,
+        sku=str(row["sku"]),
+        name=str(row["name"]),
+        category=str(row["category"]),
+        package_name=str(row["package_name"]),
+        location=str(row["location"]),
+        description=row["description"],
+        quantity=int(row["quantity"]),
+        min_stock=int(row["min_stock"]),
+        updated_at=now,
+        deleted=True,
+        allocations=load_allocations(connection, component_id) if managed else None,
+        base_updated_at=expected_updated_at if managed else None,
+    )
+    _save_payload(
+        connection,
+        settings,
+        PushRequest(
+            device_id="admin-web",
+            inventory_protocol=1 if managed else 0,
+            components=[component],
+        ),
+    )
+    return now
 
 
 def record_stock_movement(

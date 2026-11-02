@@ -171,3 +171,15 @@ jobs:
       release_name: ${{ needs.sync-and-tag.outputs.release_name }}
       release_notes: ${{ needs.sync-and-tag.outputs.release_notes }}
       publish_github_release: true
+
+  docker-images:
+    # GITHUB_TOKEN-created tags do not trigger push workflows. Call Docker
+    # publishing directly, independently of the native artifact release.
+    needs: sync-and-tag
+    if: needs.sync-and-tag.outputs.publish_release == 'true'
+    uses: ./.github/workflows/server-image.yml
+    secrets: inherit
+    with:
+      source_ref: ${{ needs.sync-and-tag.outputs.source_ref }}
+      release_tag: ${{ needs.sync-and-tag.outputs.tag }}
+      push_image: true
