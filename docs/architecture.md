@@ -2,6 +2,8 @@
 
 ## 可选网页更新服务
 
+`docker-compose.hub-web-update.yml` 提供适合群晖项目的完整单文件声明，与 Hub 基础配置加 updater override 保持一致，仅让 Web 默认启动；CI 核对渲染结果，避免两份模板漂移。既有自定义端口、数据来源及网络仍由原部署声明保留。
+
 - `server/app/admin/update_agent.py` 只为管理员代理固定 `UPDATER_URL` 的内部作业接口，沿用会话/CSRF；读取3秒、写入5秒超时。内部令牌自动原子创建，使用显式 `UPDATE_TOKEN_FILE` 或原数据库父目录，绝不返回浏览器，不修改账户密钥。
 - 独立 `updater/app.py` 以单 worker 和 SQLite 持久化任务，按项目串行执行现有 Compose helper。API 重建不终止更新任务；updater 重启后将未完成作业重新排队。只保留最近100条终态记录，支持幂等请求和失败重试。
 - 只有 updater 挂载 Docker socket，原部署目录以同绝对路径RW映射，API实际数据目录只读共享，任务另用持久卷。不克隆 HostConfig，不绕开原 Compose；仅替换 API 和已部署的 Web，不替换 updater 或其它应用。

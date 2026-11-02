@@ -110,6 +110,21 @@ def main() -> None:
                 assert any(volume["target"] == "/data" and volume.get("read_only") for volume in updater["volumes"])
                 assert any(volume["target"] == "/var/run/docker.sock" for volume in updater["volumes"])
                 assert any(volume["target"] == str(ROOT) and volume["source"] == str(ROOT) for volume in updater["volumes"])
+                # Synology's GUI can use one complete file without manually
+                # merging the Hub template and updater override. It starts Web
+                # by default; the remaining services must render identically.
+                single = render(ROOT / "docker-compose.hub-web-update.yml", os.devnull, {
+                    "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
+                    "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
+                    "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
+                })
+                combined = render(compose_file, os.devnull, {
+                    "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
+                    "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
+                    "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
+                }, (ROOT / "docker-compose.web-update.yml",))
+                combined["services"]["admin-web"].pop("profiles", None)
+                assert single == combined, "Single-file Web updater deployment drifted from the base and override."
     print("Compose first-run configuration schema: OK")
 
 

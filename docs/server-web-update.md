@@ -1,12 +1,13 @@
 # 在网页中更新服务端
 
-适用于官方 Docker Compose / 群晖 Container Manager 项目。一次在原项目中添加可选
-`updater` 服务，之后管理员就可在“设置 → 关于服务端”选择渠道、确认更新并查看结果，
+适用于官方 Docker Compose / 群晖 Container Manager 项目。提供[单文件完整配置](../docker-compose.hub-web-update.yml)，
+不需要自己合并多个 Compose 文件。一次在原项目中启用可选 `updater` 服务，之后管理员就可在“设置 → 关于服务端”选择渠道、确认更新并查看结果，
 无需每次打开 SSH。未启用时仍可正常管理库存、同步和检查版本。
 
 ## 当前支持范围
 
-- API、Web 和 updater 需使用包含此功能的配套版本，首次随 0.7.9-dev.6 提供。
+- API、Web 和 updater 需使用包含此功能的配套版本，使用 0.7.9-dev.7 或更高兼容版本。
+  dev.6 的发布验收暴露了更新后 `.env` 所有者/权限丢失的问题，请勿用于首次启用。
 - 当前正式版 0.7.8 不包含网页更新入口。在线更新会在替换前检查目标 API/Web 的
   `io.componentvault.server-update=1` 能力标识；不支持的旧版本会被拒绝，现有容器不变。
   待包含此能力的正式版通过验证并发布后，才能在受支持的正式版与 dev 之间在线切换。
@@ -18,11 +19,14 @@
 
 ## 群晖一次性配置
 
+这一次操作是让 Docker 授予更新组件管理本项目容器的能力。旧 API 本身没有 Docker 管理权限，
+无法通过普通网页请求给自己补上挂载。无需开放群晖 SSH，也不需填写 Docker Hub 密钥。
+新部署可直接采用完整模板，从一开始就启用；已有部署需在原项目保存并重新部署一次。
+
 1. 备份整个 API `/data`，记录原项目名、端口、数据来源和原 Compose 文件。保留各账户数据库、
    配置、照片及日志。不要新建同名仓库的数据卷，也不要删除旧卷。
-2. 从对应版本源码包取得 `docker-compose.hub.yml` 和 `docker-compose.web-update.yml`。
+2. 从对应版本源码包取得 `docker-compose.hub-web-update.yml`。
    在 File Station 打开**原项目目录**，保留原 `.env`；没有 `.env` 时创建它。
-   先通过 Container Manager 把 API/Web 更新到支持此功能的 dev 版本。
 3. `.env` 加入下面设置，目录与项目名替换为自己的值；其它值保留：
 
    ```dotenv
@@ -36,9 +40,11 @@
 
    原完整镜像覆盖非空时优先于渠道键，应清空或指定配套的支持版本。开发阶段 updater 使用
    `rafaelikaros/component_manager:updater-dev`，正式渠道未来使用 `updater-latest`。
-4. 在 Container Manager 的**原项目**配置中加入 `docker-compose.web-update.yml` 的内容。
-   若界面只接受单文件，合并其中的 `services.api.environment/labels`、`services.admin-web.labels`、
-   `services.updater` 及 `volumes.component_vault_updater_state`，不要替换原端口或数据配置。
+4. 在 Container Manager 的**原项目**中编辑 Compose，使用完整的 `docker-compose.hub-web-update.yml` 内容，
+   按原配置保留端口、API 数据来源及其它自定义设置，再保存为该项目原本使用的文件名。
+   完整模板默认同时启动 Web，不用再开启 `web` profile，也不用手动合并三套服务。
+   **现有部署的端口、数据卷或自定义网络与模板不一致时，不要直接覆盖这些部分。**
+   对已经深度定制的项目，也可继续只合并 `docker-compose.web-update.yml` 中的更新服务配置。
    API/Web 的 `image` 应保留 Hub 模板的变量形式；写死旧镜像会令在线更新停止并提示修正。
 5. 核对四个必要映射：
 
@@ -58,7 +64,7 @@
    原部署目录以外若还有 Compose override、env/config 文件，需以相同绝对路径映射到 updater。
 7. 若使用 Watchtower，API/Web 的 `com.centurylinklabs.watchtower.enable` 设为 `false`，
    避免两个更新服务同时重建；其它应用仍可沿用 Watchtower。
-8. 在 GUI 中保存并重新部署原项目一次，登录 Web 管理台。管理员在关于区看到可用的
+8. 在 GUI 中保存、拉取新的配套镜像并重新部署原项目一次，不删除数据卷。登录 Web 管理台，管理员在关于区看到可用的
    “服务端更新”后，日常升级只需网页操作。
 
 Docker socket 具有主机 Docker 管理能力，仅挂载到 updater；API、Web 不挂载 socket，

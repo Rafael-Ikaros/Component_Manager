@@ -1,0 +1,69 @@
+# Single-file Hub deployment with Web administration and optional Web updates.
+# Set COMPOSE_PROJECT_NAME to the existing project name and
+# COMPONENT_VAULT_DEPLOY_DIR to this directory's absolute NAS/host path in .env.
+# Until a compatible stable release is available, set
+# COMPONENT_VAULT_DOCKER_CHANNEL=dev in .env before the first deployment.
+# Existing deployments must retain their original ports and /data source.
+services:
+  api:
+    image: ${COMPONENT_VAULT_IMAGE:-rafaelikaros/component_manager:${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    ports:
+      - "8787:8787"
+    environment:
+      API_TOKEN: ${API_TOKEN:-}
+      DATABASE_PATH: /data/component_vault.db
+      CONFIG_PATH: ${CONFIG_PATH:-}
+      LOG_DIR: ${LOG_DIR:-}
+      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
+      WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
+      MQTT_ENABLED: ${MQTT_ENABLED:-false}
+      MQTT_HOST: ${MQTT_HOST:-}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_TLS: ${MQTT_TLS:-false}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-component-vault}
+      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-component-vault-server}
+      LCSC_OPENAPI_KEY: ${LCSC_OPENAPI_KEY:-}
+      LCSC_OPENAPI_SECRET: ${LCSC_OPENAPI_SECRET:-}
+      LCSC_OPENAPI_BASE_URL: ${LCSC_OPENAPI_BASE_URL:-https://ips.lcsc.com}
+      LCSC_LOOKUP_CACHE_TTL_SECONDS: ${LCSC_LOOKUP_CACHE_TTL_SECONDS:-43200}
+      IMPORT_RULES_REMOTE_URL: ${IMPORT_RULES_REMOTE_URL:-}
+      IMPORT_RULES_REFRESH_HOURS: ${IMPORT_RULES_REFRESH_HOURS:-24}
+      ENABLE_WEB_FALLBACK_RESOLVERS: ${ENABLE_WEB_FALLBACK_RESOLVERS:-false}
+      UPDATER_URL: http://updater:8790
+      UPDATE_TOKEN_FILE: /data/.updater-token
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes:
+      - component_vault_data:/data
+    restart: unless-stopped
+
+  admin-web:
+    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    depends_on:
+      - api
+    ports:
+      - "8081:80"
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    restart: unless-stopped
+
+  updater:
+    image: ${COMPONENT_VAULT_UPDATER_IMAGE:-rafaelikaros/component_manager:updater-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    environment:
+      UPDATE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:?Keep the existing Compose project name in COMPOSE_PROJECT_NAME}
+      UPDATE_TOKEN_FILE: /data/.updater-token
+    expose:
+      - "8790"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - component_vault_data:/data:ro
+      - component_vault_updater_state:/state
+      - ${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:rw
+    restart: unless-stopped
+
+volumes:
+  component_vault_data:
+  component_vault_updater_state:

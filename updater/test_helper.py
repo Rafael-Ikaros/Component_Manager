@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -101,6 +102,32 @@ class HelperTests(unittest.TestCase):
         self.assertIn(f"<{self.files[1].as_posix()}>", self.log.read_text())
         self.assertIn("<--no-deps>", self.log.read_text())
         self.assertEqual(next(self.deployment.glob(".env.before-channel-*")).read_text(), self.original)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX ownership/mode require a POSIX filesystem")
+    def test_env_and_backup_keep_original_owner_group_and_mode(self):
+        self.envfile.chmod(0o640)
+        if os.geteuid() == 0:
+            # Match the sidecar-root/host-user ownership boundary when run as root.
+            os.chown(self.envfile, 13579, 13580)
+        original = self.envfile.stat()
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        backup = next(self.deployment.glob(".env.before-channel-*"))
+        for path in (self.envfile, backup):
+            actual = path.stat()
+            self.assertEqual((actual.st_uid, actual.st_gid, stat.S_IMODE(actual.st_mode)),
+                             (original.st_uid, original.st_gid, stat.S_IMODE(original.st_mode)))
+        self.assertEqual(backup.read_text(), self.original)
+
+    def test_failed_metadata_copy_does_not_modify_deployment(self):
+        copy = self.bin / "cp"
+        copy.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8", newline="\n")
+        copy.chmod(0o755)
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("preserve .env ownership and permissions", result.stderr)
+        self.assert_unchanged()
+        self.assertFalse(self.log.exists())
 
     def test_incompatible_target_preserves_running_deployment(self):
         self.result.write_text("stale metadata")

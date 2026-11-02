@@ -137,6 +137,10 @@ trap cleanup 0
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
+# The updater runs as root, but the deployment .env belongs to its host owner.
+# Preserve that ownership and mode before writing, so the atomic replacement
+# does not leave the host user with a root-owned 0600 file.
+cp -p "$env_file" "$candidate" || fail 'Could not preserve .env ownership and permissions; .env and containers were not changed.'
 # Keep all other settings (including account keys and comments) untouched.
 # Write full images as well so older Hub Compose files can use this helper.
 awk -v channel="$image_channel" -v api="$api_image" -v web="$web_image" '

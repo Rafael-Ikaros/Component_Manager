@@ -2,7 +2,7 @@
 
 ## 可选网页更新
 
-通过原群晖/Compose项目加入 `docker-compose.web-update.yml`，沿用原数据和网络，首次需配套支持版本。
+群晖可直接使用完整的 `docker-compose.hub-web-update.yml`，无需手动合并多个文件；深度定制项目继续按需合并 `docker-compose.web-update.yml`。沿用原项目名、端口、数据来源和网络，首次通过 GUI 拉取并部署 dev.7 或更高兼容配套版本。
 步骤见[网页更新配置](server-web-update.md)。Docker Images 同时构建并发布 updater：开发标签 updater-dev，
 正式标签 updater-latest，另有 updater-版本号；dev不移动正式标签。updater仅内部端口，socket不授予API/Web。
 该流程与Watchtower对同一服务互斥；CLI仍保留用于人工恢复。当前旧正式版不支持新入口，在线目标会被能力检查拒绝，
