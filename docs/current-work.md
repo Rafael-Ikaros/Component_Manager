@@ -5,6 +5,7 @@
 - 代理11项、updater/helper 11项及版本前缀兼容测试通过，Web构建通过；已修复CONFIG_PATH与数据路径分离时的token位置，显式路径在两服务统一。检查了Compose和workflow语法及第三镜像标签。当前真实NAS未执行，隔离浏览器通过模拟更新服务验证确认、旧正式拒绝、API断线保留任务和重连；不把模拟结果称为Docker实更新。
 - 独立Docker CI新增updater构建/授权/持久化门禁，发布后新增唯一临时Compose项目的真正在线更新验收，检查API/Web替换、updater保持运行及数据/端口/挂载保留。远端验证与开发镜像发布尚待执行。
 - 初版主CI 41387818268、Docker CI 41387818321 已通过。核对官方Engine 29说明后，将updater客户端基线改为docker:28-cli以保留较旧NAS API的兼容处理，保持自动协商，不强制API版本；这一依赖变更将重新跑Docker检查，真实NAS仍未验证。
+- Docker兼容修订 `f2218702700db1918e34ce4bae9408888ddf451d` 的 Docker CI 41388859367 已成功。最终浏览器隔离模拟已验证：单一渠道、正确latest/web-latest标签确认、旧目标明确拒绝、重建进度中文化、主动停止API后保留作业并重连、重启API及刷新恢复完成状态。源码或job替身不等于实际Docker更新证明，发布后CI将执行真实重建。
 
 # 2026-11-02 服务端批量删除与 Docker 渠道（0.7.9-dev.5 已发布）
 

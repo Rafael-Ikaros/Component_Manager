@@ -17,9 +17,22 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.6] - 2026-11-02
+
+### 服务端网页更新
+
 - 新增可选服务端网页更新：管理员共享一个渠道选择，检查版本后确认更新，支持持久进度、API重启重连、刷新恢复及失败重试。
 - 新增 Compose updater 服务与镜像，复用原项目配置、端口和挂载，不需要日常SSH；仅updater具有Docker socket，普通账户不可更新。
 - 在线目标须保留网页更新能力，旧正式版0.7.8在替换前被拒绝。保留现有手动恢复流程，不自动降级数据库。
+- 更新前先拉取目标并核对 API/Web 的版本、构建提交和入口能力，再备份 `.env` 与重建；任务由独立服务继续执行，主 API 重启不丢失状态。updater 自身中断后重新排队未完成作业，保留最近100条结束记录。
+- 群晖在原项目通过 GUI 加入更新服务、同一数据来源、原部署目录及网络一次后，可在网页完成受支持版本间的更新。新增[一次配置教程](server-web-update.md)，内部认证文件自动生成，不需用户填写额外密钥。
+- 使用 Docker CLI 28.x / 配套 Compose 和 API 自动协商，照顾旧 NAS Engine；不强制 DOCKER_API_VERSION。自定义 CONFIG_PATH 不再影响共享内部令牌，支持显式路径。
+
+### 验证与边界
+
+- 管理员代理11项、updater/helper11项及版本前缀兼容检查通过，Web构建和浏览器隔离模拟流程通过：确认、旧正式拒绝、短暂断线、重连和刷新恢复。未操作真实NAS或已有库存。
+- [初版主CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41387818268)及[最终Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41388859367)通过真实三镜像构建、容器启动、鉴权与任务持久化检查。发布还需通过独立临时Compose项目的真正更新验收，核对数据、端口、挂载与容器替换；最终结果记录在[工作记录](current-work.md)。
+- 本轮只发布dev；当前正式镜像仍不包含网页更新，不能承诺现在即可在线切回旧正式版。API/Web和updater均提供独立开发镜像，不推动正式标签。
 
 ## [0.7.9-dev.5] - 2026-11-02
 
