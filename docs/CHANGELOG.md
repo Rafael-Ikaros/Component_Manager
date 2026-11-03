@@ -17,10 +17,19 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.9] - 2026-11-03
+
 ### 出入库默认原因
 
-- Android 与 Windows 的手动库存变动表单自动填写当前类型对应的原因，入库、出库无需重复输入。切换类型时仅替换空白或原默认原因，保留用户自定义内容；数量、库位与保存规则不变。
-- 小米 9 独立测试包竖屏验证默认值、类型切换、自定义原因保留和重新打开表单通过；未保存测试流水，原应用未覆盖。Windows 编译及[主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41598351655)通过。
+- Android 与 Windows 的手动库存变动表单自动填写当前类型对应的原因：入库默认“入库”，出库默认“出库”，调整与调拨也有对应默认值，无需每次重复输入。
+- 切换变动类型时，仅替换空白或原默认原因；手动填写的自定义原因保持不变。关闭表单后重新打开，按当前变动类型重新填入默认值。
+- 继续使用原有数量、库位及保存校验，不迁移数据库、不改同步协议；历史流水原因保持原记录。已有扫码和快捷出入库的默认原因逻辑不变。
+
+### 验证与发布范围
+
+- 小米 9 独立测试包竖屏验证入库、出库、调整、调拨默认值、类型切换、自定义原因保留及重新打开表单通过；未保存测试流水，原应用及现有库存未覆盖，测试后恢复旋转设置。
+- Windows Release 编译及[实现提交的主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41598351655)通过；未进行 Windows 桌面界面验收。
+- 本版为 dev 预发布，生成 Android APK、Windows 自包含 ZIP 和 Web 静态包，并发布配套 Docker 开发镜像 `dev / web-dev`。Web 与 Updater 继续共用管理镜像、独立运行；正式 `latest / web-latest` 和历史独立 updater 标签不移动。
 
 ## [0.7.9-dev.8] - 2026-11-03
 
