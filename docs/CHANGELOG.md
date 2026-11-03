@@ -30,6 +30,7 @@ bump: patch
 - 小米 9 独立测试包竖屏验证入库、出库、调整、调拨默认值、类型切换、自定义原因保留及重新打开表单通过；未保存测试流水，原应用及现有库存未覆盖，测试后恢复旋转设置。
 - Windows Release 编译及[实现提交的主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41598351655)通过；未进行 Windows 桌面界面验收。
 - 本版为 dev 预发布，生成 Android APK、Windows 自包含 ZIP 和 Web 静态包，并发布配套 Docker 开发镜像 `dev / web-dev`。Web 与 Updater 继续共用管理镜像、独立运行；正式 `latest / web-latest` 和历史独立 updater 标签不移动。
+- [发布源 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191331)与[完整发布流程](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191393)全部成功。公开 APK 摘要与 GitHub 一致，内部版本为 `0.7.9-dev.9 (709009)`；Docker 版本和镜像摘要已回读，隔离 Compose 的真实更新与数据保留验收通过。详见[验证记录](history/verification.md)。
 
 ## [0.7.9-dev.8] - 2026-11-03
 

@@ -8,16 +8,16 @@
 以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
 构建、双角色启动及发布后的真实更新均须通过 CI；下方 dev.7 摘要记录的是旧三镜像结构。
 
-2026-11-03 已回读 **0.7.9-dev.8** 的发布结果：
+2026-11-03 已回读 **0.7.9-dev.9** 的发布结果：
 
 | 镜像 | 固定标签／浮动标签 | 实际清单摘要 |
 | --- | --- | --- |
-| API | `0.7.9-dev.8` / `dev` | `sha256:227d6b4de1bf9bc135934a669a54e9f4fca11cb0602df1edce29ced2f1053828` |
-| Web 与 updater 共用 | `web-0.7.9-dev.8` / `web-dev` | `sha256:cab37cff4edd2c9b0fb32b585f1a971a7f8a569eb580298dd15441d5f0e589a8` |
+| API | `0.7.9-dev.9` / `dev` | `sha256:5542e951de068dbe96bb65287f735073094eef71c37761d0d4d624d22b573d20` |
+| Web 与 updater 共用 | `web-0.7.9-dev.9` / `web-dev` | `sha256:422449ff18201556da0a7a4f2eb03c921480b2f97bcc12dc7f4224da19e7a40f` |
 
-两种镜像均包含 amd64/arm64，实际 amd64 OCI 版本为 `0.7.9-dev.8`，提交为
-`fd1d5b8f5742074c685426caf137af94bed0741a`。管理镜像入口及默认 Web 模式已核对。
-[Docker 发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592806006/job/125773235473)
+两种镜像均包含 amd64/arm64，实际 amd64 OCI 版本为 `0.7.9-dev.9`，提交为
+`28ba7a940bde797a09c9e841bde50aac0af303cb`。管理镜像入口及默认 Web 模式已核对。
+[Docker 发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191393/job/125826740833)
 通过双角色启动、健康检查、认证、任务持久化，以及真实临时 Compose 更新与数据保留验收。
 正式 `latest / web-latest` 和历史 `updater-dev` 的摘要均未改变；未在真实群晖或 ARM 设备上运行验收。
 

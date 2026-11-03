@@ -9,7 +9,16 @@
 提交 `c862d73` 的[主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41598351655)通过。
 小米 9 独立测试包竖屏检查：入库、出库、调整、调拨各自的默认原因正确；自定义原因在切换类型后保留，
 退出并重新打开表单恢复默认值。未提交测试流水，原应用及现有业务数据未覆盖；临时测试包已移除，旋转设置恢复原值。
-Windows Release 编译通过，未做 Windows 桌面界面验收。dev.9 发布由更新日志触发；安装包与镜像的实际发布结果须另外核对，不能用实现提交的 CI 代替。
+Windows Release 编译通过，未做 Windows 桌面界面验收。
+
+2026-11-03 的 dev.9 发布源为 `28ba7a940bde797a09c9e841bde50aac0af303cb`。
+[发布源主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191331)和
+[发布流程](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191393)通过。
+公开预发布包含 Android APK、Windows 自包含 ZIP 与 Web 静态包；APK 下载摘要与 GitHub 一致，
+内部版本为 `0.7.9-dev.9 (709009)`，SHA-256 为 `f4e2e40264b5f728a352754db88acd32b82339192682cf3b75d94e9ac2f0db33`。
+Docker 固定／浮动开发标签均已核对版本、提交及 amd64/arm64 清单，正式和历史 updater 标签不变；
+隔离 Compose 真实更新门禁通过，API/Web 替换，updater、测试数据、挂载及配置权限保留。
+本次发布未在用户 NAS 上更新部署，也未重新覆盖安装手机原应用。
 
 ## 共享管理镜像：0.7.9-dev.8
 
