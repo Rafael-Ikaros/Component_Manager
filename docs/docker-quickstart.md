@@ -3,6 +3,10 @@
 本指南说明 Docker／群晖的安装、持久化文件、账户密钥和常见故障。
 公开镜像可直接拉取。首次配置页面由 API 提供，不需要先启动独立 Web。
 
+API 与管理台保持前后端分离。从 `0.7.9-dev.8` 起，只构建两种镜像：API 和管理镜像。
+管理镜像供 Web 与可选 updater 两个独立容器使用；启用网页更新时共三个容器，
+未启用时只需 API/Web。旧独立 updater 的迁移见[说明](server-web-update.md#从独立-updater-镜像迁移)。
+
 已有正式版希望升级到 dev 并在网页管理，请直接看[保留数据升级与网页配置](server-web-update.md#已有正式版先升级到-dev)。
 API/Web 可以先成对升级，应用设置随后在网页修改；要连镜像更新也放进网页，需一次启用 updater。
 新部署需要这项能力时，可直接使用[完整单文件模板](../docker-compose.hub-web-update.yml)，当前从 dev.7 或更高兼容版本开始，不必先部署基础模板再合并。
@@ -119,7 +123,7 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 
 由于 8081 和 8787 是不同 **origin**，须把浏览器实际打开的 Web `scheme://host:port` 精确加入 `ADMIN_WEB_ORIGINS`，例如 `http://nas:8081`，不要填 API origin 或通配符。API 对允许来源启用带凭据 CORS；改动环境变量后在原项目目录执行 `up -d` **重建** API，单独 `restart` 不会读取新 `.env`。若设置保存于 `/data/config.json`，服务端会动态读取。反向代理应同时正确转发 `/auth/session`、`/auth/me` 与 `/admin-api/*`。
 
-当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。Docker 已分别发布正式与 dev 镜像：正式使用 `latest / web-latest`，开发使用 `dev / web-dev`；网页更新组件开发镜像为 `updater-dev`。以[Docker Hub 核对记录](dockerhub.md)和实际运行的 `/health` 为准。
+当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。正式使用 `latest / web-latest`，开发使用 `dev / web-dev`；新模板的 updater 与 Web 使用同一个管理镜像，通过 `command: [updater]` 启动。共享镜像需要 `0.7.9-dev.8` 或更新版本，旧正式镜像不包含此启动模式。实际发布以[Docker Hub 核对记录](dockerhub.md)和 `/health` 为准。
 
 `.env.example` 后半部分列出全部可由 Compose 传入的 LCSC、远程识别规则和 MQTT 高级选项。普通部署无需填写。Web 设置页保存的 MQTT 配置也位于 SQLite，并在 API 下次启动时优先于 MQTT 环境变量默认值。
 

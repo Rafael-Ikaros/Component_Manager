@@ -51,7 +51,9 @@ services:
     restart: unless-stopped
 
   updater:
-    image: ${COMPONENT_VAULT_UPDATER_IMAGE:-rafaelikaros/component_manager:updater-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    # Same management image as admin-web; a separate process and container.
+    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    command: [updater]
     environment:
       UPDATE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:?Keep the existing Compose project name in COMPOSE_PROJECT_NAME}
       UPDATE_TOKEN_FILE: /data/.updater-token

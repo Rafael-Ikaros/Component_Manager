@@ -2,6 +2,12 @@
 
 ## 可选网页更新服务
 
+从 `0.7.9-dev.8` 起，API 使用独立镜像，Web 与 updater 共用 `web-*` 管理镜像、保留独立容器。
+管理镜像默认启动 Nginx，`command: [updater]` 启动单 worker 更新服务；每个容器只运行对应角色。
+健康检查根据启动角色访问网页或更新接口。两者在 Compose 中共用 `COMPONENT_VAULT_WEB_IMAGE`；
+只给 updater 挂载 Docker socket、原部署目录和任务卷。更新 API/Web 时不重建 updater，
+同一镜像产物不要求两个容器始终运行同一版本。旧独立 updater 的迁移见[部署教程](server-web-update.md#从独立-updater-镜像迁移)。
+
 网页更新是可选部署能力，首次启用必须配置独立 updater、原 Compose 部署目录及内部连接；仅将 0.7.8 的 API/Web 换成新镜像不会自动完成这些配置。配置后，管理员日常可选择正式或 Dev 渠道并明确提交更新作业；服务不会定时自动安装新版本。渠道检测与实际更新作业是不同操作。
 
 `docker-compose.hub-web-update.yml` 提供适合群晖项目的完整单文件声明，与 Hub 基础配置加 updater override 保持一致，仅让 Web 默认启动；CI 核对渲染结果，避免两份模板漂移。既有自定义端口、数据来源及网络仍由原部署声明保留。
@@ -388,7 +394,8 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Dev tags (`vX.Y.Z-dev.N`) build the same `master` code as prereleases, injecting
   artifact version names and monotonically ordered Android version codes. They
   do not advance stable metadata or move stable Docker tags. The separate Docker
-  workflow publishes dev/web-dev/updater-dev and matching fixed tags. Windows
+  workflow publishes dev/web-dev and matching fixed tags; Web and updater share
+  the web image, while existing updater tags remain historical. Windows
   displays the informational version, including the dev suffix, while keeping
   numeric assembly metadata. See [release channels](runbook.md#stable-and-dev-publishing).
 - CI explicitly includes branch pushes alongside pull requests. The reusable

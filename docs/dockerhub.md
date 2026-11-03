@@ -4,6 +4,10 @@
 安装服务端请看[快速部署](docker-quickstart.md)；在网页更新请看[网页更新](server-web-update.md)。
 普通部署者无需配置下方 Docker Hub Token。
 
+从 `0.7.9-dev.8` 起，工作流只构建 API 和共享管理镜像。管理镜像默认运行 Web，
+以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
+构建、双角色启动及发布后的真实更新均须通过 CI；下方 dev.7 摘要记录的是旧三镜像结构。
+
 当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
 
 2026-11-02 已实际核对 **0.7.9-dev.7**（首次启用网页更新请使用本版或更高兼容版本）：
@@ -139,9 +143,9 @@ GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs
 独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
 手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
-以 dev.7 为例会推送 API `0.7.9-dev.7 / dev`、Web `web-0.7.9-dev.7 / web-dev`、
-updater `updater-0.7.9-dev.7 / updater-dev`。正式版本使用相同固定前缀，但浮动渠道为
-`latest / web-latest / updater-latest`。补发历史版本会移动**该渠道**的浮动标签，操作前应确认目标，
+以 dev.8 为例会推送 API `0.7.9-dev.8 / dev`、管理镜像 `web-0.7.9-dev.8 / web-dev`。
+正式版本使用相同固定前缀，但浮动渠道为 `latest / web-latest`。
+旧 dev.7 的 `updater-*` 标签保留历史用途，不再随新版本更新。补发历史版本会移动**该渠道**的浮动标签，操作前应确认目标，
 不要为了补旧版本附件而无意回退当前渠道。
 
 普通 Docker CI 或 `push_image=false` 只构建检查。请求发布但用户名、镜像名或 Token 缺失时，
@@ -150,14 +154,14 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 
 ## 六、确认发布确实成功
 
-先在本次 Actions run 中确认发布配置、API/Web/updater 构建及启动、登录、三组多平台镜像推送均成功。
+先在本次 Actions run 中确认发布配置、API/管理镜像构建、三个角色的启动及健康检查、登录、两种多平台镜像推送均成功。
 发布末尾的 **Verify real Web-triggered Compose update and data preservation** 也须成功；
 该项在唯一临时项目中执行真实更新，不操作用户 NAS。
 
 再到 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 确认：
 
-- 存在对应 API、Web、updater 的固定版本与该渠道浮动标签。
-- 同一角色的固定/浮动标签摘要一致，三角色 OCI `version / revision` 对应同一发布源。
+- 存在对应 API、管理镜像的固定版本与该渠道浮动标签。
+- 同一镜像的固定/浮动标签摘要一致，两种镜像 OCI `version / revision` 对应同一发布源。
 - 清单包含 `linux/amd64` 和 `linux/arm64`。
 
 工作流在 `linux/amd64` 实际启动 API、Web、updater，验证健康、认证、任务持久化和 Web 资源。
@@ -169,7 +173,6 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 ```sh
 docker buildx imagetools inspect rafaelikaros/component_manager:dev
 docker buildx imagetools inspect rafaelikaros/component_manager:web-dev
-docker buildx imagetools inspect rafaelikaros/component_manager:updater-dev
 ```
 
 ## 部署者入口

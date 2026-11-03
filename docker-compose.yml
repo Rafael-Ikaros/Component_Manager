@@ -34,7 +34,8 @@ services:
 
   admin-web:
     build:
-      context: ./admin-web
+      context: .
+      dockerfile: admin-web/Dockerfile
       args:
         VITE_DEFAULT_API_BASE_URL: ${VITE_DEFAULT_API_BASE_URL:-}
     depends_on:

@@ -1,6 +1,8 @@
 **/.git
 **/.venv
 **/node_modules
+admin-web/dist
+admin-web/*.tsbuildinfo
 **/build
 **/bin
 **/obj

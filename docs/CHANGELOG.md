@@ -17,6 +17,12 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+### Docker 管理镜像
+
+- Web 和 Updater 共用 `web-*` 管理镜像，保持独立容器；API 镜像及前后端分离不变。默认启动 Web，`command: [updater]` 启动单 worker 更新服务，健康检查按角色执行。
+- Compose 中两个管理容器共用 `COMPONENT_VAULT_WEB_IMAGE`，只给 Updater 挂载 Docker 管理接口和任务目录。更新 API/Web 时继续保留 Updater，避免中断更新任务；不再构建或发布新的独立 `updater-*` 镜像。
+- 补充旧 updater 的一次迁移步骤：同时修改镜像和启动命令，保留原项目、账户、数据和任务卷。既有独立 updater 可继续更新兼容 API/Web；本次不修改 SQLite 或同步协议。
+
 ### 文档与部署说明
 
 - 重写仓库首页，增加 Ikaros 首屏、版本与构建徽章、Android／Windows／Docker 入口和按任务组织的文档导航。

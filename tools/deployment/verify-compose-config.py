@@ -104,7 +104,8 @@ def main() -> None:
                     assert not any(volume["target"] == "/var/run/docker.sock" for volume in services[service].get("volumes", []))
                 updater = services["updater"]
                 assert not updater.get("ports")
-                assert updater["image"] == "rafaelikaros/component_manager:updater-dev"
+                assert updater["image"] == services["admin-web"]["image"]
+                assert updater["command"] == ["updater"]
                 assert updater["environment"]["UPDATE_PROJECT_NAME"] == "component-vault-compose-ci"
                 assert updater["environment"]["UPDATE_TOKEN_FILE"] == "/data/.updater-token"
                 assert any(volume["target"] == "/data" and volume.get("read_only") for volume in updater["volumes"])
@@ -125,6 +126,19 @@ def main() -> None:
                 }, (ROOT / "docker-compose.web-update.yml",))
                 combined["services"]["admin-web"].pop("profiles", None)
                 assert single == combined, "Single-file Web updater deployment drifted from the base and override."
+                # Explicit Web pins must also select the updater image, even if
+                # an old deployment still has the retired updater override.
+                for channel in ("latest", "dev"):
+                    shared = render(ROOT / "docker-compose.hub-web-update.yml", os.devnull, {
+                        "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
+                        "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
+                        "COMPONENT_VAULT_DOCKER_CHANNEL": channel,
+                        "COMPONENT_VAULT_WEB_IMAGE": "example/inventory:web-pinned",
+                        "COMPONENT_VAULT_UPDATER_IMAGE": "example/inventory:updater-old",
+                    })["services"]
+                    assert shared["admin-web"]["image"] == "example/inventory:web-pinned"
+                    assert shared["updater"]["image"] == shared["admin-web"]["image"]
+                    assert shared["updater"]["command"] == ["updater"]
     print("Compose first-run configuration schema: OK")
 
 

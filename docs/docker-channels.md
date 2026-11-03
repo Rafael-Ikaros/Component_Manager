@@ -3,6 +3,10 @@
 正式版使用 `latest / web-latest`，开发版使用 `dev / web-dev`。两组镜像由独立的
 **Docker Images** 工作流发布；开发版不会覆盖正式版标签。普通部署者无需 Docker Hub Token。
 
+从 `0.7.9-dev.8` 起，Web 和 updater 使用同一 `web-*` 管理镜像，仍为两个容器。
+网页更新只替换 API/Web；切换渠道不会重建正在执行任务的 updater。
+旧独立 updater 的迁移和后续维护见[网页更新教程](server-web-update.md#从独立-updater-镜像迁移)。
+
 服务端的渠道选择用于版本检查和更新目标，只有确认更新后才替换容器。
 群晖希望日常不使用 SSH，可一次配置[网页更新服务](server-web-update.md)。不启用该服务时，
 仍可用下方部署助手切换，不必手动记忆或编辑镜像标签。

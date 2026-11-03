@@ -4,6 +4,10 @@
 启用 updater 后，管理员可在“设置 → 关于服务端”选择渠道、确认更新并查看进度。
 配置可采用[完整单文件模板](../docker-compose.hub-web-update.yml)。
 
+从 `0.7.9-dev.8` 起，API 使用独立镜像，Web 与 updater 共用 `web-*` 管理镜像。
+仍有三个容器：Web 默认启动网页；updater 通过 `command: [updater]` 单独启动更新服务。
+两者共用 `COMPONENT_VAULT_WEB_IMAGE`，但网页更新不会重建正在执行任务的 updater。
+
 ## 是否只换镜像就够
 
 | 操作 | 当前支持情况 |
@@ -50,8 +54,10 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 
 ## 当前支持范围
 
-- API、Web 和 updater 需使用包含此功能的配套版本，使用 0.7.9-dev.7 或更高兼容版本。
-  dev.6 的发布验收暴露了更新后 `.env` 所有者/权限丢失的问题，请勿用于首次启用。
+- 当前共享管理镜像模板需使用 `0.7.9-dev.8` 或更新兼容版本；`web-0.7.9-dev.7`
+  及旧正式镜像不能通过 `command: [updater]` 运行更新服务。已部署的独立 dev.7 updater
+  可以继续使用，采用新模板时按下方迁移步骤操作。
+- dev.6 的发布验收暴露了更新后 `.env` 所有者/权限丢失的问题，请勿用于首次启用。
 - 当前正式版 0.7.8 不包含网页更新入口。在线更新会在替换前检查目标 API/Web 的
   `io.componentvault.server-update=1` 能力标识；不支持的旧版本会被拒绝，现有容器不变。
   待包含此能力的正式版通过验证并发布后，才能在受支持的正式版与 dev 之间在线切换。
@@ -79,11 +85,11 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    COMPONENT_VAULT_DOCKER_CHANNEL=dev
    COMPONENT_VAULT_IMAGE=
    COMPONENT_VAULT_WEB_IMAGE=
-   COMPONENT_VAULT_UPDATER_IMAGE=
    ```
 
-   原完整镜像覆盖非空时优先于渠道键，应清空或指定配套的支持版本。开发阶段 updater 使用
-   `rafaelikaros/component_manager:updater-dev`，正式渠道未来使用 `updater-latest`。
+   原完整镜像覆盖非空时优先于渠道键，应清空或指定配套的支持版本。
+   Web 和 updater 均使用 `web-dev`，固定版本时均由 `COMPONENT_VAULT_WEB_IMAGE` 指定。
+   新模板不再读取 `COMPONENT_VAULT_UPDATER_IMAGE`，旧 `.env` 中此项可移除。
 4. 在 Container Manager 的**原项目**中编辑 Compose，使用完整的 `docker-compose.hub-web-update.yml` 内容，
    按原配置保留端口、API 数据来源及其它自定义设置，再保存为该项目原本使用的文件名。
    完整模板默认同时启动 Web，不用再开启 `web` profile，也不用手动合并三套服务。
@@ -113,6 +119,26 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 
 Docker socket 具有主机 Docker 管理能力，仅挂载到 updater；API、Web 不挂载 socket，
 updater 不映射主机端口。实际更新接口仅管理员可调用，普通账户没有更新入口。
+
+## 从独立 Updater 镜像迁移
+
+已运行 `updater-dev` 的旧部署可以先保留原 updater，继续更新兼容的 API/Web。
+若要改为共用管理镜像，在原项目中将 updater 的镜像改为与 Web 相同的变量，并加入启动命令：
+
+```yaml
+services:
+  updater:
+    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    command: [updater]
+    # 其余 environment、volumes、网络和重启设置保留原值。
+```
+
+保留项目名、原 `.env`、`/data` 来源、`/state` 任务卷及所有原挂载，然后在 Container Manager
+拉取支持共享镜像的版本并重新部署。只换镜像而不设置命令，会启动网页而不是更新服务。
+迁移时应等待已有更新任务结束。不要删除任务卷、重建空库存或使用旧 Web 镜像运行 updater。
+
+日常网页更新只重建 API/Web，updater 容器继续运行，因此两者运行中的镜像版本可能暂时不同。
+更新 updater 自身仍需在原项目中重新部署；不要在它执行任务时替换它。
 
 ## 日常网页操作
 

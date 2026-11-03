@@ -121,29 +121,19 @@ jobs:
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,mode=max,scope=server-image
 
-      - name: Build web image for startup validation
+      - name: Build shared management image for startup validation
         uses: docker/build-push-action@v7
         with:
-          context: ./admin-web
+          context: .
+          file: admin-web/Dockerfile
           platforms: linux/amd64
           load: true
-          tags: component-vault-web:ci
+          tags: component-vault-management:ci
           cache-from: type=gha,scope=web-image
           cache-to: type=gha,mode=max,scope=web-image
 
       - name: Verify Compose first-run configuration schema
         run: python tools/deployment/verify-compose-config.py
-
-      - name: Build updater image for startup validation
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: updater/Dockerfile
-          platforms: linux/amd64
-          load: true
-          tags: component-vault-updater:ci
-          cache-from: type=gha,scope=updater-image
-          cache-to: type=gha,mode=max,scope=updater-image
 
       - name: Verify updater startup, authentication and persisted failed jobs
         run: |
@@ -154,10 +144,12 @@ jobs:
             -e UPDATE_PROJECT_NAME=isolated-missing-project \
             -v "$RUNNER_TEMP/updater-data:/data:ro" \
             -v "$RUNNER_TEMP/updater-state:/state" \
-            component-vault-updater:ci
+            component-vault-management:ci updater
           trap 'docker logs component-vault-updater-ci; docker rm -f component-vault-updater-ci' EXIT
           curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
             --output /dev/null http://127.0.0.1:18790/health
+          docker exec component-vault-updater-ci /usr/local/bin/componentvault-healthcheck
+          docker exec component-vault-updater-ci python -c "import socket; s=socket.socket(); assert s.connect_ex(('127.0.0.1', 80)) != 0, 'Updater must not listen on the Web port'"
           python - <<'PY'
           import json
           import time
@@ -246,10 +238,13 @@ jobs:
         run: |
           docker run -d --name component-vault-web-ci \
             -p 127.0.0.1:18081:80 \
-            component-vault-web:ci
+            component-vault-management:ci
           trap 'docker logs component-vault-web-ci; docker rm -f component-vault-web-ci' EXIT
           curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
             --output "$RUNNER_TEMP/admin-index.html" http://127.0.0.1:18081/
+          docker exec component-vault-web-ci /usr/local/bin/componentvault-healthcheck
+          docker exec component-vault-web-ci python -c "import socket; s=socket.socket(); assert s.connect_ex(('127.0.0.1', 8790)) != 0, 'Web must not listen on the updater port'"
+          test "$(docker inspect --format '{{len .Mounts}}' component-vault-web-ci)" = 0
           mapfile -t assets < <(
             grep -oE '(src|href)="/assets/[^"]+"' "$RUNNER_TEMP/admin-index.html" \
               | cut -d'"' -f2
@@ -319,11 +314,12 @@ jobs:
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,mode=max,scope=server-image
 
-      - name: Publish multi-platform web image
+      - name: Publish multi-platform management image
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
         uses: docker/build-push-action@v7
         with:
-          context: ./admin-web
+          context: .
+          file: admin-web/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.web_tags.outputs.tags }}
@@ -333,38 +329,6 @@ jobs:
             org.opencontainers.image.revision=${{ steps.build_identity.outputs.revision }}
           cache-from: type=gha,scope=web-image
           cache-to: type=gha,mode=max,scope=web-image
-
-      - name: Resolve updater image tags
-        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
-        id: updater_tags
-        env:
-          IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
-        run: |
-          version="${RELEASE_TAG#v}"
-          channel=latest
-          if [[ "$version" == *-dev.* ]]; then channel=dev; fi
-          {
-            echo 'tags<<EOF'
-            echo "$IMAGE:updater-$version"
-            echo "$IMAGE:updater-$channel"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Publish multi-platform updater image
-        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: updater/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.updater_tags.outputs.tags }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
-            org.opencontainers.image.revision=${{ steps.build_identity.outputs.revision }}
-          cache-from: type=gha,scope=updater-image
-          cache-to: type=gha,mode=max,scope=updater-image
 
       - name: Verify real Web-triggered Compose update and data preservation
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')

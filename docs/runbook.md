@@ -2,9 +2,10 @@
 
 ## 可选网页更新
 
-群晖可直接使用完整的 `docker-compose.hub-web-update.yml`，无需手动合并多个文件；深度定制项目继续按需合并 `docker-compose.web-update.yml`。沿用原项目名、端口、数据来源和网络，首次通过 GUI 拉取并部署 dev.7 或更高兼容配套版本。
-步骤见[网页更新配置](server-web-update.md)。Docker Images 同时构建并发布 updater：开发标签 updater-dev，
-正式标签 updater-latest，另有 updater-版本号；dev不移动正式标签。updater仅内部端口，socket不授予API/Web。
+群晖可直接使用完整的 `docker-compose.hub-web-update.yml`，无需手动合并多个文件；深度定制项目继续按需合并 `docker-compose.web-update.yml`。沿用原项目名、端口、数据来源和网络。当前共享管理镜像模板需要 dev.8 或更新兼容版本，旧部署迁移见[网页更新配置](server-web-update.md)。
+Docker Images 只构建 API 和管理镜像：开发标签 `dev / web-dev`，正式标签 `latest / web-latest`，另有固定版本标签。
+Web 与 updater 共用管理镜像，后者通过 `command: [updater]` 独立运行；不再新增 `updater-*` 标签。
+updater仅内部端口，socket不授予API/Web。
 该流程与Watchtower对同一服务互斥；CLI仍保留用于人工恢复。当前旧正式版不支持新入口，在线目标会被能力检查拒绝，
 不要为了让它可切换而跳过dev验收发布正式版。独立任务状态保存在updater卷；API无法恢复时从NAS界面查看日志。
 
@@ -12,7 +13,7 @@
 
 Docker 构建检查由 `docker-ci.yml` 单独运行。`Docker Images` (`server-image.yml`) 可手动补发：填写已有 `release_tag`，开启 `push_image`；source_ref 留空使用该 tag，显式填写时必须对应同一提交。使用既有 DOCKERHUB_USERNAME / DOCKERHUB_IMAGE Variables 和 DOCKERHUB_TOKEN Secret。
 
-changelog 发布在 sync/tag 后并行生成原生附件和 Docker 镜像；两个 job 分别报告成功/失败。Docker 失败时修复后重跑独立流程，不需要重建 Android/Windows。dev 更新固定版本及 dev/web-dev/updater-dev，正式版才更新 latest/web-latest/updater-latest。核对三镜像版本、revision 和 amd64/arm64 manifest，以及发布后真实更新门禁，不能只看 GitHub Release。当前旧正式0.7.8没有updater-latest，首次启用使用dev.7或更高兼容版本。
+changelog 发布在 sync/tag 后并行生成原生附件和 Docker 镜像；两个 job 分别报告成功/失败。Docker 失败时修复后重跑独立流程，不需要重建 Android/Windows。dev 更新固定版本及 dev/web-dev，正式版才更新 latest/web-latest。核对两种镜像版本、revision 和 amd64/arm64 manifest，以及发布后真实更新门禁，不能只看 GitHub Release。当前旧正式0.7.8不支持网页更新及共享管理镜像的 updater 启动模式。
 
 部署切换使用 [渠道教程](docker-channels.md)，保留项目名及完整 `/data`。只选择或检测渠道不替换容器；启用updater后在Web确认才执行更新。Watchtower跟随已选镜像，不会跨渠道。dev.7发布CI已通过唯一临时Compose项目的真实更新，核对API/Web替换、updater持续运行及数据/挂载/端口保留；不是用户NAS实测。已有正式版可先升级dev后在Web管理应用配置，最少操作见[升级说明](server-web-update.md#已有正式版先升级到-dev)。
 
@@ -406,7 +407,7 @@ Main build and release workflows:
 - `.github/workflows/docker-ci.yml`
   Runs independent API/Web/updater image, startup and Compose checks for relevant changes.
 - `.github/workflows/server-image.yml` (`Docker Images`)
-  Builds/checks all three images and, when publishing is requested, pushes the
+  Builds/checks API and shared management images in all three container roles and, when publishing is requested, pushes the
   selected channel and verifies a real isolated Compose update. Missing publishing
   credentials fail this job; native release artifacts are reported independently.
 
@@ -698,7 +699,7 @@ topic/deletion behavior.
 
 只保留 `master` 主线。日常功能和界面调整先发 dev，CI 成功不能代替实际 UI 验收。准备发布时，将最新版本标题和说明写入 `docs/CHANGELOG.md`：`X.Y.Z-dev.N` 自动走预发布，无后缀的 `X.Y.Z` 自动走正式发布；详细测试说明可链接到 `docs/releases/`。
 
-也可直接给已通过 CI 的提交推送 `vX.Y.Z-dev.N` tag，触发 `Release Artifacts` 与独立 `Docker Images`。两种入口共用渠道识别：dev 发布固定版本与 dev/web-dev/updater-dev，不替换正式 latest/web-latest/updater-latest；不能仅凭原生附件完成推断 Docker 已完成。
+也可直接给已通过 CI 的提交推送 `vX.Y.Z-dev.N` tag，触发 `Release Artifacts` 与独立 `Docker Images`。两种入口共用渠道识别：dev 发布固定版本与 dev/web-dev，不替换正式 latest/web-latest；不能仅凭原生附件完成推断 Docker 已完成。
 
 Both channels keep the same Android application ID and signing key. Published
 Android version codes are derived from the release tag:

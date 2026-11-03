@@ -24,7 +24,7 @@ export SMOKE_API_BASE="http://127.0.0.1:$api_port"
 export SMOKE_WEB_BASE="http://127.0.0.1:$web_port"
 
 docker tag component-vault-server:ci "$repository:updater-smoke-before"
-docker tag component-vault-web:ci "$repository:web-updater-smoke-before"
+docker tag component-vault-management:ci "$repository:web-updater-smoke-before"
 cat > "$deployment/.env" <<EOF
 COMPOSE_PROJECT_NAME=$project
 SMOKE_DEPLOY_DIR=$deployment
@@ -52,7 +52,8 @@ services:
     ports:
       - "127.0.0.1:${SMOKE_WEB_PORT}:80"
   updater:
-    image: component-vault-updater:ci
+    image: ${COMPONENT_VAULT_WEB_IMAGE}
+    command: [updater]
     environment:
       UPDATE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}
       UPDATE_TOKEN_FILE: /data/.updater-token
@@ -139,6 +140,7 @@ status = wait_for(lambda: request('/admin-api/server-update/status'), 'Updater t
 assert status['enabled'], status
 wait_for(web_ready, 'Initial Web startup')
 before = {service: container(service) for service in ('api', 'admin-web', 'updater')}
+assert inspect(before['admin-web'])['Image'] == inspect(before['updater'])['Image'], 'Web and updater must start from the same image ID'
 original_mount = data_source(before['api'])
 original_ports = inspect(before['api'])['HostConfig']['PortBindings']
 timestamp = datetime.now(timezone.utc).isoformat()
