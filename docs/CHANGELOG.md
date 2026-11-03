@@ -24,7 +24,8 @@ bump: patch
 - Web 和 Updater 共用 `web-*` 管理镜像，保持独立容器；API 镜像及前后端分离不变。默认启动 Web，`command: [updater]` 启动单 worker 更新服务，健康检查按角色执行。
 - Compose 中两个管理容器共用 `COMPONENT_VAULT_WEB_IMAGE`，只给 Updater 挂载 Docker 管理接口和任务目录。更新 API/Web 时继续保留 Updater，避免中断更新任务；不再构建或发布新的独立 `updater-*` 镜像。
 - 补充旧 updater 的一次迁移步骤：同时修改镜像和启动命令，保留原项目、账户、数据和任务卷。既有独立 updater 可继续更新兼容 API/Web；本次不修改 SQLite 或同步协议。
-- Docker CI 检查共享镜像的两个启动模式、对应健康检查、端口隔离和无 Docker 挂载的 Web；发布后继续用独立临时 Compose 项目验证真实更新及数据保留。实际完成状态以本版本 Docker 发布任务为准，未在用户群晖上执行操作。
+- [主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592805978)、[Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592531861)和[发布](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592806006)成功。真实共享镜像的两个启动模式、健康检查、端口隔离和 Web 无 Docker 挂载检查通过；隔离 Compose 更新后 API/Web 替换、updater 保持，测试库存、库位、数据挂载、端口与配置权限保留。
+- 已核对两种镜像的固定/浮动摘要、amd64/arm64 清单及实际 amd64 OCI 版本/提交；正式标签与旧 `updater-dev` 未改变。未在真实群晖或 ARM 设备上执行验收，详细证据见[验证记录](history/verification.md)。
 
 ### 文档与部署说明
 

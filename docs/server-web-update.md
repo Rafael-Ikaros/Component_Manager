@@ -23,8 +23,8 @@ updater 自身的镜像维护仍通过原项目完成，不承诺所有未来部
 
 ## 已有正式版先升级到 dev
 
-不需要重新安装或重新初始化库存。2026-11-02 已核实的正式镜像为
-`latest / web-latest`（0.7.8），当前已验证开发镜像为 `dev / web-dev`（0.7.9-dev.7）。
+不需要重新安装或重新初始化库存。2026-11-03 已核实的正式镜像为
+`latest / web-latest`（0.7.8），已验证开发镜像为 `dev / web-dev`（0.7.9-dev.8）。
 保持原 Compose 项目名称、完整 `/data`、现有环境变量、端口和网络，在 Container Manager
 原项目中成对改用并拉取开发镜像，然后重新部署。只更新 Web 或只重启旧 API 都不算完成升级。
 如果原文件已经使用本仓库的渠道变量，可设 `COMPONENT_VAULT_DOCKER_CHANNEL=dev`，

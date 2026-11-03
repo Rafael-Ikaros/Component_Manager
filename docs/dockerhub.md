@@ -8,9 +8,24 @@
 以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
 构建、双角色启动及发布后的真实更新均须通过 CI；下方 dev.7 摘要记录的是旧三镜像结构。
 
+2026-11-03 已回读 **0.7.9-dev.8** 的发布结果：
+
+| 镜像 | 固定标签／浮动标签 | 实际清单摘要 |
+| --- | --- | --- |
+| API | `0.7.9-dev.8` / `dev` | `sha256:227d6b4de1bf9bc135934a669a54e9f4fca11cb0602df1edce29ced2f1053828` |
+| Web 与 updater 共用 | `web-0.7.9-dev.8` / `web-dev` | `sha256:cab37cff4edd2c9b0fb32b585f1a971a7f8a569eb580298dd15441d5f0e589a8` |
+
+两种镜像均包含 amd64/arm64，实际 amd64 OCI 版本为 `0.7.9-dev.8`，提交为
+`fd1d5b8f5742074c685426caf137af94bed0741a`。管理镜像入口及默认 Web 模式已核对。
+[Docker 发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592806006/job/125773235473)
+通过双角色启动、健康检查、认证、任务持久化，以及真实临时 Compose 更新与数据保留验收。
+正式 `latest / web-latest` 和历史 `updater-dev` 的摘要均未改变；未在真实群晖或 ARM 设备上运行验收。
+
 当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
 
-2026-11-02 已实际核对 **0.7.9-dev.7**（首次启用网页更新请使用本版或更高兼容版本）：
+### 历史：0.7.9-dev.7 的独立镜像
+
+2026-11-02 核对的 **0.7.9-dev.7** 如下；该版本使用独立 updater，不适用当前共享镜像模板：
 
 | 镜像标签 | 固定标签 | 实际清单摘要 |
 | --- | --- | --- |

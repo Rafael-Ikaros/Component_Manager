@@ -4,7 +4,24 @@
 它不是用户操作指南，也不表示所有平台、设备和异常情况均已验证。
 本次整理未重新执行历史测试，现行功能和接口以[使用指南](../README.md)、[架构](../architecture.md)和[集成指南](../integration-guide.md)为准。
 
-## Docker 网页更新
+## 共享管理镜像：0.7.9-dev.8
+
+2026-11-03 的发布源为 `fd1d5b8f5742074c685426caf137af94bed0741a`。
+[主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592805978)通过，
+[实现提交的 Docker CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592531861)及
+[镜像发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41592806006/job/125773235473)通过。
+
+- 两种镜像产物：API 和共享管理镜像；Web、updater 以同一镜像的不同命令独立启动。
+- 真实容器检查了对应健康检查、另一角色端口未监听、Web 无挂载、更新接口认证及任务持久化。
+- 真实临时 Compose 项目核对初始 Web/updater 镜像 ID 相同；管理员更新后 API/Web 容器替换，
+  updater 容器不变，合成库存、库位、原数据挂载、端口及宿主配置权限保留。
+- Hub 回读 API/管理镜像的固定和浮动摘要一致，均有 amd64/arm64；实际 amd64 OCI 版本和提交正确，
+  管理镜像入口、默认 Web 命令和角色健康检查正确。正式标签与历史 `updater-dev` 摘要未改变。
+
+门禁运行在隔离 amd64 runner，未操作真实群晖、ARM 设备或用户已有库存；不涉及原生业务 UI 改动。
+镜像摘要见[Docker Hub 核对](../dockerhub.md)，迁移步骤见[网页更新](../server-web-update.md#从独立-updater-镜像迁移)。
+
+## Docker 网页更新：0.7.9-dev.7
 
 0.7.9-dev.7 的发布源为 `6567a3d0faeeab3f50bfab8d5fa64d10729c4a4d`。
 
