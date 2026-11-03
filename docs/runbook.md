@@ -405,7 +405,7 @@ Main build and release workflows:
   Windows self-contained portable ZIP packaging on manual trigger, reusable workflow calls, and
   `v*` tag pushes.
 - `.github/workflows/docker-ci.yml`
-  Runs independent API/Web/updater image, startup and Compose checks for relevant changes.
+  Runs API/shared-management image, role startup and Compose checks for relevant changes.
 - `.github/workflows/server-image.yml` (`Docker Images`)
   Builds/checks API and shared management images in all three container roles and, when publishing is requested, pushes the
   selected channel and verifies a real isolated Compose update. Missing publishing
