@@ -102,9 +102,18 @@ public sealed class MovementEntryDialog(
             SmallChange = 1,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
         };
+        var automaticReason = (movementTypeCombo.SelectedItem as MovementTypeOption)?.Label ?? "";
         var reasonBox = new TextBox
         {
+            Text = automaticReason,
             PlaceholderText = "例如 到货、样机装配、盘点修正",
+        };
+        movementTypeCombo.SelectionChanged += (_, _) =>
+        {
+            if (movementTypeCombo.SelectedItem is not MovementTypeOption movementType) return;
+            if (string.IsNullOrWhiteSpace(reasonBox.Text) || reasonBox.Text == automaticReason)
+                reasonBox.Text = movementType.Label;
+            automaticReason = movementType.Label;
         };
         var noteBox = new TextBox
         {

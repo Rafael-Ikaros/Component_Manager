@@ -488,6 +488,8 @@ internal fun MovementEditorSurface(
     storageLocations: List<StorageLocationRecord> = emptyList(),
 ) {
     val strings = vaultStrings()
+    val defaultReasons = listOf("inbound", "outbound", "adjustment", "transfer")
+        .associateWith { movementTypeLabel(it) }
     var componentMenuExpanded by remember { mutableStateOf(false) }
     var selectedComponent by remember(selectedComponentId, components) {
         mutableStateOf(
@@ -498,6 +500,7 @@ internal fun MovementEditorSurface(
         mutableStateOf(
             MovementEditorState(
                 movementType = initialMovementType ?: "inbound",
+                reason = defaultReasons.getValue(initialMovementType ?: "inbound"),
                 locationId = components.firstOrNull { it.id == selectedComponentId }?.location.orEmpty(),
             ),
         )
@@ -573,6 +576,9 @@ internal fun MovementEditorSurface(
                     onMovementTypeChange = { movementType ->
                         editorState = editorState.copy(
                             movementType = movementType,
+                            reason = if (editorState.reason.isBlank() ||
+                                editorState.reason == defaultReasons[editorState.movementType]
+                            ) defaultReasons.getValue(movementType) else editorState.reason,
                             errorMessage = null,
                         )
                     },

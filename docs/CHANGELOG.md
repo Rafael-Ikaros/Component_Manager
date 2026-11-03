@@ -17,6 +17,10 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+### 出入库默认原因
+
+- Android 与 Windows 的手动库存变动表单自动填写当前类型对应的原因，入库、出库无需重复输入。切换类型时仅替换空白或原默认原因，保留用户自定义内容；数量、库位与保存规则不变。
+
 ## [0.7.9-dev.8] - 2026-11-03
 
 ### Docker 管理镜像
