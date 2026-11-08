@@ -608,7 +608,7 @@
     <string name="bluetooth_label_print_locked_detail">%1$s · 旋转 %2$d° · 水平偏移 %3$s mm、垂直偏移 %4$s mm</string>
     <string name="bluetooth_label_print_device">已配对打印机</string>
     <string name="bluetooth_label_print_refresh_devices">刷新已配对设备</string>
-    <string name="bluetooth_label_print_pair_hint">先在 Android 蓝牙设置中配对 M1 打印机，再刷新列表。</string>
+    <string name="bluetooth_label_print_pair_hint">先在 Android 蓝牙设置中配对打印机，再刷新列表。</string>
     <string name="bluetooth_label_print_unknown_device">未命名设备</string>
     <string name="bluetooth_label_print_pair_settings">打开蓝牙设置</string>
     <string name="bluetooth_label_print_copy_report">复制打印报告</string>

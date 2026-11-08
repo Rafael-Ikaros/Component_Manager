@@ -626,7 +626,7 @@
     <string name="bluetooth_label_print_locked_detail">%1$s · rotation %2$d° · offset X %3$s mm, Y %4$s mm</string>
     <string name="bluetooth_label_print_device">Paired printer</string>
     <string name="bluetooth_label_print_refresh_devices">Refresh paired devices</string>
-    <string name="bluetooth_label_print_pair_hint">Pair your M1 printer in Android Bluetooth settings, then refresh this list.</string>
+    <string name="bluetooth_label_print_pair_hint">Pair your printer in Android Bluetooth settings, then refresh this list.</string>
     <string name="bluetooth_label_print_unknown_device">Unnamed device</string>
     <string name="bluetooth_label_print_pair_settings">Open Bluetooth settings</string>
     <string name="bluetooth_label_print_copy_report">Copy printer report</string>
