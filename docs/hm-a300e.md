@@ -13,6 +13,8 @@
 - 当前没有 Windows 直连、BLE 写入、自动纸张学习、永久参数修改或固件更新功能。
 
 这是代码候选，尚未由 HM-A300E 真机验证。单张、连续定位和异常恢复均需实际设备验收。
+候选提交 `36efa94` 已通过[主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/42495936800)，
+构建和自动检查不等同于实际出纸验收。
 
 ## 型号与资料依据
 

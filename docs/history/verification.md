@@ -15,7 +15,10 @@ Android 调试包构建通过。联合定向测试55项中首轮53项通过；�
 旧 UI 上限断言已更新为“60 mm可编辑、73 mm拒绝”，该项定向复测通过。
 其余唯一未通过项为 `LabelPrintQueueStoreTest.loadPersistsRecoveryAndPreservesCompletedStates`：
 内存恢复为 Uncertain，但 Windows Robolectric 读取文件仍为 Sending；疑似 Android AtomicFile 覆盖重命名
-在 Windows 宿主上的边界，保留完整落盘断言及生产恢复逻辑，需 Linux CI 继续核对。
+在 Windows 宿主上的边界，保留完整落盘断言及生产恢复逻辑。
+提交 `36efa94` 的[主 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/42495936800)
+已全部通过，Android 的 Linux runner 包括该队列恢复用例及新增 CPCL 测试；Windows、服务端、Web和版本检查也通过。
+发布附件与 Docker 镜像 job 均跳过，未创建新发布或更新镜像标签。
 
 本轮未运行本地全量回归，未操作手机或打印机、未修改库存、未进行实际出纸和连续定位验收。
 宽幅二维码可解码与协议字节测试通过不代表 HM-A300E 固件兼容性或标签实物通过。
