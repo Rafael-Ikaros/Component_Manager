@@ -1,5 +1,16 @@
 # Architecture Notes
 
+## 标签打印机 profile
+
+Android 在现有打印页选择 `m1` 或实验性 `hm-a300e-cpcl`，不增加另一套编辑器。
+队列v4保存 printerProfileId 和 mediaType（gap／continuous），v1–v3按M1解释；
+已有队列不能切换指令集，未知profile或纸型拒绝加载。清除打印任务不修改库存。
+
+共用纸张容器可容纳72 mm宽、300 mm高，机型边界单独验证：M1仍为20–48 mm、10–100 mm，
+HM首版可打印25–72 mm、10–300 mm。HM使用标准CPCL单色CG栅格；复用SPP连接所有权及取消机制，
+不发送M1型号、状态或压缩图像命令。未解析真实完成回执，完整write仍映射为待核对并停止批次。
+300 mm及图像字节上限是应用限制，不代表设备缓冲区。依据、硬件版本差异与验收步骤见[型号指南](hm-a300e.md)。
+
 ## 实际采购成本
 
 采购成本与 description 中的商城参考价分开保存。三端组件新增 nullable TEXT

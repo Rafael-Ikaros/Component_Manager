@@ -665,4 +665,9 @@
     <string name="bluetooth_label_print_error_no_response">The printer did not respond. Check power and pairing, then retry.</string>
     <string name="bluetooth_label_print_error_not_ready">The printer is not ready. Check paper, cover, and connection, then review the failed label.</string>
     <string name="bluetooth_label_print_dismiss_error">Close</string>
+    <string name="label_printer_profile">Printer profile</string>
+    <string name="label_hm_experimental">Experimental HM-A300E CPCL over Bluetooth SPP. Pair in Android settings first. Each label stops for physical verification; review it before continuing. Sending bytes does not confirm printing.</string>
+    <string name="label_media_gap">Gap labels</string>
+    <string name="label_media_continuous">Continuous paper</string>
+    <string name="label_hm_printable_width">Printable width: 25–72 mm (paper roll: 25–80 mm). Height: 10–300 mm, an initial app limit. Black mark media is not supported yet.</string>
 </resources>

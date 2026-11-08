@@ -37,10 +37,10 @@ internal data class M1TestPaperProfile(
     }
 
     companion object {
-        val WidthRange = 20f..48f
-        val HeightRange = 10f..100f
-        val OffsetXRange = -48f..48f
-        val OffsetYRange = -100f..100f
+        val WidthRange = 20f..72f
+        val HeightRange = 10f..300f
+        val OffsetXRange = -72f..72f
+        val OffsetYRange = -300f..300f
         val Rotations = setOf(0, 90, 180, 270)
 
         private const val KeyWidth = "width_mm"

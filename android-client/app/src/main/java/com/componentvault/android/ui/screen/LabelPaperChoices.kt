@@ -19,6 +19,7 @@ internal fun LabelPaperChoices(
     widthMm: Float?,
     heightMm: Float?,
     enabled: Boolean,
+    isM1: Boolean = true,
     onSelect: (LabelPaperSize) -> Unit,
 ) {
     Text(stringResource(R.string.label_ui_common_sizes), style = MaterialTheme.typography.titleSmall)
@@ -37,7 +38,7 @@ internal fun LabelPaperChoices(
             }
         }
     }
-    Text(stringResource(R.string.label_ui_m1_size_boundary),
+    if (isM1) Text(stringResource(R.string.label_ui_m1_size_boundary),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

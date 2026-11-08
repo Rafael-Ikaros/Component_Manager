@@ -107,9 +107,9 @@ class M1SppTestLabelRendererTest {
     @Test
     fun profileRejectsValuesOutsideActualRasterLimits() {
         assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(19.9f, 20f) }
-        assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(48.1f, 20f) }
+        assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(72.1f, 20f) }
         assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(30f, 9.9f) }
-        assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(30f, 100.1f) }
+        assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(30f, 300.1f) }
         assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(30f, 20f, rotationDegrees = 45) }
         assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(30f, 20f, offsetXmm = Float.NaN) }
     }
@@ -122,7 +122,7 @@ class M1SppTestLabelRendererTest {
         profile.save(preferences)
         assertEquals(profile, M1TestPaperProfile.load(preferences, ComponentLabelTemplate.Qr10x40))
 
-        preferences.edit().putFloat("width_mm", 60f).apply()
+        preferences.edit().putFloat("width_mm", 80f).apply()
         assertEquals(
             M1TestPaperProfile.fromTemplate(ComponentLabelTemplate.Qr10x40),
             M1TestPaperProfile.load(preferences, ComponentLabelTemplate.Qr10x40),

@@ -4,6 +4,22 @@
 它不是用户操作指南，也不表示所有平台、设备和异常情况均已验证。
 本次整理未重新执行历史测试，现行功能和接口以[使用指南](../README.md)、[架构](../architecture.md)和[集成指南](../integration-guide.md)为准。
 
+## HM-A300E 实验适配（2026-11-08）
+
+已下载并阅读用户指定的官方手册，视觉核对中文规格表；区分 HM-A300 产品网页与 HM-A300E 手册。
+型号 SDK V1.22.05已完成归档下载，静态阅读说明并用JDK工具查看命令生成字节码，
+核对打印头、CG与FORM／PRINT结构。未运行或集成厂商二进制；SDK和临时文件不纳入仓库。
+标准 CPCL 候选路径的来源及验收边界见[机型指南](../hm-a300e.md)。
+
+Android 调试包构建通过。联合定向测试55项中首轮53项通过；共享纸张容器扩大后，
+旧 UI 上限断言已更新为“60 mm可编辑、73 mm拒绝”，该项定向复测通过。
+其余唯一未通过项为 `LabelPrintQueueStoreTest.loadPersistsRecoveryAndPreservesCompletedStates`：
+内存恢复为 Uncertain，但 Windows Robolectric 读取文件仍为 Sending；疑似 Android AtomicFile 覆盖重命名
+在 Windows 宿主上的边界，保留完整落盘断言及生产恢复逻辑，需 Linux CI 继续核对。
+
+本轮未运行本地全量回归，未操作手机或打印机、未修改库存、未进行实际出纸和连续定位验收。
+宽幅二维码可解码与协议字节测试通过不代表 HM-A300E 固件兼容性或标签实物通过。
+
 ## Issue #27 后续 CI 修复（2026-11-08）
 
 修复依据为 `fa9e135` 的[失败 CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/42452946458)，

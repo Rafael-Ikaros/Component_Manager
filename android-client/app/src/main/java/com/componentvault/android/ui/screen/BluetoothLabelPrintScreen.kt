@@ -79,6 +79,8 @@ import com.componentvault.android.data.LabelElement
 import com.componentvault.android.data.LabelElementType
 import com.componentvault.android.data.LabelPrintItemState
 import com.componentvault.android.data.M1ComponentLabelRenderer
+import com.componentvault.android.data.LabelPrinterProfile
+import com.componentvault.android.data.LabelMediaType
 import com.componentvault.android.data.M1TestPaperProfile
 import com.componentvault.android.data.LabelPaperSize
 import com.componentvault.android.model.ComponentLabelSeed
@@ -232,7 +234,8 @@ internal fun BluetoothLabelPrintScreen(
             permissionRequest.launch(permissions)
         }
     }
-    val paper = remember(widthText, heightText, rotationText, offsetXText, offsetYText) {
+    val activeProfile = LabelPrinterProfile.fromId(if (controller.queue.items.isNotEmpty()) controller.queue.printerProfileId else controller.selectedProfileId)
+    val paper = remember(widthText, heightText, rotationText, offsetXText, offsetYText, activeProfile) {
         runCatching {
             M1TestPaperProfile(
                 widthMm = widthText.toFloat(),
@@ -240,7 +243,7 @@ internal fun BluetoothLabelPrintScreen(
                 rotationDegrees = rotationText.toInt(),
                 offsetXmm = offsetXText.toFloat(),
                 offsetYmm = offsetYText.toFloat(),
-            )
+            ).also { activeProfile.validate(it) }
         }.getOrNull()
     }
     val draftSelections = choices.mapNotNull { choice ->
@@ -559,6 +562,21 @@ internal fun BluetoothLabelPrintScreen(
                     preview.request == previewRequest && preview.error == null && preview.bitmap != null,
                     { localMessage = it })
                 PrintSection(stringResource(R.string.bluetooth_label_print_device)) {
+                    Text(stringResource(R.string.label_printer_profile))
+                    LabelPrinterProfile.entries.forEach { profile ->
+                        FilterChip(selected = activeProfile == profile,
+                            onClick = { controller.selectProfile(profile.id) }, enabled = editable,
+                            label = { Text(if (profile == LabelPrinterProfile.M1) "M1" else "HM-A300E CPCL") })
+                    }
+                    if (activeProfile == LabelPrinterProfile.HmA300eCpcl) {
+                        Text(stringResource(R.string.label_hm_experimental))
+                        LabelMediaType.entries.forEach { media ->
+                            FilterChip(selected = (if (hasQueue) queue.mediaType else controller.selectedMediaType) == media.id,
+                                onClick = { controller.selectMedia(media.id) }, enabled = editable,
+                                label = { Text(stringResource(if (media == LabelMediaType.Gap)
+                                    R.string.label_media_gap else R.string.label_media_continuous)) })
+                        }
+                    }
                     OutlinedButton(onClick = ::refreshDevices, enabled = !controller.running && !controller.working) {
                         Text(stringResource(R.string.bluetooth_label_print_refresh_devices))
                     }
@@ -675,7 +693,8 @@ internal fun BluetoothLabelPrintScreen(
                 }
                 "paper" -> {
                     Text(stringResource(R.string.label_ui_paper), style = MaterialTheme.typography.titleLarge)
-                    LabelPaperChoices(paper?.widthMm, paper?.heightMm, editable) { size ->
+                    if (activeProfile == LabelPrinterProfile.HmA300eCpcl) Text(stringResource(R.string.label_hm_printable_width))
+                    LabelPaperChoices(paper?.widthMm, paper?.heightMm, editable, isM1 = activeProfile == LabelPrinterProfile.M1) { size ->
                         if (paper?.let { it.widthMm == size.widthMm && it.heightMm == size.heightMm } != true) {
                             if (draftDesigns.isNotEmpty()) pendingPaperSize = size
                             else {

@@ -42,10 +42,12 @@ internal class LabelPrintQueueStore(context: Context) {
 }
 
 internal object LabelPrintQueueCodec {
-    private const val Version = 3
+    private const val Version = 4
 
     fun encode(queue: LabelPrintQueue): String = JSONObject()
         .put("version", Version)
+        .put("printerProfileId", queue.printerProfileId)
+        .put("mediaType", queue.mediaType)
         .put("templateId", queue.templateId)
         .put("textTemplateId", queue.textTemplateId)
         .put("paper", JSONObject()
@@ -116,6 +118,8 @@ internal object LabelPrintQueueCodec {
             templateId = root.getString("templateId"),
             textTemplateId = root.getString("textTemplateId"),
             paper = paper,
+            printerProfileId = if (version < 4) LabelPrinterProfile.M1.id else root.getString("printerProfileId"),
+            mediaType = if (version < 4) LabelMediaType.Gap.id else root.getString("mediaType"),
         )
     }
 

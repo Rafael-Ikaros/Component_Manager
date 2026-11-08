@@ -647,5 +647,10 @@
     <string name="bluetooth_label_print_error_no_response">打印机无响应。检查电源和配对状态后重试。</string>
     <string name="bluetooth_label_print_error_not_ready">打印机尚未就绪。检查纸张、盖板和连接，再核对失败标签。</string>
     <string name="bluetooth_label_print_dismiss_error">关闭</string>
+    <string name="label_printer_profile">打印机配置</string>
+    <string name="label_hm_experimental">HM-A300E 蓝牙 SPP / CPCL 实验适配。请先在 Android 设置中配对。每张发送后暂停，需核对实物并人工处理后再继续；数据发送完成不代表打印完成。</string>
+    <string name="label_media_gap">间隙标签</string>
+    <string name="label_media_continuous">连续纸</string>
+    <string name="label_hm_printable_width">可打印宽度 25–72 mm（纸卷 25–80 mm）；高度 10–300 mm 是应用首版限制。暂不支持黑标纸。</string>
 </resources>
 

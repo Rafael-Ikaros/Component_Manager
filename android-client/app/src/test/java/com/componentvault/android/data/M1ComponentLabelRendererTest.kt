@@ -24,6 +24,16 @@ class M1ComponentLabelRendererTest {
     private val seed = ComponentLabelSeed("C70565", "贴片电阻 RC0603FR", "电阻", "0603", "A01", 15, 1,
         model = "RC0603FR", brand = "Example")
 
+    @Test fun hmPrintableWidthUsesExistingRasterWithoutRescalingQr() {
+        val template = ComponentLabelTemplate.Qr10x40
+        val bitmap = M1ComponentLabelRenderer.render(seed, template, ComponentTextLabelTemplate.default,
+            M1TestPaperProfile(72f, 60f))
+        try {
+            assertEquals(575, bitmap.width)
+            assertEquals(ComponentLabelCodec.buildQrPayload(seed, template)!!.rawValue, decode(bitmap))
+        } finally { bitmap.recycle() }
+    }
+
     @Test fun actualPaperRasterDecodesTheOriginalPayloadInAllRotations() {
         for (rotation in listOf(0, 90, 180, 270)) {
             for (template in listOf(ComponentLabelTemplate.Qr10x40, ComponentLabelTemplate.Qr30x40)) {

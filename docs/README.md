@@ -16,6 +16,7 @@
 | 用商城订单修正已有元件资料 | [从订单更新资料](order-metadata-update.md) |
 | 批量查询中文资料和补全参数 | [资料补全](parameter-enrichment.md) |
 | 编辑标签、模板和汉印 M1 打印 | [标签打印](m1-printing-feature-matrix.md) |
+| HM-A300E Android 实验适配与资料 | [HM-A300E](hm-a300e.md) |
 | 反馈错误和附加诊断 | [扫码诊断与反馈](feedback-and-scan-diagnostics.md) |
 | 向 Home Assistant、看板发布库存变化 | [MQTT](mqtt.md) |
 

@@ -37,6 +37,24 @@ internal class LabelPrintController(context: Context) {
         private set
     var selectedAddress by mutableStateOf(preferences.getString("device_address", "").orEmpty())
         private set
+    var selectedProfileId by mutableStateOf(preferences.getString("printer_profile", "m1").orEmpty().let {
+        runCatching { LabelPrinterProfile.fromId(it).id }.getOrDefault("m1")
+    })
+        private set
+    var selectedMediaType by mutableStateOf(preferences.getString("media_type", "gap").orEmpty().let {
+        runCatching { LabelMediaType.fromId(it).id }.getOrDefault("gap")
+    })
+        private set
+    fun selectProfile(id: String) {
+        if (running || working || closed || queue.items.isNotEmpty()) return
+        selectedProfileId = LabelPrinterProfile.fromId(id).id
+        preferences.edit().putString("printer_profile", id).apply()
+    }
+    fun selectMedia(id: String) {
+        if (running || working || closed || queue.items.isNotEmpty()) return
+        selectedMediaType = LabelMediaType.fromId(id).id
+        preferences.edit().putString("media_type", id).apply()
+    }
     private var stopRequested = false
     private var closed = false
 
@@ -76,7 +94,7 @@ internal class LabelPrintController(context: Context) {
             return
         }
         val next = try {
-            LabelPrintQueue.create(selections, templateId, textTemplateId, paper, designs)
+            LabelPrintQueue.create(selections, templateId, textTemplateId, paper, designs, selectedProfileId, selectedMediaType)
         } catch (_: IllegalArgumentException) {
             error = "queue_invalid_selection"
             return
@@ -92,7 +110,7 @@ internal class LabelPrintController(context: Context) {
             return
         }
         val next = try {
-            LabelPrintQueue.createFree(freeLabel, copies, paper, design)
+            LabelPrintQueue.createFree(freeLabel, copies, paper, design, selectedProfileId, selectedMediaType)
         } catch (_: IllegalArgumentException) {
             error = "queue_invalid_selection"
             return
@@ -183,7 +201,10 @@ internal class LabelPrintController(context: Context) {
                             sendingId = null
                             break
                         }
-                        transport.printM1Label(candidate, bitmap, queue.paper)
+                        if (queue.printerProfileId == LabelPrinterProfile.M1.id)
+                            transport.printM1Label(candidate, bitmap, queue.paper)
+                        else transport.printHmA300eLabel(candidate, bitmap, queue.paper,
+                            queue.mediaType == LabelMediaType.Continuous.id)
                     } finally {
                         bitmap.recycle()
                     }

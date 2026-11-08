@@ -30,7 +30,11 @@ internal data class LabelPrintQueue(
     val templateId: String = ComponentLabelTemplate.default.id,
     val textTemplateId: String = ComponentTextLabelTemplate.default.id,
     val paper: M1TestPaperProfile = M1TestPaperProfile(40f, 60f),
+    val printerProfileId: String = LabelPrinterProfile.M1.id,
+    val mediaType: String = LabelMediaType.Gap.id,
 ) {
+    init { LabelPrinterProfile.fromId(printerProfileId).validate(paper); LabelMediaType.fromId(mediaType) }
+
     /** A send interrupted by process death may already have reached the printer. */
     fun recovered(): LabelPrintQueue = copy(items = items.map { item ->
         if (item.state == LabelPrintItemState.Sending) {
@@ -57,6 +61,8 @@ internal data class LabelPrintQueue(
             textTemplateId: String = ComponentTextLabelTemplate.default.id,
             paper: M1TestPaperProfile = M1TestPaperProfile(40f, 60f),
             designs: Map<String, LabelDesign> = emptyMap(),
+            printerProfileId: String = LabelPrinterProfile.M1.id,
+            mediaType: String = LabelMediaType.Gap.id,
         ): LabelPrintQueue {
             require(selections.isNotEmpty()) { "Select at least one component to print" }
             var total = 0
@@ -71,7 +77,7 @@ internal data class LabelPrintQueue(
                         design = design?.copy(elements = design.elements.toList()))
                 }
             }
-            return LabelPrintQueue(items, templateId, textTemplateId, paper)
+            return LabelPrintQueue(items, templateId, textTemplateId, paper, printerProfileId, mediaType)
         }
 
         fun createFree(
@@ -79,6 +85,8 @@ internal data class LabelPrintQueue(
             copies: Int,
             paper: M1TestPaperProfile,
             design: LabelDesign,
+            printerProfileId: String = LabelPrinterProfile.M1.id,
+            mediaType: String = LabelMediaType.Gap.id,
         ): LabelPrintQueue {
             require(copies in 1..MaxCopies) { "Copies must be between 1 and $MaxCopies" }
             require(freeLabel.title.isNotBlank()) { "Label title is required" }
@@ -93,6 +101,8 @@ internal data class LabelPrintQueue(
                         design = design.copy(elements = design.elements.toList()), freeLabel = freeLabel)
                 },
                 paper = paper,
+                printerProfileId = printerProfileId,
+                mediaType = mediaType,
             )
         }
     }

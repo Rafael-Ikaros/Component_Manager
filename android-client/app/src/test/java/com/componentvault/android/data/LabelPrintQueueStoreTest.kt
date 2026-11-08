@@ -20,6 +20,20 @@ class LabelPrintQueueStoreTest {
     )
 
     @Test
+    fun hmProfileRoundTripsAndLegacyQueueRemainsM1() {
+        val hm = LabelPrintQueue(paper = M1TestPaperProfile(72f, 300f),
+            printerProfileId = LabelPrinterProfile.HmA300eCpcl.id, mediaType = LabelMediaType.Continuous.id)
+        assertEquals(hm, LabelPrintQueueCodec.decode(LabelPrintQueueCodec.encode(hm)))
+        val legacy = JSONObject(LabelPrintQueueCodec.encode(LabelPrintQueue())).put("version", 3)
+        legacy.remove("printerProfileId")
+        legacy.remove("mediaType")
+        assertEquals("m1", LabelPrintQueueCodec.decode(legacy.toString()).printerProfileId)
+        assertFailsWith<IllegalArgumentException> { LabelPrintQueue(paper = M1TestPaperProfile(72f, 40f)) }
+        assertFailsWith<IllegalArgumentException> { LabelPrintQueue(printerProfileId = "unknown") }
+        assertFailsWith<IllegalArgumentException> { LabelPrintQueue(mediaType = "black_mark") }
+    }
+
+    @Test
     fun jsonRoundTripPreservesFullSnapshotAndPaper() {
         val queue = LabelPrintQueue.create(
             listOf(seed to 2), templateId = ComponentLabelTemplate.Qr10x40.id,

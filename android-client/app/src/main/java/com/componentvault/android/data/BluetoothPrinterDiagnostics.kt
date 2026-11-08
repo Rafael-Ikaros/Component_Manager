@@ -311,6 +311,99 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     fun printM1Label(candidate: PrinterDeviceCandidate, bitmap: Bitmap, paper: M1TestPaperProfile) =
         printM1Bitmap(candidate, bitmap, paper, M1FeedMode.Label, "m1_component_label")
 
+    /** Experimental CPCL; a completed socket write never confirms a printed label. */
+    fun printHmA300eLabel(
+        candidate: PrinterDeviceCandidate,
+        bitmap: Bitmap,
+        paper: M1TestPaperProfile,
+        continuous: Boolean,
+    ) {
+        prepareM1Operation(candidate.address)
+        printResult = M1TestPrintResult.None
+        canContinueBatch = false
+        report = "transport=spp\nprobe=hma300e_cpcl_label\nprotocol_verified=false\n" +
+            "sdk_command_structure_checked=true\nphysical_printer_verified=false\n" +
+            "media=${if (continuous) "continuous" else "gap"}\n" +
+            "paper_width_mm=${paper.widthMm}\npaper_height_mm=${paper.heightMm}\n" +
+            "bitmap_width_dots=${bitmap.width}\nbitmap_height_dots=${bitmap.height}\n"
+        if (!candidate.paired || candidate.type !in setOf(
+                BluetoothDevice.DEVICE_TYPE_CLASSIC, BluetoothDevice.DEVICE_TYPE_DUAL,
+            )
+        ) {
+            finish(PrinterProbeStatus.Unsupported, "error=unsupported_device")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        val parts = try {
+            HmA300eCpclProtocol.parts(bitmap, continuous)
+        } catch (_: RuntimeException) {
+            finish(PrinterProbeStatus.ConnectionFailed, "error=invalid_bitmap")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        try {
+            if (adapter?.isEnabled != true) {
+                finish(PrinterProbeStatus.BluetoothOff, "error=bluetooth_off")
+                printResult = M1TestPrintResult.Rejected
+                return
+            }
+            status = PrinterProbeStatus.Connecting
+            val session = SppSession(generation, candidate.address, isPrint = true)
+            sppSession = session
+            Thread({ runHmA300ePrint(candidate, parts, session) }, "hma300e-cpcl-print").start()
+        } catch (_: SecurityException) {
+            finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
+            printResult = M1TestPrintResult.Rejected
+        } catch (_: RuntimeException) {
+            finish(PrinterProbeStatus.ConnectionFailed, "error=worker_start")
+            printResult = M1TestPrintResult.Rejected
+        }
+    }
+
+    private fun runHmA300ePrint(
+        candidate: PrinterDeviceCandidate,
+        parts: List<M1PrintPart>,
+        session: SppSession,
+    ) {
+        try {
+            // Reuse only RFCOMM connection ownership; never send the M1 query/print protocol.
+            val connection = acquireM1Connection(candidate, session) ?: return
+            postSpp(session) { status = PrinterProbeStatus.Printing; report += "stage=sending\n" }
+            scheduleSppDeadline(session, PRINT_STAGE_TIMEOUT_MS, "cpcl_write")
+            parts.forEach { part ->
+                if (!writePrintPart(connection.output, part.bytes, session)) return
+                if (part.isImageFrame) session.framesSent++
+                if (part.isFormFeed) session.formFeedCommands++
+            }
+            session.printWriteComplete = true
+            cancelSppDeadline(session)
+            postSpp(session) {
+                appendPrintProgress(session)
+                canContinueBatch = false
+                report += "batch_ready=false\nprint_confirmation=unavailable\n"
+                finish(PrinterProbeStatus.Complete, "print_result=sent_unconfirmed")
+                printResult = M1TestPrintResult.SentUnconfirmed
+            }
+        } catch (_: SecurityException) {
+            postSpp(session) {
+                appendPrintProgress(session)
+                finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
+                printResult = failedPrintResult(session.bytesAttempted)
+            }
+        } catch (_: Exception) {
+            postSpp(session) {
+                appendPrintProgress(session)
+                val result = failedPrintResult(session.bytesAttempted)
+                finish(PrinterProbeStatus.ConnectionFailed, "print_result=${result.name.lowercase()}")
+                printResult = result
+            }
+        } finally {
+            cancelSppDeadline(session)
+            session.sockets.closeCurrent()
+            session.connection?.let(m1Connections::closeIfOwned)
+        }
+    }
+
     private fun printM1Bitmap(
         candidate: PrinterDeviceCandidate,
         bitmap: Bitmap,
@@ -347,6 +440,14 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
             report += "form_feed_commands=0\n"
             report += "short_feed_commands=0\n"
             finish(PrinterProbeStatus.Unsupported, "error=unsupported_device")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        if (paperProfile != null &&
+            (paperProfile.widthMm !in 20f..48f || paperProfile.heightMm !in 10f..100f ||
+                paperProfile.offsetXmm !in -48f..48f || paperProfile.offsetYmm !in -100f..100f)
+        ) {
+            finish(PrinterProbeStatus.Unsupported, "error=unsupported_m1_paper")
             printResult = M1TestPrintResult.Rejected
             return
         }
