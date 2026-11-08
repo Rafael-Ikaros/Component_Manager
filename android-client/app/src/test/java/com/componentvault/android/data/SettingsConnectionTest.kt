@@ -38,7 +38,7 @@ class SettingsConnectionTest {
                     val reader = socket.getInputStream().bufferedReader()
                     val headers = generateSequence { reader.readLine() }.takeWhile { it.isNotEmpty() }.toList()
                     assertEquals(if (index == 0) "POST /auth/ping HTTP/1.1" else "GET /auth/me HTTP/1.1", headers.first())
-                    val body = if (index == 0) "{\"inventory_protocol\":1,\"server_time\":\"external\"}"
+                    val body = if (index == 0) "{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"external\"}"
                         else "{\"server_id\":\"server-1\",\"account_id\":\"admin\"}"
                     val bytes = body.toByteArray()
                     socket.getOutputStream().apply {
@@ -82,7 +82,7 @@ class SettingsConnectionTest {
                     val body = when {
                         !success -> "{\"detail\":\"Invalid token\"}"
                         index == 1 -> "{\"server_id\":\"server-1\",\"account_id\":\"admin\"}"
-                        else -> "{\"inventory_protocol\":1,\"server_time\":\"test\"}"
+                        else -> "{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"test\"}"
                     }
                     val bytes = body.toByteArray()
                     val status = if (success) "200 OK" else "401 Unauthorized"
@@ -131,7 +131,7 @@ class SettingsConnectionTest {
                             val headers = generateSequence { reader.readLine() }
                                 .takeWhile { it.isNotEmpty() }.toList()
                             assertEquals(if (index == 0) "POST /auth/ping HTTP/1.1" else "GET /auth/me HTTP/1.1", headers.first())
-                            val body = if (index == 0) "{\"inventory_protocol\":1,\"server_time\":\"now\"}" else identityBody
+                            val body = if (index == 0) "{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"now\"}" else identityBody
                             val bytes = body.toByteArray()
                             val responseStatus = if (index == 0) "200 OK" else status
                             socket.getOutputStream().apply {
@@ -151,6 +151,38 @@ class SettingsConnectionTest {
     }
 
     @Test
+    fun missingOrUnsupportedCostProtocolStopsBeforeIdentityAndPush(): Unit = runBlocking {
+        val context: Application = RuntimeEnvironment.getApplication()
+        val repository = InventoryRepository(context)
+        listOf(null, 0, 2).forEach { version ->
+            listOf(false, true).forEach { sync ->
+                ServerSocket(0).use { server ->
+                    server.soTimeout = 10_000
+                    val responder = CompletableFuture.runAsync {
+                        server.accept().use { socket ->
+                            val reader = socket.getInputStream().bufferedReader()
+                            val headers = generateSequence { reader.readLine() }.takeWhile { !it.isNullOrEmpty() }.toList()
+                            assertEquals("POST /auth/ping HTTP/1.1", headers.first())
+                            val body = "{\"inventory_protocol\":1" + (version?.let { ",\"cost_protocol\":$it" } ?: "") + "}"
+                            val bytes = body.toByteArray()
+                            socket.getOutputStream().apply {
+                                write("HTTP/1.1 200 OK\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray()); write(bytes); flush()
+                            }
+                        }
+                    }
+                    val url = "http://127.0.0.1:${server.localPort}"
+                    val result = if (sync) { repository.saveSyncConfiguration(url,"key",true); repository.runSync() } else repository.testConnection(url,"key")
+                    assertFalse(result.isSuccess)
+                    assertTrue("升级" in result.message, result.message)
+                    responder.get(10, TimeUnit.SECONDS)
+                    server.soTimeout = 200
+                    kotlin.test.assertFailsWith<java.net.SocketTimeoutException> { server.accept().close() }
+                }
+            }
+        }
+    }
+
+    @Test
     fun unsupportedProtocolFailsBeforeIdentityRequest(): Unit = runBlocking {
         val context: Application = RuntimeEnvironment.getApplication()
         val repository = InventoryRepository(context)
@@ -162,7 +194,7 @@ class SettingsConnectionTest {
                     val reader = socket.getInputStream().bufferedReader()
                     val headers = generateSequence { reader.readLine() }.takeWhile { it.isNotEmpty() }.toList()
                     assertEquals("POST /auth/ping HTTP/1.1", headers.first())
-                    val body = "{\"inventory_protocol\":0,\"server_time\":\"now\"}"
+                    val body = "{\"inventory_protocol\":0,\"cost_protocol\":1,\"server_time\":\"now\"}"
                     val bytes = body.toByteArray()
                     socket.getOutputStream().apply {
                         write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())

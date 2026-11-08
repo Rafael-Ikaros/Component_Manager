@@ -10,6 +10,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -252,33 +254,58 @@ class InventoryInteractionUiTest {
         var draft: MovementEntryDraft? = null
         var completion: ((OperationResult) -> Unit)? = null
         var dismissals = 0
+        var submits = 0
         setInventoryContent {
             MaterialTheme {
                 QuickStockActionDialog(item, inbound = true, allocations = emptyList(),
                     locations = listOf(StorageLocationRecord("A", "Shelf A", "")),
                     onDismiss = { dismissals++ }, onSubmit = { submitted, callback ->
-                        draft = submitted; completion = callback
+                        submits++; draft = submitted; completion = callback
                     })
             }
         }
         compose.onNodeWithTag("quick_quantity").performTextReplacement("3")
+        compose.onNodeWithText("购买总金额（CNY）").performScrollTo().performTextReplacement("1.25")
         compose.onNodeWithTag("quick_submit").performClick()
         compose.runOnIdle {
             assertEquals("inbound", draft?.movementType)
             assertEquals(item.id, draft?.componentId)
             assertEquals("A", draft?.locationId)
             assertEquals(3, draft?.quantity)
+            assertEquals("1.25", draft?.purchaseAmount)
+            assertEquals(1, submits)
             assertEquals(0, dismissals)
         }
         compose.onNodeWithTag("quick_submit").assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.action_cancel)).assertIsNotEnabled()
         compose.runOnIdle { completion?.invoke(OperationResult(false, "temporary failure")) }
         compose.onNodeWithText("temporary failure").assertIsDisplayed()
+        compose.onNodeWithText("购买总金额（CNY）").performScrollTo().assertTextContains("1.25")
         assertEquals("3", compose.onNodeWithTag("quick_quantity")
             .fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.onNodeWithTag("quick_submit").performClick()
         compose.runOnIdle { completion?.invoke(OperationResult(true, "saved")) }
         compose.runOnIdle { assertEquals(1, dismissals) }
+    }
+
+    @Test
+    fun quickStockRejectsInvalidAmountWithoutSubmittingOrLosingInput() {
+        var submissions = 0
+        setInventoryContent {
+            MaterialTheme {
+                QuickStockActionDialog(item, inbound = true,
+                    allocations = listOf(ComponentAllocationRecord(item.id,"A","Shelf A",2)),
+                    locations = listOf(StorageLocationRecord("A","Shelf A","")),
+                    onDismiss = {}, onSubmit = { _, _ -> submissions++ })
+            }
+        }
+        compose.onNodeWithTag("quick_quantity").performTextReplacement("4")
+        compose.onNodeWithText("购买总金额（CNY）").performScrollTo().performTextReplacement("-1")
+        compose.onNodeWithTag("quick_submit").performClick()
+        compose.onNodeWithText("金额必须使用十进制数字。").assertIsDisplayed()
+        compose.onNodeWithTag("quick_submit").assertIsEnabled()
+        compose.onNodeWithText("购买总金额（CNY）").performScrollTo().assertTextContains("-1")
+        compose.runOnIdle { assertEquals(0,submissions) }
     }
 
     @Test
@@ -413,6 +440,7 @@ class InventoryInteractionUiTest {
                     layoutMode = compactMode, onDismiss = {}, onSave = { draft, _ -> saved = draft })
             }
         }
+        compose.onNodeWithTag("component_editor_fields").performScrollToNode(androidx.compose.ui.test.hasTestTag("component_editor_category_choices"))
         compose.onNodeWithTag("component_editor_category_choices").performClick()
         compose.onNodeWithText("Widget").performClick()
         compose.onNodeWithTag("component_editor_fields")

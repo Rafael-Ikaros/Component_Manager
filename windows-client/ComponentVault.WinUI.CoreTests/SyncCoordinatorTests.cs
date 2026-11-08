@@ -85,10 +85,10 @@ public sealed class SyncCoordinatorTests : IDisposable
     private static HttpResponseMessage SuccessFor(HttpRequestMessage request) =>
         request.RequestUri!.AbsolutePath switch
         {
-            "/auth/ping" => Json("{\"status\":\"ok\",\"server_time\":\"2026-09-16T00:00:00Z\",\"inventory_protocol\":1}"),
+            "/auth/ping" => Json("{\"status\":\"ok\",\"server_time\":\"2026-09-16T00:00:00Z\",\"inventory_protocol\":1,\"cost_protocol\":1}"),
             "/auth/me" => Json("{\"server_id\":\"server-1\",\"account_id\":\"account-1\",\"name\":\"Admin\",\"role\":\"admin\"}"),
             "/sync/push" => Json("{\"accepted_components\":0,\"accepted_stock_movements\":0,\"server_time\":\"2026-09-16T00:00:00Z\"}"),
-            "/sync/pull" => Json("{\"inventory_protocol\":1,\"server_time\":\"2026-09-16T00:00:00Z\",\"sync_cursor\":8,\"components\":[],\"stock_movements\":[],\"storage_locations\":[]}"),
+            "/sync/pull" => Json("{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"2026-09-16T00:00:00Z\",\"sync_cursor\":8,\"components\":[],\"stock_movements\":[],\"storage_locations\":[]}"),
             _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}"),
         };
 

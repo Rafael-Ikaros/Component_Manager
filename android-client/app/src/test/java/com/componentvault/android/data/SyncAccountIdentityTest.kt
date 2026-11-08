@@ -41,7 +41,7 @@ class SyncAccountIdentityTest {
                             .takeWhile { it.isNotEmpty() }.toList()
                         requests.add(lines.first())
                         val body = if (index == 0)
-                            "{\"inventory_protocol\":1,\"server_time\":\"now\"}"
+                            "{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"now\"}"
                         else
                             "{\"server_id\":\"server-1\",\"account_id\":\"account-2\",\"name\":\"Other\",\"role\":\"user\"}"
                         val bytes = body.toByteArray()

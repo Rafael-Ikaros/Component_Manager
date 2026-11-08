@@ -274,7 +274,7 @@ public sealed class SyncApiClientTests
         var handler = new RecordingHandler(async (request, _) =>
         {
             if (request.RequestUri!.AbsolutePath == "/auth/ping" && capability)
-                return Json(HttpStatusCode.OK, "{\"status\":\"ok\",\"server_time\":\"2026-10-22T00:00:00Z\",\"inventory_protocol\":1,\"bom_preset_protocol\":1}");
+                return Json(HttpStatusCode.OK, "{\"status\":\"ok\",\"server_time\":\"2026-10-22T00:00:00Z\",\"inventory_protocol\":1,\"cost_protocol\":1,\"bom_preset_protocol\":1}");
             if (request.RequestUri.AbsolutePath == "/sync/bom-presets")
             {
                 Assert.Equal("account-1", Assert.Single(request.Headers.GetValues("X-Component-Vault-Account-Id")));
@@ -293,6 +293,46 @@ public sealed class SyncApiClientTests
         else await Assert.ThrowsAsync<InvalidOperationException>(() => client.RunPresetSyncAsync(Settings(), result, presets));
         Assert.Equal(capability ? 5 : 4, handler.Requests.Count);
     }
+    [Theory]
+    [InlineData("")]
+    [InlineData(",\"cost_protocol\":2")]
+    public async Task CostCapability_MissingOrUnsupported_StopsBeforeIdentityAndWrites(string costField)
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(Json(HttpStatusCode.OK,
+            "{\"status\":\"ok\",\"server_time\":\"2026-09-16T00:00:00Z\",\"inventory_protocol\":1" + costField + "}")));
+        var client = CreateClient(handler);
+        var connection = await client.TestConnectionAsync(Settings());
+        Assert.False(connection.IsSuccess);
+        Assert.Contains("cost_protocol=1", connection.Message);
+        Assert.Equal(["POST https://primary.example/auth/ping"], handler.Requests);
+        handler.Requests.Clear();
+        var sync = await client.RunSyncAsync(Settings(), EmptyPush(), null);
+        Assert.False(sync.IsSuccess);
+        Assert.Contains("cost_protocol=1", sync.Message);
+        Assert.Equal(["POST https://primary.example/auth/ping"], handler.Requests);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(",\"cost_protocol\":2")]
+    public async Task RunSync_PullMissingOrUnsupportedCostProtocol_RejectsPulledData(string costField)
+    {
+        var handler = new RecordingHandler((request, _) => Task.FromResult(
+            request.RequestUri!.AbsolutePath == "/sync/pull"
+                ? Json(HttpStatusCode.OK,"{\"inventory_protocol\":1,\"server_time\":\"2026-09-16T00:00:00Z\",\"components\":[],\"stock_movements\":[]" + costField + "}")
+                : SuccessFor(request)));
+        var result = await CreateClient(handler).RunSyncAsync(Settings(),EmptyPush(),null);
+        Assert.False(result.IsSuccess);
+        Assert.Contains("cost_protocol=1",result.Message);
+        Assert.Null(result.PullResponse);
+        Assert.Equal([
+            "POST https://primary.example/auth/ping",
+            "GET https://primary.example/auth/me",
+            "POST https://primary.example/sync/push",
+            "GET https://primary.example/sync/pull",
+        ],handler.Requests);
+    }
+
     private static SyncApiClient CreateClient(HttpMessageHandler handler) =>
         new(new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) });
 
@@ -313,10 +353,10 @@ public sealed class SyncApiClientTests
     private static HttpResponseMessage SuccessFor(HttpRequestMessage request) =>
         request.RequestUri!.AbsolutePath switch
         {
-            "/auth/ping" => Json(HttpStatusCode.OK, "{\"status\":\"ok\",\"server_time\":\"2026-09-16T00:00:00Z\",\"inventory_protocol\":1}"),
+            "/auth/ping" => Json(HttpStatusCode.OK, "{\"status\":\"ok\",\"server_time\":\"2026-09-16T00:00:00Z\",\"inventory_protocol\":1,\"cost_protocol\":1}"),
             "/auth/me" => Json(HttpStatusCode.OK, "{\"server_id\":\"server-1\",\"account_id\":\"account-1\",\"name\":\"Admin\",\"role\":\"admin\"}"),
             "/sync/push" => Json(HttpStatusCode.OK, "{\"accepted_components\":0,\"accepted_stock_movements\":0,\"server_time\":\"2026-09-16T00:00:00Z\"}"),
-            "/sync/pull" => Json(HttpStatusCode.OK, "{\"inventory_protocol\":1,\"server_time\":\"2026-09-16T00:00:00Z\",\"sync_cursor\":8,\"components\":[],\"stock_movements\":[],\"storage_locations\":[]}"),
+            "/sync/pull" => Json(HttpStatusCode.OK, "{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"2026-09-16T00:00:00Z\",\"sync_cursor\":8,\"components\":[],\"stock_movements\":[],\"storage_locations\":[]}"),
             _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}"),
         };
 

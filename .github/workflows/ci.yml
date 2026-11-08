@@ -203,6 +203,7 @@ jobs:
           --tests 'com.componentvault.android.data.BatchJlcModelsTest'
           --tests 'com.componentvault.android.data.ScannedBarcodeSelectorTest'
           --tests 'com.componentvault.android.data.StockAllocationMathTest'
+          --tests 'com.componentvault.android.data.InventoryCostTest'
           --tests 'com.componentvault.android.data.BatchTransferTest'
           --tests 'com.componentvault.android.ui.screen.InventorySearchTest'
           --tests 'com.componentvault.android.data.StorageLocationPersistenceTest'

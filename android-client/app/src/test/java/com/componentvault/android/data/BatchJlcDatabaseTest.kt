@@ -140,11 +140,21 @@ class BatchJlcDatabaseTest {
     fun versionFourUpgradeCreatesReceiptsAndPreservesStock() = runBlocking {
         val backupDirectory = java.io.File(context.noBackupFilesDir, "database-preupgrade")
         backupDirectory.listFiles()?.forEach { it.delete() }
-        val sourceHelper = InventoryDatabaseHelper(context)
-        val source = sourceHelper.writableDatabase
+        context.deleteDatabase("component-vault.db")
+        val source = SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath("component-vault.db"), null)
+        // Actual v4 columns: neither cost fields nor v5 batch receipts exist.
+        source.execSQL("CREATE TABLE components (id TEXT PRIMARY KEY,sku TEXT NOT NULL,name TEXT NOT NULL,category TEXT NOT NULL,package_name TEXT NOT NULL,location TEXT NOT NULL,description TEXT,quantity INTEGER NOT NULL CHECK(quantity>=0),min_stock INTEGER NOT NULL CHECK(min_stock>=0),updated_at TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,base_updated_at TEXT)")
+        source.execSQL("CREATE UNIQUE INDEX idx_components_sku_active ON components(sku) WHERE deleted=0")
+        source.execSQL("CREATE TABLE stock_movements(id TEXT PRIMARY KEY,component_id TEXT NOT NULL,movement_type TEXT NOT NULL,quantity INTEGER NOT NULL,reason TEXT NOT NULL,note TEXT,happened_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,location_id TEXT,destination_location_id TEXT)")
+        source.execSQL("CREATE TABLE storage_locations(id TEXT PRIMARY KEY,name TEXT NOT NULL,updated_at TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0)")
+        source.execSQL("CREATE TABLE component_allocations(component_id TEXT NOT NULL,location_id TEXT NOT NULL,quantity INTEGER NOT NULL,PRIMARY KEY(component_id,location_id))")
+        source.execSQL("CREATE TABLE sync_queue(entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,entity_updated_at TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(entity_type,entity_id))")
+        source.execSQL("INSERT INTO components VALUES('legacy','C70565','Existing part','IC','SOT-23','A','Keep existing data',10,1,'2026-01-01T00:00:00Z',0,NULL)")
+        source.execSQL("INSERT INTO storage_locations VALUES('A','A','2026-01-01T00:00:00Z',0)")
+        source.execSQL("INSERT INTO component_allocations VALUES('legacy','A',10)")
+        source.execSQL("INSERT INTO stock_movements VALUES('old-movement','legacy','inbound',10,'initial',NULL,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0,'A',NULL)")
         source.rawQuery("PRAGMA journal_mode=WAL", null).use { assertTrue(it.moveToFirst()) }
         source.rawQuery("PRAGMA wal_autocheckpoint=0", null).use { assertTrue(it.moveToFirst()) }
-        source.execSQL("DROP TABLE batch_jlc_receipts")
         source.version = 4
         source.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { assertTrue(it.moveToFirst()) }
         source.execSQL("UPDATE components SET description='WAL pre-upgrade marker' WHERE sku='C70565'")
@@ -155,11 +165,13 @@ class BatchJlcDatabaseTest {
             val upgraded = InventoryRepository(context)
             assertTrue(upgraded.loadBatchJlcReceipts("new-session").isEmpty())
         } finally {
-            sourceHelper.close()
+            source.close()
         }
         assertEquals(10, number("SELECT quantity FROM components WHERE sku='C70565'"))
         assertEquals(10, number("SELECT SUM(quantity) FROM component_allocations"))
         assertEquals(6, number("PRAGMA user_version"))
+        assertEquals(1, number("SELECT COUNT(*) FROM components WHERE sku='C70565' AND inventory_unit_cost IS NULL"))
+        assertEquals(1, number("SELECT COUNT(*) FROM stock_movements WHERE id='old-movement' AND quantity=10 AND purchase_amount IS NULL AND cost_amount IS NULL"))
 
         val backup = requireNotNull(backupDirectory.listFiles()?.singleOrNull { it.name.endsWith(".db") })
         SQLiteDatabase.openDatabase(backup.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->

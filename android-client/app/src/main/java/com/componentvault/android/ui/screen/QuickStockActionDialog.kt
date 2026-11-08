@@ -71,40 +71,42 @@ internal fun QuickStockActionDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         title = { Text("$title · ${item.sku}", maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
-            Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                Text(item.name, style = MaterialTheme.typography.bodyMedium)
-                Box {
-                    OutlinedButton(onClick = { expanded = true }, enabled = !busy && options.isNotEmpty(),
-                        modifier = Modifier.fillMaxWidth().testTag("quick_location")) {
-                        Text(options.firstOrNull { it.id == locationId }?.name
-                            ?: stringResource(R.string.inventory_quick_choose_location))
-                    }
-                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                        options.forEach { location ->
-                            DropdownMenuItem(text = { Text(location.name) }, onClick = {
-                                locationId = location.id; error = ""; expanded = false
-                            })
+            Column {
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    Text(item.name, style = MaterialTheme.typography.bodyMedium)
+                    Box {
+                        OutlinedButton(onClick = { expanded = true }, enabled = !busy && options.isNotEmpty(),
+                            modifier = Modifier.fillMaxWidth().testTag("quick_location")) {
+                            Text(options.firstOrNull { it.id == locationId }?.name
+                                ?: stringResource(R.string.inventory_quick_choose_location))
+                        }
+                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            options.forEach { location ->
+                                DropdownMenuItem(text = { Text(location.name) }, onClick = {
+                                    locationId = location.id; error = ""; expanded = false
+                                })
+                            }
                         }
                     }
+                    if (!inbound) Text(stringResource(R.string.inventory_quick_available, available),
+                        style = MaterialTheme.typography.bodySmall)
+                    QuantityInputField(
+                        value = quantityText,
+                        onValueChange = { value -> if (value.all(Char::isDigit)) { quantityText = value; error = "" } },
+                        label = stringResource(R.string.inventory_quick_quantity),
+                        minimum = 1,
+                        maximum = if (inbound) Int.MAX_VALUE else available.coerceAtLeast(0),
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        fieldTestTag = "quick_quantity",
+                    )
+                    if (inbound) PurchaseCostFields(purchaseText, purchaseIsUnit, quantity, { purchaseText = it }, { purchaseIsUnit = it })
+                    if (options.isEmpty()) Text(stringResource(R.string.inventory_quick_no_location),
+                        color = MaterialTheme.colorScheme.error)
+                    if (!inbound && quantity != null && quantity > available) Text(
+                        stringResource(R.string.inventory_quick_exceeds_stock), color = MaterialTheme.colorScheme.error)
                 }
-                if (!inbound) Text(stringResource(R.string.inventory_quick_available, available),
-                    style = MaterialTheme.typography.bodySmall)
-                QuantityInputField(
-                    value = quantityText,
-                    onValueChange = { value -> if (value.all(Char::isDigit)) { quantityText = value; error = "" } },
-                    label = stringResource(R.string.inventory_quick_quantity),
-                    minimum = 1,
-                    maximum = if (inbound) Int.MAX_VALUE else available.coerceAtLeast(0),
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                    fieldTestTag = "quick_quantity",
-                )
-                if (inbound) PurchaseCostFields(purchaseText, purchaseIsUnit, quantity, { purchaseText = it }, { purchaseIsUnit = it })
-                if (options.isEmpty()) Text(stringResource(R.string.inventory_quick_no_location),
-                    color = MaterialTheme.colorScheme.error)
-                if (!inbound && quantity != null && quantity > available) Text(
-                    stringResource(R.string.inventory_quick_exceeds_stock), color = MaterialTheme.colorScheme.error)
-                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
@@ -113,9 +115,13 @@ internal fun QuickStockActionDialog(
         confirmButton = {
             Button(onClick = {
                 if (busy || !valid) return@Button
+                val paid = runCatching {
+                    com.componentvault.android.data.InventoryCost.decimal(purchaseText)
+                    if (inbound) purchaseTotal(purchaseText,purchaseIsUnit,requireNotNull(quantity)) else null
+                }.getOrElse { error = it.message ?: "请输入有效金额。"; return@Button }
                 busy = true
                 onSubmit(MovementEntryDraft(item.id, if (inbound) "inbound" else "outbound",
-                    requireNotNull(quantity), reason, "", locationId, purchaseAmount = if (inbound) purchaseTotal(purchaseText,purchaseIsUnit,requireNotNull(quantity)) else null)) { result ->
+                    requireNotNull(quantity), reason, "", locationId, purchaseAmount = paid)) { result ->
                     busy = false
                     if (result.isSuccess) onDismiss() else error = result.message
                 }

@@ -73,10 +73,10 @@ public sealed class SyncRecoveryTests : IDisposable
             }
             return Json(request.RequestUri.AbsolutePath switch
             {
-                "/auth/ping" => "{\"status\":\"ok\",\"server_time\":\"2026-10-22T00:00:00Z\",\"inventory_protocol\":1,\"bom_preset_protocol\":1,\"photo_protocol\":1}",
+                "/auth/ping" => "{\"status\":\"ok\",\"server_time\":\"2026-10-22T00:00:00Z\",\"inventory_protocol\":1,\"cost_protocol\":1,\"bom_preset_protocol\":1,\"photo_protocol\":1}",
                 "/auth/me" => "{\"server_id\":\"server\",\"account_id\":\"account\",\"name\":\"Admin\",\"role\":\"admin\"}",
                 "/sync/push" => "{\"accepted_components\":1,\"accepted_stock_movements\":0,\"server_time\":\"2026-10-22T00:00:00Z\"}",
-                "/sync/pull" => "{\"inventory_protocol\":1,\"server_time\":\"2026-10-22T00:00:00Z\",\"sync_cursor\":8,\"components\":[],\"stock_movements\":[],\"storage_locations\":[]}",
+                "/sync/pull" => "{\"inventory_protocol\":1,\"cost_protocol\":1,\"server_time\":\"2026-10-22T00:00:00Z\",\"sync_cursor\":8,\"components\":[],\"stock_movements\":[],\"storage_locations\":[]}",
                 "/sync/bom-presets" => "{\"bom_preset_protocol\":1,\"presets\":[]}",
                 "/sync/photos" => "{\"photo_protocol\":1,\"photos\":[]}",
                 _ => throw new InvalidOperationException("Unexpected request")
