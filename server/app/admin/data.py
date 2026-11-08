@@ -92,7 +92,7 @@ def load_admin_component(
     row = connection.execute(
             """
             SELECT id, sku, name, category, package_name, location, description,
-                   quantity, min_stock, updated_at, inventory_managed,
+                   quantity, min_stock, updated_at, inventory_managed, inventory_unit_cost,
                    quantity <= min_stock AS low_stock
             FROM components
             WHERE id = ? AND deleted = 0

@@ -28,13 +28,13 @@ public sealed class InventoryWorkbookBackup
         SimpleXlsx.Write(path, new Dictionary<string, IReadOnlyList<object?[]>>
         {
             ["meta"] = [
-                ["format", "component-vault"], ["schemaVersion", "1"],
+                ["format", "component-vault"], ["schemaVersion", "2"],
                 ["exportedAt", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture)]
             ],
-            ["components"] = WithHeader(["id","sku","name","category","package_name","location","description","quantity","min_stock","updated_at","deleted","base_updated_at","image_preview"], sheets.Components),
+            ["components"] = WithHeader(["id","sku","name","category","package_name","location","description","quantity","min_stock","updated_at","deleted","base_updated_at","image_preview","inventory_unit_cost"], sheets.Components),
             ["storage_locations"] = WithHeader(["id","name","updated_at","deleted"], sheets.Locations),
             ["allocations"] = WithHeader(["component_id","location_id","quantity"], sheets.Allocations),
-            ["stock_movements"] = WithHeader(["id","component_id","movement_type","quantity","reason","note","happened_at","updated_at","deleted","location_id","destination_location_id"], sheets.Movements),
+            ["stock_movements"] = WithHeader(["id","component_id","movement_type","quantity","reason","note","happened_at","updated_at","deleted","location_id","destination_location_id","purchase_amount","cost_amount"], sheets.Movements),
         }, images);
     }
 
@@ -101,6 +101,7 @@ public sealed class InventoryWorkbookBackup
             for (var i=0;i<names.Length;i++) command.Parameters.AddWithValue(names[i], component[i] ?? string.Empty);
             command.Parameters.AddWithValue("$description", component[6] ?? DBNull.Value); command.Parameters.AddWithValue("$quantity", Int(component[7])); command.Parameters.AddWithValue("$min_stock", Int(component[8]));
             command.Parameters.AddWithValue("$updated_at", component[9]!); command.Parameters.AddWithValue("$deleted", Bool(component[10]) ? 1 : 0); command.Parameters.AddWithValue("$base", component[11] ?? DBNull.Value); command.ExecuteNonQuery();
+            using (var cost = connection.CreateCommand()) { cost.CommandText="UPDATE components SET inventory_unit_cost=$cost WHERE id=$id"; cost.Parameters.AddWithValue("$cost",component.ElementAtOrDefault(13) ?? DBNull.Value);cost.Parameters.AddWithValue("$id",id);cost.ExecuteNonQuery(); }
             existingIds.Add(id); existingSkus.Add(sku); importedIds.Add(id); imported++;
             Queue(connection,"component",id,Text(component[9]));
         }
@@ -144,10 +145,10 @@ public sealed class InventoryWorkbookBackup
     {
         using var c = new SqliteConnection($"Data Source={_store.DatabasePath}"); c.Open(); using var transaction=c.BeginTransaction();
         var result = new BackupRows(
-            BooleanColumn(Query(c,"SELECT id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,NULL FROM components"),10),
+            BooleanColumn(Query(c,"SELECT id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,NULL,inventory_unit_cost FROM components"),10),
             BooleanColumn(Query(c,"SELECT id,name,updated_at,deleted FROM storage_locations"),3),
             Query(c,"SELECT component_id,location_id,quantity FROM component_allocations"),
-            BooleanColumn(Query(c,"SELECT id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id FROM stock_movements"),8)
+            BooleanColumn(Query(c,"SELECT id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id,purchase_amount,cost_amount FROM stock_movements"),8)
         ); transaction.Commit(); return result;
     }
 
@@ -155,12 +156,18 @@ public sealed class InventoryWorkbookBackup
     {
         if (wb.TryGetValue("meta", out var meta) && meta.Any(row => Text(row.ElementAtOrDefault(0))=="format" && Text(row.ElementAtOrDefault(1))=="component-vault"))
         {
-            if (!meta.Any(row => Text(row.ElementAtOrDefault(0))=="schemaVersion" && Text(row.ElementAtOrDefault(1))=="1")) throw new InvalidDataException("不支持的 component-vault schemaVersion。");
-            RequireHeader(wb,"components",["id","sku","name","category","package_name","location","description","quantity","min_stock","updated_at","deleted","base_updated_at","image_preview"]);
+            if (!meta.Any(row => Text(row.ElementAtOrDefault(0))=="schemaVersion" && Text(row.ElementAtOrDefault(1)) is "1" or "2")) throw new InvalidDataException("不支持的 component-vault schemaVersion。");
+            var version2 = meta.Any(row => Text(row.ElementAtOrDefault(0))=="schemaVersion" && Text(row.ElementAtOrDefault(1))=="2");
+            RequireHeader(wb,"components",["id","sku","name","category","package_name","location","description","quantity","min_stock","updated_at","deleted","base_updated_at","image_preview","inventory_unit_cost"]);
             RequireHeader(wb,"storage_locations",["id","name","updated_at","deleted"]);
             RequireHeader(wb,"allocations",["component_id","location_id","quantity"]);
-            RequireHeader(wb,"stock_movements",["id","component_id","movement_type","quantity","reason","note","happened_at","updated_at","deleted","location_id","destination_location_id"]);
-            return new("component-vault", Rows(wb,"components"), Rows(wb,"storage_locations"), Rows(wb,"allocations"), Rows(wb,"stock_movements"), false);
+            RequireHeader(wb,"stock_movements",["id","component_id","movement_type","quantity","reason","note","happened_at","updated_at","deleted","location_id","destination_location_id","purchase_amount","cost_amount"]);
+            if(version2 && (wb["components"][0].Length!=14 || wb["stock_movements"][0].Length!=13))throw new InvalidDataException("schema2 缺少成本列。");
+            if(!version2 && (wb["components"][0].Length!=13 || wb["stock_movements"][0].Length!=11))throw new InvalidDataException("schema1 不应含成本列。");
+            var components=Rows(wb,"components");var movements=Rows(wb,"stock_movements");
+            foreach(var row in components) NormalizeCostCell(row,13);
+            foreach(var row in movements) { NormalizeCostCell(row,11);NormalizeCostCell(row,12); }
+            return new("component-vault", components, Rows(wb,"storage_locations"), Rows(wb,"allocations"), movements, false);
         }
         if (meta?.Any(row => Text(row.ElementAtOrDefault(0))=="schemaVersion" && Text(row.ElementAtOrDefault(1))=="1") == true
             && wb.ContainsKey("inventory_items")) return ConvertLegacy(wb);
@@ -190,10 +197,23 @@ public sealed class InventoryWorkbookBackup
         foreach(var r in d.Movements) { if(!componentIds.Contains(Text(r[1]))) issues.Add("流水存在孤立组件外键。"); if(Text(r[9]).Length>0&&!locationIds.Contains(Text(r[9]))||Text(r[10]).Length>0&&!locationIds.Contains(Text(r[10])))issues.Add("流水存在孤立库位外键。"); Timestamp(r[6],"流水 happened_at",issues);Timestamp(r[7],"流水 updated_at",issues);try { var q=Int(r[3]); if(Text(r[2])=="transfer" && (q<=0 || Text(r[9])==Text(r[10]))) issues.Add("调拨流水的数量或库位无效。"); } catch { issues.Add("流水数量必须是无小数的 32 位整数。"); } }
         foreach(var g in d.Allocations.GroupBy(r=>Text(r[0]))) { var c=d.Components.FirstOrDefault(r=>Text(r[0])==g.Key); if(c!=null && g.Sum(r=>(long)Int(r[2]))!=Int(c[7])) issues.Add($"组件 {g.Key} 分配合计不等于总库存。"); }
         if(d.Components.Any(r=>!d.Allocations.Any(a=>Text(a[0])==Text(r[0])))) issues.Add("每个组件至少需要一条库位分配（零库存也需要）。");
+        foreach(var row in d.Components) { ValidateMoney(row.ElementAtOrDefault(13),false,16,issues);if(Int(row[7])==0 && row.ElementAtOrDefault(13) is not null)issues.Add("零库存均价必须为空。"); }
+        foreach(var row in d.Movements) { ValidateMoney(row.ElementAtOrDefault(11),false,8,issues);ValidateMoney(row.ElementAtOrDefault(12),true,16,issues);if(Text(row[2])!="inbound" && row.ElementAtOrDefault(11) is not null)issues.Add("非采购入库流水不能包含采购金额。"); }
         return issues.Distinct().ToList();
     }
 
-    private static void InsertMovement(SqliteConnection c, object?[] r) { using var q=c.CreateCommand(); q.CommandText="INSERT OR IGNORE INTO stock_movements(id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id) VALUES($a,$b,$c,$d,$e,$f,$g,$h,$i,$j,$k)"; for(int i=0;i<11;i++) q.Parameters.AddWithValue("$"+(char)('a'+i), r[i]??DBNull.Value); q.ExecuteNonQuery(); }
+    private static void NormalizeCostCell(object?[] row,int index)
+    {
+        if(index<row.Length && string.IsNullOrWhiteSpace(Text(row[index])))row[index]=null;
+    }
+    private static void ValidateMoney(object? value,bool signed,int precision,List<string> issues)
+    {
+        if(value is null || string.IsNullOrWhiteSpace(Text(value)))return;
+        if(value is not string) { issues.Add("成本必须以文本单元格保存。");return; }
+        var text=Text(value);
+        if(!System.Text.RegularExpressions.Regex.IsMatch(text,(signed?"^-?":"^")+@"\d+(?:\.\d{1,"+precision+"})?$"))issues.Add("成本必须为有效十进制金额文本。");
+    }
+    private static void InsertMovement(SqliteConnection c, object?[] r) { using var q=c.CreateCommand(); q.CommandText="INSERT OR IGNORE INTO stock_movements(id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id) VALUES($a,$b,$c,$d,$e,$f,$g,$h,$i,$j,$k)"; for(int i=0;i<11;i++) q.Parameters.AddWithValue("$"+(char)('a'+i), r[i]??DBNull.Value); if(q.ExecuteNonQuery()==0)return; using var cost=c.CreateCommand();cost.CommandText="UPDATE stock_movements SET purchase_amount=$purchase,cost_amount=$cost WHERE id=$id";cost.Parameters.AddWithValue("$id",r[0]!);cost.Parameters.AddWithValue("$purchase",r.ElementAtOrDefault(11)??DBNull.Value);cost.Parameters.AddWithValue("$cost",r.ElementAtOrDefault(12)??DBNull.Value);cost.ExecuteNonQuery(); }
     private static void InsertInitialMovement(SqliteConnection c, object?[] component) { var r=new object?[]{"mov-import-"+Guid.NewGuid().ToString("N"),component[0],"inbound",component[7],"LCSC schema1 initial inventory","源文件无历史流水，仅记录迁入时初始库存",component[9],component[9],false,component[5],null}; InsertMovement(c,r); Queue(c,"stock_movement",Text(r[0]),Text(r[7])); }
     private static void Queue(SqliteConnection c,string type,string id,string at){using var q=c.CreateCommand();q.CommandText="INSERT INTO sync_queue(entity_type,entity_id,entity_updated_at,created_at) VALUES($t,$id,$at,$now) ON CONFLICT(entity_type,entity_id) DO UPDATE SET entity_updated_at=excluded.entity_updated_at,created_at=excluded.created_at";q.Parameters.AddWithValue("$t",type);q.Parameters.AddWithValue("$id",id);q.Parameters.AddWithValue("$at",at);q.Parameters.AddWithValue("$now",DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'",CultureInfo.InvariantCulture));q.ExecuteNonQuery();}
     private static HashSet<string> ScalarSet(SqliteConnection c,string sql) { using var q=c.CreateCommand();q.CommandText=sql;using var r=q.ExecuteReader();var s=new HashSet<string>(StringComparer.OrdinalIgnoreCase);while(r.Read())s.Add(r.GetString(0));return s; }
@@ -202,7 +222,7 @@ public sealed class InventoryWorkbookBackup
     private static IReadOnlyList<object?[]> WithHeader(object?[] h,List<object?[]> rows)=>new[]{h}.Concat(rows).ToArray();
     private static List<object?[]> Rows(Dictionary<string,List<object?[]>> wb,string name)=>wb.TryGetValue(name,out var rows)&&rows.Count>0?rows.Skip(1).ToList():[];
     private static Dictionary<string,object?>[] Table(Dictionary<string,List<object?[]>> wb,string name){if(!wb.TryGetValue(name,out var rows)||rows.Count==0)return[];var h=rows[0].Select(Text).ToArray();return rows.Skip(1).Select(r=>h.Select((x,i)=>(x,r.ElementAtOrDefault(i))).ToDictionary(x=>x.x,x=>x.Item2)).ToArray();}
-    private static void RequireHeader(Dictionary<string,List<object?[]>> wb,string name,string[] expected){if(!wb.TryGetValue(name,out var rows)||rows.Count==0||!rows[0].Select(Text).SequenceEqual(expected,StringComparer.Ordinal))throw new InvalidDataException($"工作表 {name} 的表头或顺序不符合 schemaVersion=1。");}
+    private static void RequireHeader(Dictionary<string,List<object?[]>> wb,string name,string[] expected){if(!wb.TryGetValue(name,out var rows)||rows.Count==0||!rows[0].Select(Text).SequenceEqual(expected,StringComparer.Ordinal) && !(name is "components" or "stock_movements" && rows[0].Select(Text).SequenceEqual(expected.Take(name=="components"?13:11),StringComparer.Ordinal)))throw new InvalidDataException($"工作表 {name} 的表头或顺序不符合 schemaVersion=1。");}
     private static void Duplicate(List<object?[]> rows,int col,string label,List<string> issues)=>Duplicate(rows,r=>Text(r[col]),label,issues);
     private static void Duplicate(List<object?[]> rows,Func<object?[],string> key,string label,List<string> issues){if(rows.GroupBy(key,StringComparer.OrdinalIgnoreCase).Any(g=>string.IsNullOrWhiteSpace(g.Key)||g.Count()>1))issues.Add($"{label} 为空或重复。");}
     private static void TryNonNegative(object? v,string label,List<string> issues){try{if(Int(v)<0)issues.Add(label+"不能为负数。");}catch{issues.Add(label+"必须是无小数的 32 位整数。");}}

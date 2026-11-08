@@ -865,6 +865,8 @@ internal fun InventoryDetailPane(
         }
         item {
             SectionPane(title = strings.inventory.detailStockTitle) {
+                ValueBlock(label = "库存均价（CNY）", value = component.inventoryUnitCost ?: "成本未知")
+                ValueBlock(label = "库存价值（CNY）", value = com.componentvault.android.data.InventoryCost.amount(component.inventoryUnitCost, component.quantity)?.let { java.math.BigDecimal(it).setScale(2, java.math.RoundingMode.HALF_EVEN).toPlainString() } ?: "成本未知")
                 val usage = StockUsageSummary(component.quantity, detail.issuedQuantity)
                 ValueBlock(
                     label = androidx.compose.ui.res.stringResource(

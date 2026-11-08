@@ -64,6 +64,10 @@ Android 和 Windows 将数据保存在本机 SQLite，**不用部署服务器，
 导入、预览、保存和同步预设均不会扣库存；只有明确确认出库才提交。
 操作步骤与替代候选条件见[项目用料指南](docs/bom-and-migration.md)。
 
+实际购买价格与商城参考价分别记录。入库可填写单价或商品总金额，项目用料按当前库存加权平均价
+估算单套与整批材料成本；历史无价库存明确显示未知，不当作零成本。首版使用人民币商品金额，
+不含运费、PCB 和加工费，详见[购买价格与材料成本](docs/inventory-cost.md)。
+
 ### 离线使用，按需连接自己的服务端
 
 每台原生客户端先保存本地修改，再按需同步。服务端为不同账户使用独立数据库，
@@ -103,6 +107,7 @@ API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管
 | --- | --- |
 | 连续扫码、订单导入 | [批量入库](docs/batch-jlc-inbound.md) |
 | BOM、预设与配料 | [项目用料](docs/bom-and-migration.md) |
+| 采购金额、库存均价与 PCBA 材料成本 | [购买价格与材料成本](docs/inventory-cost.md) |
 | 库位、转移、Excel 备份和标签 Excel | [库存与备份](docs/storage-and-backup.md) |
 | 模板编辑、M1 打印与兼容范围 | [标签打印](docs/m1-printing-feature-matrix.md) |
 | 照片、账户和服务端接入 | [完整文档导航](docs/README.md) |

@@ -45,6 +45,7 @@ data class MovementBatchQueueItemUiState(
     val scanCount: Int = 1,
     val movementType: String = MovementQuickAction.Inbound.movementType,
     val quantityText: String = "1",
+    val purchaseAmount: String = "",
     val reason: String = "",
     val note: String = "",
     val errorMessage: String? = null,

@@ -297,12 +297,7 @@
 												LostFocus="OnDraftFieldLostFocus"
 												Style="{StaticResource ReviewTextBoxStyle}"
 												Text="{x:Bind Category, Mode=TwoWay}" />
-											<TextBox
-												Grid.Column="5"
-												AutomationProperties.Name="封装"
-												LostFocus="OnDraftFieldLostFocus"
-												Style="{StaticResource ReviewTextBoxStyle}"
-												Text="{x:Bind PackageName, Mode=TwoWay}" />
+											<StackPanel Grid.Column="5" Spacing="4"><TextBox AutomationProperties.Name="封装" LostFocus="OnDraftFieldLostFocus" Style="{StaticResource ReviewTextBoxStyle}" Text="{x:Bind PackageName, Mode=TwoWay}" /><TextBox Header="采购总额 ¥" PlaceholderText="留空未知；0赠品" LostFocus="OnDraftFieldLostFocus" Text="{x:Bind PurchaseAmount, Mode=TwoWay}" /><TextBlock Text="{x:Bind CostPreview, Mode=OneWay}" /></StackPanel>
 										</Grid>
 									</Grid>
 								</DataTemplate>
@@ -492,12 +487,7 @@
 												LostFocus="OnDraftFieldLostFocus"
 												Style="{StaticResource ReviewTextBoxStyle}"
 												Text="{x:Bind Name, Mode=TwoWay}" />
-											<TextBox
-												Grid.Column="3"
-												AutomationProperties.Name="封装"
-												LostFocus="OnDraftFieldLostFocus"
-												Style="{StaticResource ReviewTextBoxStyle}"
-												Text="{x:Bind PackageName, Mode=TwoWay}" />
+											<StackPanel Grid.Column="3" Spacing="4"><TextBox AutomationProperties.Name="封装" LostFocus="OnDraftFieldLostFocus" Style="{StaticResource ReviewTextBoxStyle}" Text="{x:Bind PackageName, Mode=TwoWay}" /><TextBox Header="采购总额 ¥" PlaceholderText="留空未知；0赠品" LostFocus="OnDraftFieldLostFocus" Text="{x:Bind PurchaseAmount, Mode=TwoWay}" /><TextBlock Text="{x:Bind CostPreview, Mode=OneWay}" /></StackPanel>
 										</Grid>
 									</Grid>
 								</DataTemplate>

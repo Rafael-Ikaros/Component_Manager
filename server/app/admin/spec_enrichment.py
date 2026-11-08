@@ -305,7 +305,7 @@ def _enrich_one(
                 or current["sku"] != sku):
             return "failed", "Component changed during catalog lookup; retry after review."
         managed = bool(current["inventory_managed"])
-        payload = ComponentPayload(
+        payload = ComponentPayload(inventory_unit_cost=current["inventory_unit_cost"],
             id=str(current["id"]), sku=sku, name=str(current["name"]),
             category=str(current["category"]), package_name=str(current["package_name"]),
             location=str(current["location"]), description=description,
@@ -317,7 +317,7 @@ def _enrich_one(
         save_sync_payload_in_transaction(
             connection,
             PushRequest(
-                device_id="admin-web", inventory_protocol=1 if managed else 0,
+                device_id="admin-web", cost_protocol=1, inventory_protocol=1 if managed else 0,
                 components=[payload],
             ),
             mqtt_topic_prefix=settings.mqtt_topic_prefix if settings.mqtt_enabled else None,

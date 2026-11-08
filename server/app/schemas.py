@@ -12,12 +12,14 @@ from pydantic import (
     model_validator,
 )
 
+from .costs import decimal_text
 from .build_info import BUILD_REVISION, BUILD_VERSION
 
 
 class HealthResponse(BaseModel):
     status: str
     server_time: datetime
+    cost_protocol: int = 1
     inventory_protocol: int = 1
     bom_preset_protocol: int = 1
     photo_protocol: int = 1
@@ -28,6 +30,7 @@ class HealthResponse(BaseModel):
 class SyncTokenStatus(BaseModel):
     status: str
     server_time: datetime
+    cost_protocol: int = 1
     inventory_protocol: int = 1
     bom_preset_protocol: int = 1
     photo_protocol: int = 1
@@ -62,9 +65,17 @@ class ComponentPayload(BaseModel):
     deleted: bool = False
     allocations: list[AllocationPayload] | None = None
     base_updated_at: datetime | None = None
+    inventory_unit_cost: str | None = None
+
+    @field_validator("inventory_unit_cost", mode="before")
+    @classmethod
+    def validate_cost(cls, value):
+        return decimal_text(value, 16)
 
     @model_validator(mode="after")
     def validate_allocations(self) -> ComponentPayload:
+        if self.quantity == 0 and self.inventory_unit_cost is not None:
+            raise ValueError("Empty inventory must have unknown unit cost.")
         if self.allocations is not None:
             ids = [item.location_id for item in self.allocations]
             if not ids or len(ids) != len(set(ids)):
@@ -89,8 +100,23 @@ class StockMovementPayload(BaseModel):
     location_id: str | None = None
     destination_location_id: str | None = None
 
+    purchase_amount: str | None = None
+    cost_amount: str | None = None
+
+    @field_validator("purchase_amount", mode="before")
+    @classmethod
+    def validate_purchase(cls, value):
+        return decimal_text(value, 8)
+
+    @field_validator("cost_amount", mode="before")
+    @classmethod
+    def validate_cost_amount(cls, value):
+        return decimal_text(value, 16, signed=True)
+
     @model_validator(mode="after")
     def validate_transfer(self) -> StockMovementPayload:
+        if self.purchase_amount is not None and self.movement_type != "inbound":
+            raise ValueError("Only purchase inbound movements accept purchase_amount.")
         if self.movement_type == "transfer" and (
             self.quantity <= 0 or not self.location_id
             or not self.destination_location_id
@@ -104,6 +130,7 @@ class PushRequest(BaseModel):
     device_id: str = Field(min_length=1)
     components: list[ComponentPayload] = Field(default_factory=list)
     stock_movements: list[StockMovementPayload] = Field(default_factory=list)
+    cost_protocol: Literal[0, 1] = 0
     inventory_protocol: Literal[0, 1] = 0
     storage_locations: list[StorageLocationPayload] = Field(default_factory=list)
 
@@ -119,6 +146,7 @@ class PullResponse(BaseModel):
     sync_cursor: int = Field(ge=0)
     components: list[ComponentPayload] = Field(default_factory=list)
     stock_movements: list[StockMovementPayload] = Field(default_factory=list)
+    cost_protocol: int = 1
     inventory_protocol: int = 1
     storage_locations: list[StorageLocationPayload] = Field(default_factory=list)
 
@@ -211,6 +239,7 @@ class AdminComponentAllocation(BaseModel):
 
 
 class AdminComponentDetail(AdminComponentListItem):
+    inventory_unit_cost: str | None = None
     description: str | None = None
     allocations: list[AdminComponentAllocation] = Field(default_factory=list)
     inventory_managed: bool = False
@@ -351,6 +380,19 @@ class AdminComponentBulkDeleteResult(BaseModel):
 
 
 class AdminStockMovementCreate(BaseModel):
+    @model_validator(mode="after")
+    def validate_purchase_direction(self):
+        if self.purchase_amount is not None and self.movement_type != "inbound":
+            raise ValueError("Only inbound movements accept purchase_amount.")
+        return self
+
+    purchase_amount: str | None = None
+
+    @field_validator("purchase_amount", mode="before")
+    @classmethod
+    def validate_purchase(cls, value):
+        return decimal_text(value, 8)
+
     model_config = ConfigDict(extra="forbid")
 
     request_id: str = Field(min_length=8, max_length=120)
@@ -375,6 +417,20 @@ class AdminStockMovementCreate(BaseModel):
         if value is not None and (not value.strip() or value != value.strip()):
             raise ValueError("Location code must not be blank or padded.")
         return value
+
+
+class AdminInventoryCostUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request_id: str = Field(min_length=8, max_length=120)
+    expected_updated_at: datetime
+    inventory_amount: str
+
+    @field_validator("inventory_amount", mode="before")
+    @classmethod
+    def validate_inventory_amount(cls, value):
+        if value is None:
+            raise ValueError("Inventory amount is required.")
+        return decimal_text(value, 8)
 
 
 class AdminSyncResponse(BaseModel):

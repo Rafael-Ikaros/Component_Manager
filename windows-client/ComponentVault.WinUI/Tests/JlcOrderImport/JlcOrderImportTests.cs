@@ -18,6 +18,18 @@ public sealed class JlcOrderImportTests(ITestOutputHelper output) : IDisposable
     private static readonly object?[] DetailHeaders = ["序号", "商品编号", "品牌", "厂家型号", "封装 ", "商品名称", "订购数量（修改后）", "发货数量"];
 
     [Fact]
+    public void PurchaseAmountMergesLineTotalsBeforeDerivingUnitCost()
+    {
+        var headers=StatementHeaders.Concat(new object?[]{"单价（人民币含税）","小计金额（人民币含税）"}).ToArray();
+        var first=Product(3d).Concat(new object?[]{"9","1.2"}).ToArray();
+        var second=Product(2d).Concat(new object?[]{"0.5",null}).ToArray();
+        var merged=Assert.Single(Parse(headers,first,second).Rows);
+        Assert.Equal("5",merged.QuantityText);Assert.Equal("2.2",merged.PurchaseAmount);
+        var unknown=Product(1d).Concat(new object?[]{null,null}).ToArray();
+        Assert.Null(Assert.Single(Parse(headers,first,unknown).Rows).PurchaseAmount);
+    }
+
+    [Fact]
     public void Statement_MergesPurchasedQuantityAndSkipsFeesSummariesAndRow199Note()
     {
         var rows = new object?[199][];

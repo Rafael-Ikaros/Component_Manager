@@ -125,7 +125,8 @@ class InventoryRepository(
                     package_name,
                     location,
                     COALESCE(description, '') AS description,
-                    quantity,
+                    inventory_unit_cost,
+                quantity,
                     min_stock,
                     updated_at,
                     deleted
@@ -150,7 +151,8 @@ class InventoryRepository(
                     package_name,
                     location,
                     COALESCE(description, '') AS description,
-                    quantity,
+                    inventory_unit_cost,
+                quantity,
                     min_stock,
                     updated_at,
                     deleted
@@ -180,7 +182,9 @@ class InventoryRepository(
                     m.updated_at,
                     m.deleted,
                     m.location_id,
-                    m.destination_location_id
+                    m.destination_location_id,
+                    m.purchase_amount,
+                    m.cost_amount
                 FROM stock_movements m
                 LEFT JOIN components c ON c.id = m.component_id
                 WHERE m.deleted = 0
@@ -405,8 +409,8 @@ class InventoryRepository(
     suspend fun recordMovement(draft: MovementEntryDraft): OperationResult = writeService.recordMovement(draft)
 
     internal suspend fun appendImportedStock(
-        target: ExistingImportTarget, quantity: Int, locationId: String,
-    ): OperationResult = writeService.appendImportedStock(target, quantity, locationId)
+        target: ExistingImportTarget, quantity: Int, locationId: String, purchaseAmount: String? = null,
+    ): OperationResult = writeService.appendImportedStock(target, quantity, locationId, purchaseAmount)
 
     internal suspend fun loadBatchJlcReceipts(sessionId: String): Set<String> =
         writeService.loadBatchJlcReceipts(sessionId)
@@ -560,6 +564,7 @@ class InventoryRepository(
                 active = !component.deleted,
                 category = component.category,
                 parameters = component.officialParameters(),
+                inventoryUnitCost = component.inventoryUnitCost,
             )
         }
         val matches = com.componentvault.android.data.bom.BomInventoryMatcher.match(
@@ -659,7 +664,8 @@ class InventoryRepository(
                 packageName = cursor.getString(cursor.getColumnIndexOrThrow("package_name")),
                 location = cursor.getString(cursor.getColumnIndexOrThrow("location")),
                 description = cursor.getString(cursor.getColumnIndexOrThrow("description")),
-                quantity = cursor.getInt(cursor.getColumnIndexOrThrow("quantity")),
+                inventoryUnitCost = cursor.getString(cursor.getColumnIndexOrThrow("inventory_unit_cost")),
+                    quantity = cursor.getInt(cursor.getColumnIndexOrThrow("quantity")),
                 minStock = cursor.getInt(cursor.getColumnIndexOrThrow("min_stock")),
                 updatedAt = cursor.getString(cursor.getColumnIndexOrThrow("updated_at")),
                 deleted = cursor.getInt(cursor.getColumnIndexOrThrow("deleted")) == 1,
@@ -676,6 +682,8 @@ class InventoryRepository(
                 componentId = cursor.getString(cursor.getColumnIndexOrThrow("component_id")),
                 componentSku = cursor.getString(cursor.getColumnIndexOrThrow("component_sku")),
                 componentName = cursor.getString(cursor.getColumnIndexOrThrow("component_name")),
+                purchaseAmount = cursor.getString(cursor.getColumnIndexOrThrow("purchase_amount")),
+                costAmount = cursor.getString(cursor.getColumnIndexOrThrow("cost_amount")),
                 movementType = cursor.getString(cursor.getColumnIndexOrThrow("movement_type")),
                 quantity = cursor.getInt(cursor.getColumnIndexOrThrow("quantity")),
                 reason = cursor.getString(cursor.getColumnIndexOrThrow("reason")),
@@ -704,6 +712,7 @@ class InventoryRepository(
                 package_name,
                 location,
                 COALESCE(description, '') AS description,
+                inventory_unit_cost,
                 quantity,
                 min_stock,
                 updated_at,

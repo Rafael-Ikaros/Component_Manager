@@ -9,6 +9,7 @@
 | 安装客户端、检查和下载更新 | [安装与更新](app-updates.md) |
 | 连续扫码、订单 Excel 批量入库 | [嘉立创批量入库](batch-jlc-inbound.md) |
 | 导入 BOM、匹配库存、配料和确认出库 | [项目用料](bom-and-migration.md) |
+| 记录购买价格、补录库存成本及估算 PCBA 材料成本 | [购买价格与材料成本](inventory-cost.md) |
 | 管理库位、转移、备份恢复和标签 Excel 导出 | [库存与备份](storage-and-backup.md) |
 | 在设备间同步元件照片 | [照片同步](photo-sync.md) |
 | 创建、停用、删除用户及分发密钥 | [账户管理](accounts.md) |

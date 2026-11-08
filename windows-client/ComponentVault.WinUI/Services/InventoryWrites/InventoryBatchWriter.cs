@@ -110,6 +110,9 @@ internal sealed class InventoryBatchWriter
                     insert.ExecuteNonQuery();
                     SetAllocationQuantity(connection, componentId, line.LocationId, 0);
                 }
+                var costBefore = GetCost(connection, componentId);
+                var purchaseAmount = InventoryCost.Input(line.PurchaseAmount);
+                var average = InventoryCost.Inbound(total, costBefore, line.Quantity, purchaseAmount);
                 var newTotal = checked(total + line.Quantity);
                 var allocation = checked(GetAllocationQuantity(connection, componentId, line.LocationId) + line.Quantity);
                 SetAllocationQuantity(connection, componentId, line.LocationId, allocation);
@@ -139,6 +142,7 @@ internal sealed class InventoryBatchWriter
                     movement.Parameters.AddWithValue("$location", line.LocationId);
                     movement.ExecuteNonQuery();
                 }
+                SetCost(connection, componentId, average, movementId, purchaseAmount, purchaseAmount);
                 using (var receipt = connection.CreateCommand())
                 {
                     receipt.CommandText = "INSERT INTO batch_inbound_receipts(receipt_id,committed_at) VALUES($id,$at)";
@@ -146,7 +150,7 @@ internal sealed class InventoryBatchWriter
                     receipt.Parameters.AddWithValue("$at", at);
                     receipt.ExecuteNonQuery();
                 }
-                EnqueueEntity(connection, "component", componentId, at);
+            EnqueueEntity(connection, "component", componentId, at);
                 EnqueueEntity(connection, "stock_movement", movementId, at);
                 committed++;
             }
@@ -180,7 +184,7 @@ internal sealed class InventoryBatchWriter
         int quantity,
         string locationId,
         string expectedUpdatedAt,
-        string? newLocationName = null)
+        string? newLocationName = null, string? purchaseAmount = null)
     {
         if (LcscPublicCatalog.NormalizeSku(sku) is null
             || quantity <= 0 || string.IsNullOrWhiteSpace(locationId))
@@ -222,6 +226,9 @@ internal sealed class InventoryBatchWriter
                     return OperationResult.Failure("所选库位不存在或已删除。");
             }
 
+            var oldCost = GetCost(connection, componentId);
+            purchaseAmount = InventoryCost.Input(purchaseAmount);
+            var average = InventoryCost.Inbound(currentQuantity, oldCost, quantity, purchaseAmount);
             var newTotal = checked(currentQuantity + quantity);
             var newAllocation = checked(GetAllocationQuantity(connection, componentId, locationId) + quantity);
             var at = UtcNow();
@@ -250,6 +257,7 @@ internal sealed class InventoryBatchWriter
                 movement.Parameters.AddWithValue("$location", locationId);
                 movement.ExecuteNonQuery();
             }
+            SetCost(connection, componentId, average, movementId, purchaseAmount, purchaseAmount);
             EnqueueEntity(connection, "component", componentId, at);
             EnqueueEntity(connection, "stock_movement", movementId, at);
             transaction.Commit();

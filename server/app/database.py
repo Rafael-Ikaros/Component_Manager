@@ -194,6 +194,7 @@ def init_db(settings: Settings, *, initialize_accounts: bool = True) -> None:
         connection.execute("BEGIN IMMEDIATE")
         for statement in SCHEMA_STATEMENTS:
             connection.execute(statement)
+        _migrate_costs(connection)
         _migrate_storage(connection)
         _migrate_sync_revisions(connection)
         _migrate_sync_observability(connection)
@@ -228,6 +229,15 @@ def init_db(settings: Settings, *, initialize_accounts: bool = True) -> None:
         for user_path in user_database_paths(settings):
             if Path(user_path).is_file():
                 init_db(replace(settings, database_path=user_path), initialize_accounts=False)
+
+
+def _migrate_costs(connection: sqlite3.Connection) -> None:
+    for table, column in (("components", "inventory_unit_cost"),
+                          ("stock_movements", "purchase_amount"),
+                          ("stock_movements", "cost_amount")):
+        columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
 
 
 def _migrate_storage(connection: sqlite3.Connection) -> None:

@@ -12,6 +12,7 @@ data class ComponentRecord(
     val minStock: Int,
     val updatedAt: String,
     val deleted: Boolean,
+    val inventoryUnitCost: String? = null,
 ) {
     val isLowStock: Boolean
         get() = !deleted && quantity <= minStock

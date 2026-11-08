@@ -47,7 +47,7 @@ public sealed class InventoryEditingService(InventoryStore store)
 
     public OperationResult Append(ComponentEditRequest request, string expectedUpdatedAt) =>
         store.AppendCatalogInbound(request.Draft.Sku, request.Draft.Quantity,
-            request.Draft.Location, expectedUpdatedAt, request.NewLocationName);
+            request.Draft.Location, expectedUpdatedAt, request.NewLocationName, request.Draft.PurchaseAmount);
 }
 
 public static class InventoryEditWriteCoordinator

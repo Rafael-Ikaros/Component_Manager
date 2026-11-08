@@ -33,6 +33,7 @@ def component_state(row: sqlite3.Row) -> dict[str, Any]:
         "location": row["location"],
         "quantity": row["quantity"],
         "min_stock": row["min_stock"],
+        "inventory_unit_cost": row["inventory_unit_cost"] if "inventory_unit_cost" in row.keys() else None,
         "updated_at": row["updated_at"],
         "deleted": bool(row["deleted"]),
         "sync_revision": row["sync_revision"],

@@ -64,8 +64,10 @@ internal class BomReleaseCommitter(private val databaseHelper: InventoryDatabase
                         "预览后库位分配已变化，请重新生成 BOM 预览。"
                     }
                     val consumed = consumeAllocations(db, current.first, required)
+                    val average = db.rawQuery("SELECT inventory_unit_cost FROM components WHERE id=?", arrayOf(current.first)).use { cursor -> cursor.moveToFirst(); cursor.getString(0) }
                     val values = ContentValues().apply {
                         put("quantity", current.second - required)
+                        if (current.second == required) putNull("inventory_unit_cost")
                         put("updated_at", now)
                     }
                     db.update("components", values, "id = ?", arrayOf(current.first))
@@ -78,6 +80,7 @@ internal class BomReleaseCommitter(private val databaseHelper: InventoryDatabase
                                 put("component_id", current.first)
                                 put("movement_type", "outbound")
                                 put("quantity", consumedQuantity)
+                                put("cost_amount", InventoryCost.amount(average, consumedQuantity))
                                 put("reason", "BOM: ${preview.parsed.projectName}")
                                 put("note", "Batch $batchId; release $releaseId")
                                 put("happened_at", now)

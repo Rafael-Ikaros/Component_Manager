@@ -19,6 +19,7 @@
     <Compile Include="../../Views/BatchInboundEditableRow.cs" Link="Production/BatchInboundEditableRow.cs" />
     <Compile Include="../../ViewModels/ObservableObject.cs" Link="Production/ObservableObject.cs" />
     <Compile Include="../../Services/BatchInbound/*.cs" Link="Production/BatchInbound/%(Filename)%(Extension)" />
+    <Compile Include="../../Services/InventoryCost.cs" Link="Production/InventoryCost.cs" />
     <Compile Include="../../Services/InventoryDatabase.cs" Link="Production/InventoryDatabase.cs" />
     <Compile Include="../../Services/InventoryWrites/InventoryBatchWriter.cs" Link="Production/InventoryBatchWriter.cs" />
     <Compile Include="../../Services/InventoryWrites/InventoryLocationWriter.cs" Link="Production/InventoryLocationWriter.cs" />

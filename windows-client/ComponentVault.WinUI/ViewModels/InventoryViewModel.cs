@@ -165,7 +165,7 @@ public sealed class InventoryViewModel : ObservableObject
             UpdatedAt = component.UpdatedAt,
             Deleted = component.Deleted,
             CumulativeOutboundQuantity = outboundTotals.GetValueOrDefault(component.Id),
-            Allocations = component.Allocations,
+            Allocations = component.Allocations, InventoryUnitCost = component.InventoryUnitCost,
             BaseUpdatedAt = component.BaseUpdatedAt,
         })).ToArray();
         UpdateFilterOptions();

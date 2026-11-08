@@ -260,11 +260,11 @@ def apply_one(connection: sqlite3.Connection, settings: Settings, row: dict, sel
         category, package = selected.get("category", current["category"]), selected.get("package_name", current["package_name"])
         managed = bool(current["inventory_managed"])
         now = _now_datetime_after(current["updated_at"])
-        component = ComponentPayload(id=current["id"], sku=current["sku"], name=current["name"], category=category,
+        component = ComponentPayload(inventory_unit_cost=current["inventory_unit_cost"], id=current["id"], sku=current["sku"], name=current["name"], category=category,
             package_name=package, description=description, location=current["location"], quantity=current["quantity"],
             min_stock=current["min_stock"], updated_at=now, allocations=load_allocations(connection, current["id"]) if managed else None,
             base_updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if managed else None)
-        _save_payload(connection, settings, PushRequest(device_id="admin-web", inventory_protocol=1 if managed else 0, components=[component]))
+        _save_payload(connection, settings, PushRequest(device_id="admin-web", cost_protocol=1, inventory_protocol=1 if managed else 0, components=[component]))
         _save_receipt(connection, selection.request_id, "catalog_metadata", row["id"], payload, _storage_time(now))
     return "updated"
 

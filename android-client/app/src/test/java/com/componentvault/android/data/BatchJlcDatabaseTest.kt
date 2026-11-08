@@ -35,6 +35,48 @@ class BatchJlcDatabaseTest {
         )).isSuccess)
     }
 
+    @Test fun initialPurchaseKeepsActualAmountAndZeroStockClearsAverage() = runBlocking {
+        assertTrue(repository.saveComponent(ComponentDraft(sku="NEW", name="Paid", category="IC", packageName="SMD", location="A", description="", quantity=3,minStock=0,purchaseAmount="1")).isSuccess)
+        val paid=repository.loadComponents().first { it.sku=="NEW" }
+        assertEquals("0.3333333333333333",paid.inventoryUnitCost)
+        assertEquals("1",repository.loadMovements().first { it.componentId==paid.id }.purchaseAmount)
+        val oneThird = java.math.BigDecimal("1").divide(java.math.BigDecimal(3),16,java.math.RoundingMode.HALF_EVEN).toPlainString()
+        assertTrue(repository.saveComponent(ComponentDraft(id=paid.id,sku=paid.sku,name=paid.name,category=paid.category,packageName=paid.packageName,location=paid.location,description=paid.description,quantity=3,minStock=0,valuationUnitCost=oneThird,valuationAmount="1")).isSuccess)
+        assertEquals(oneThird,repository.loadComponents().first { it.id==paid.id }.inventoryUnitCost)
+        assertEquals("0.0000000000000001",repository.loadMovements().first { it.componentId==paid.id && it.movementType=="adjustment" }.costAmount)
+        assertTrue(!repository.saveComponent(ComponentDraft(sku="EMPTYPAID",name="Invalid",category="IC",packageName="SMD",location="A",description="",quantity=0,minStock=0,purchaseAmount="1")).isSuccess)
+        assertTrue(repository.recordMovement(com.componentvault.android.model.MovementEntryDraft(paid.id,"outbound",3,"test","","A")).isSuccess)
+        assertEquals(null,repository.loadComponents().first { it.id==paid.id }.inventoryUnitCost)
+    }
+
+    @Test fun versionFiveCostMigrationPreservesExistingData() {
+        val helper = InventoryDatabaseHelper(context)
+        SQLiteDatabase.create(null).use { db ->
+            db.execSQL("CREATE TABLE components(id TEXT PRIMARY KEY, quantity INTEGER)")
+            db.execSQL("CREATE TABLE stock_movements(id TEXT PRIMARY KEY, quantity INTEGER)")
+            db.execSQL("INSERT INTO components VALUES('kept',7)")
+            db.execSQL("INSERT INTO stock_movements VALUES('history',3)")
+            helper.onUpgrade(db,5,6)
+            db.rawQuery("SELECT quantity,inventory_unit_cost FROM components WHERE id='kept'",null).use { cursor -> assertTrue(cursor.moveToFirst()); assertEquals(7,cursor.getInt(0)); assertTrue(cursor.isNull(1)) }
+            db.rawQuery("SELECT quantity,purchase_amount,cost_amount FROM stock_movements WHERE id='history'",null).use { cursor -> assertTrue(cursor.moveToFirst()); assertEquals(3,cursor.getInt(0)); assertTrue(cursor.isNull(1)); assertTrue(cursor.isNull(2)) }
+        }
+        helper.close()
+    }
+
+    @Test fun costFlowsAndUnknownInbound() = runBlocking {
+        val original = repository.loadComponents().single()
+        assertTrue(repository.saveComponent(ComponentDraft(id = original.id, sku = original.sku, name = original.name, category = original.category, packageName = original.packageName, location = original.location, description = original.description, quantity = 10, minStock = 1, valuationUnitCost = "1")).isSuccess)
+        val paid = listOf(row("paid", "C70565", "10", "A").copy(purchaseAmount = "20"))
+        assertTrue(repository.commitBatchJlc("cost", paid).isSuccess)
+        assertEquals("1.5", repository.loadComponents().single().inventoryUnitCost)
+        assertTrue(repository.commitBatchJlc("cost", paid).isSuccess)
+        assertEquals(20, repository.loadComponents().single().quantity)
+        assertTrue(repository.recordMovement(com.componentvault.android.model.MovementEntryDraft(original.id,"outbound",5,"test","", "A")).isSuccess)
+        assertEquals("1.5", repository.loadComponents().single().inventoryUnitCost)
+        assertTrue(repository.commitBatchJlc("unknown", listOf(row("unknown", "C70565", "1", "A"))).isSuccess)
+        assertEquals(null, repository.loadComponents().single().inventoryUnitCost)
+    }
+
     @Test
     fun mixedInboundUpdatesAllocationsAndReplayDoesNotDuplicate() = runBlocking {
         val rows = listOf(row("one", "C70565", "5", "B"),
@@ -117,7 +159,7 @@ class BatchJlcDatabaseTest {
         }
         assertEquals(10, number("SELECT quantity FROM components WHERE sku='C70565'"))
         assertEquals(10, number("SELECT SUM(quantity) FROM component_allocations"))
-        assertEquals(5, number("PRAGMA user_version"))
+        assertEquals(6, number("PRAGMA user_version"))
 
         val backup = requireNotNull(backupDirectory.listFiles()?.singleOrNull { it.name.endsWith(".db") })
         SQLiteDatabase.openDatabase(backup.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->

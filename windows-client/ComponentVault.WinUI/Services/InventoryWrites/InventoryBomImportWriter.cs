@@ -86,6 +86,8 @@ internal sealed class InventoryBomImportWriter
                 movement.Parameters.AddWithValue("$at", happenedAt);
                 movement.Parameters.AddWithValue("$location_id", deduction.LocationId);
                 movement.ExecuteNonQuery();
+                var sourceCost = current[line.ComponentId].InventoryUnitCost;
+                SetCost(connection, line.ComponentId, current[line.ComponentId].Quantity == line.RequiredQuantity ? null : sourceCost, movementId, null, InventoryCost.Multiply(sourceCost, deduction.Quantity));
                 EnqueueEntity(connection, "stock_movement", movementId, happenedAt);
             }
             EnqueueEntity(connection, "component", line.ComponentId, happenedAt);

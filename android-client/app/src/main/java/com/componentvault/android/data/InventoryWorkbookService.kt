@@ -117,6 +117,7 @@ internal class InventoryWorkbookService(
                             put("updated_at", component.updatedAt)
                             put("deleted", if (component.deleted) 1 else 0)
                             put("base_updated_at", component.baseUpdatedAt)
+                            put("inventory_unit_cost", component.inventoryUnitCost)
                         })
                     }
                     workbook.allocations.filter { it.componentId in selectedIds }.forEach { allocation ->
@@ -200,6 +201,8 @@ internal class InventoryWorkbookService(
                 put("deleted", if (movement.deleted) 1 else 0)
                 put("location_id", movement.locationId)
                 put("destination_location_id", movement.destinationLocationId)
+                put("purchase_amount", movement.purchaseAmount)
+                put("cost_amount", movement.costAmount)
             })
             enqueueEntity(db, "stock_movement", movement.id, movement.updatedAt)
         }
@@ -234,14 +237,14 @@ internal class InventoryWorkbookService(
 
     private fun readWorkbookSnapshot(db: SQLiteDatabase): InventoryWorkbook {
         val components = db.rawQuery(
-            "SELECT id,sku,name,category,package_name,location,COALESCE(description,''),quantity,min_stock,updated_at,deleted,base_updated_at FROM components ORDER BY id",
+            "SELECT id,sku,name,category,package_name,location,COALESCE(description,''),quantity,min_stock,updated_at,deleted,base_updated_at,inventory_unit_cost FROM components ORDER BY id",
             null,
         ).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(WorkbookComponent(
                     cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
                     cursor.getString(4), cursor.getString(5), cursor.getString(6), cursor.getInt(7),
-                    cursor.getInt(8), cursor.getString(9), cursor.getInt(10) == 1, cursor.getString(11),
+                    cursor.getInt(8), cursor.getString(9), cursor.getInt(10) == 1, cursor.getString(11), cursor.getString(12),
                 ))
             }
         }
@@ -264,14 +267,14 @@ internal class InventoryWorkbookService(
             }
         }
         val movements = db.rawQuery(
-            "SELECT id,component_id,movement_type,quantity,reason,COALESCE(note,''),happened_at,updated_at,deleted,location_id,destination_location_id FROM stock_movements ORDER BY id",
+            "SELECT id,component_id,movement_type,quantity,reason,COALESCE(note,''),happened_at,updated_at,deleted,location_id,destination_location_id,purchase_amount,cost_amount FROM stock_movements ORDER BY id",
             null,
         ).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(WorkbookMovement(
                     cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getInt(3),
                     cursor.getString(4), cursor.getString(5), cursor.getString(6), cursor.getString(7),
-                    cursor.getInt(8) == 1, cursor.getString(9), cursor.getString(10),
+                    cursor.getInt(8) == 1, cursor.getString(9), cursor.getString(10), cursor.getString(11), cursor.getString(12),
                 ))
             }
         }

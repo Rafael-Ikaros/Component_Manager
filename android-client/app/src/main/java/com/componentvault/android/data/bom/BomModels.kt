@@ -108,6 +108,7 @@ data class InventoryMatchCandidate(
     val active: Boolean = true,
     val category: String? = null,
     val parameters: Map<String, String> = emptyMap(),
+    val inventoryUnitCost: String? = null,
 )
 
 enum class BomMatchKind {

@@ -49,6 +49,7 @@ public static partial class JlcOrderSpreadsheetParser
         using var reader = ExcelReaderFactory.CreateBinaryReader(buffer, new ExcelReaderConfiguration { LeaveOpen = true, SinglePassMode = true });
         var fileHash = Convert.ToHexStringLower(SHA256.HashData(bytes));
         var grouped = new Dictionary<string, OrderLine>(StringComparer.Ordinal);
+        var amounts = new Dictionary<string, string?>(StringComparer.Ordinal);
         var mergedLines = 0;
         var skippedFees = 0;
         var skippedSummaries = 0;
@@ -119,6 +120,15 @@ public static partial class JlcOrderSpreadsheetParser
                 var identity = identified ? order + '\u001f' + sku : $"unidentified\u001f{fileHash}\u001f{sheetIndex}\u001f{rowIndex}";
                 var digest = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
                 var raw = "lcsc-order:" + (identified ? "order-" : "unidentified:") + Convert.ToHexStringLower(digest);
+                string? amount = null;
+                try
+                {
+                    var subtotal = Value(header.Subtotal);
+                    var unitPrice = Value(header.UnitPrice);
+                    amount = subtotal.Length > 0 ? InventoryCost.Input(subtotal) : quantity is int q ? InventoryCost.Multiply(InventoryCost.Input(unitPrice), q) : null;
+                }
+                catch (InvalidOperationException) { errors.Add("采购金额无效，请手动确认。"); }
+                amounts[raw] = amounts.TryGetValue(raw, out var previousAmount) ? InventoryCost.Add(previousAmount, amount) : amount;
                 var line = new OrderLine(new Guid(digest.AsSpan(0, 16)).ToString("D"), raw, sku, name, model, brand, category,
                     packageName, quantity, quantity?.ToString(CultureInfo.InvariantCulture) ?? quantityText, errors);
                 if (grouped.TryGetValue(raw, out var prior))
@@ -148,7 +158,7 @@ public static partial class JlcOrderSpreadsheetParser
         } while (reader.NextResult());
         if (!recognized) throw new InvalidDataException("未识别立创商城对账单或订单详情表头，请确认选择了订单 .xls 文件。");
         if (grouped.Count == 0) throw new InvalidDataException("订单表中没有可导入的商品明细。");
-        var rows = grouped.Values.Select(ToBatchItem).ToArray();
+        var rows = grouped.Values.Select(line => ToBatchItem(line) with { PurchaseAmount = amounts[line.Raw] }).ToArray();
         return new(rows, mergedLines, skippedFees, skippedSummaries, rows.Count(row => row.Error.Length > 0));
     }
 
@@ -197,7 +207,7 @@ public static partial class JlcOrderSpreadsheetParser
         // Order details may have a missing order label; retain their rows for manual review.
         if (order < 0 && Index("厂家型号") < 0) return null;
         return new Header(sku, quantity, name, model, brand, Index("商品类型", "分类", "商品分类"), Index("封装格式", "封装"),
-            order, Index("订单状态"), Index("是否不发此货"), Index("商品单位", "单位"));
+            order, Index("订单状态"), Index("是否不发此货"), Index("商品单位", "单位"), Index("小计金额(人民币含税)"), Index("单价(人民币含税)"));
     }
 
     private static int? ReadQuantity(object? cell, string unit)
@@ -217,7 +227,7 @@ public static partial class JlcOrderSpreadsheetParser
     private static string NormalizeHeader(string value) => Regex.Replace(value, @"\s+", "").Replace('（', '(').Replace('）', ')');
     private static string CellText(object? value) => value is null or DBNull ? "" : Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? "";
 
-    private sealed record Header(int Sku, int Quantity, int Name, int Model, int Brand, int Category, int Package, int Order, int Status, int Withheld, int Unit);
+    private sealed record Header(int Sku, int Quantity, int Name, int Model, int Brand, int Category, int Package, int Order, int Status, int Withheld, int Unit, int Subtotal, int UnitPrice);
     private sealed class OrderLine(string receiptId, string raw, string sku, string name, string model, string brand, string category,
         string package, int? quantity, string quantityText, List<string> errors)
     {

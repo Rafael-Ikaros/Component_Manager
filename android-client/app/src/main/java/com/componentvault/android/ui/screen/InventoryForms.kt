@@ -94,6 +94,9 @@ internal fun ComponentEditorSurface(
     var minStockText by rememberSaveable(stateKey) {
         mutableStateOf((existing?.minStock ?: initialDraft?.minStock ?: 0).toString())
     }
+    var valuationIsTotal by rememberSaveable(stateKey) { mutableStateOf(initialDraft?.purchaseAmount != null) }
+    fun valuationUnit(text: String): String? = com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(text)?.let { if (valuationIsTotal) it.divide(java.math.BigDecimal(quantityText.toInt()), 16, java.math.RoundingMode.HALF_EVEN) else it })
+    var valuationText by rememberSaveable(stateKey) { mutableStateOf((initialDraft?.purchaseAmount ?: initialDraft?.valuationUnitCost).orEmpty()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val title = if (existing == null) {
@@ -127,7 +130,8 @@ internal fun ComponentEditorSurface(
                 onError = { errorMessage = it },
             )?.let { draft ->
                 errorMessage = null
-                onSave(draft) { result ->
+                val cost = runCatching { valuationUnit(valuationText) }.getOrElse { errorMessage = it.message; return@let }
+                onSave(draft.copy(valuationUnitCost = cost.takeIf { existing != null }, valuationAmount = if (existing != null) purchaseTotal(valuationText,!valuationIsTotal,draft.quantity) else null, purchaseAmount = if (existing == null) com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(valuationText)?.let { if (valuationIsTotal) it else it.multiply(java.math.BigDecimal(draft.quantity)) }) else null)) { result ->
                     if (result.isSuccess) photoSession.finish(description, committed = true)
                     if (!result.isSuccess) {
                         errorMessage = result.message
@@ -151,7 +155,8 @@ internal fun ComponentEditorSurface(
                 onError = { errorMessage = it },
             )?.let { draft ->
                 errorMessage = null
-                onSaveAndGenerateLabel?.invoke(draft) { result ->
+                val cost = runCatching { valuationUnit(valuationText) }.getOrElse { errorMessage = it.message; return@let }
+                onSaveAndGenerateLabel?.invoke(draft.copy(valuationUnitCost = cost.takeIf { existing != null }, valuationAmount = if (existing != null) purchaseTotal(valuationText,!valuationIsTotal,draft.quantity) else null, purchaseAmount = if (existing == null) com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(valuationText)?.let { if (valuationIsTotal) it else it.multiply(java.math.BigDecimal(draft.quantity)) }) else null)) { result ->
                     if (result.isSuccess) photoSession.finish(description, committed = true)
                     if (!result.isSuccess) {
                         errorMessage = result.message
@@ -160,6 +165,13 @@ internal fun ComponentEditorSurface(
             }
         },
     ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !valuationIsTotal, onClick = { valuationIsTotal = false }, label = { Text(if (existing == null) "购买单价" else "补录单价") })
+                FilterChip(selected = valuationIsTotal, onClick = { valuationIsTotal = true }, label = { Text(if (existing == null) "购买总金额" else "补录当前总额") })
+            }
+            OutlinedTextField(value = valuationText, onValueChange = { valuationText = it }, label = { Text(if (existing == null) "实际采购金额（CNY）" else if (valuationIsTotal) "补录当前库存总额（CNY）" else "补录当前库存单价（CNY）") }, supportingText = { Text(if (existing == null) "留空表示成本未知；0 表示赠品。" else "留空保留现有成本；填写将按当前库存估值并记录调整，不修改历史采购。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        }
         item {
             SectionPane(
                 title = strings.forms.componentBasicTitle,
@@ -321,6 +333,8 @@ private fun validateComponentDraft(
 }
 
 internal data class MovementEditorState(
+    val purchaseText: String = "",
+    val purchaseIsUnit: Boolean = false,
     val movementType: String = "inbound",
     val quantityText: String = "1",
     val reason: String = "",
@@ -351,6 +365,7 @@ internal fun validateMovementEditorState(
             (state.destinationLocationId.isBlank() || state.destinationLocationId == state.locationId)
         ) throw IllegalStateException("调拨必须选择两个不同库位。")
         MovementEntryDraft(
+            purchaseAmount = if (state.movementType == "inbound") com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(state.purchaseText)?.let { if (state.purchaseIsUnit) it.multiply(java.math.BigDecimal(quantity)) else it }) else null,
             componentId = selectedComponentId,
             movementType = state.movementType,
             quantity = quantity,
@@ -410,6 +425,16 @@ internal fun MovementEntryFields(
             minimum = if (state.movementType == "adjustment") Int.MIN_VALUE else 1,
             skipZero = state.movementType == "adjustment",
         )
+        if (state.movementType == "inbound") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !state.purchaseIsUnit, onClick = { onStateChange(state.copy(purchaseIsUnit = false)) }, label = { Text("购买总金额") })
+                FilterChip(selected = state.purchaseIsUnit, onClick = { onStateChange(state.copy(purchaseIsUnit = true)) }, label = { Text("购买单价") })
+            }
+            OutlinedTextField(value = state.purchaseText, onValueChange = { onStateChange(state.copy(purchaseText = it, errorMessage = null)) }, label = { Text(if (state.purchaseIsUnit) "购买单价（CNY）" else "购买总金额（CNY）") }, supportingText = { Text("留空表示成本未知；0 表示赠品。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            val entered = state.purchaseText.toBigDecimalOrNull()
+            val count = state.quantityText.toIntOrNull()
+            if (entered != null && count != null && count > 0) Text(if (state.purchaseIsUnit) "折算总金额（CNY）：${entered.multiply(java.math.BigDecimal(count)).toPlainString()}" else "折算单价（CNY）：${entered.divide(java.math.BigDecimal(count), 16, java.math.RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString()}")
+        }
         OutlinedTextField(
             value = state.reason,
             onValueChange = {

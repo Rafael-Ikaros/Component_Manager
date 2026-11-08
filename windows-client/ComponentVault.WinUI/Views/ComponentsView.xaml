@@ -525,6 +525,8 @@
 							</ItemsControl>
 						</StackPanel>
 						<StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding SelectedComponent.InventoryCostLabel}" VerticalAlignment="Center" />
+                            <Button Content="补录成本" Click="OnSetCostClicked" IsEnabled="{Binding CanEditSelectedComponent}" />
 							<Button
 								Click="OnEditComponentClicked"
 								Content="编辑"

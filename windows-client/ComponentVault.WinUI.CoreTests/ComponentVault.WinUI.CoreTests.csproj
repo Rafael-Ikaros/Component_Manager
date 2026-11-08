@@ -32,6 +32,7 @@
     <Compile Include="..\ComponentVault.WinUI\Services\InventorySyncService.cs" Link="Services\InventorySyncService.cs" />
     <Compile Include="..\ComponentVault.WinUI\Services\SyncPersistence\*.cs" Link="Services\SyncPersistence\%(Filename)%(Extension)" />
     <Compile Include="..\ComponentVault.WinUI\Services\InventoryWrites\*.cs" Link="Services\InventoryWrites\%(Filename)%(Extension)" />
+    <Compile Include="..\ComponentVault.WinUI\Services\InventoryCost.cs" Link="Services\InventoryCost.cs" />
     <Compile Include="..\ComponentVault.WinUI\Services\InventoryDatabase.cs" Link="Services\InventoryDatabase.cs" />
     <Compile Include="..\ComponentVault.WinUI\Services\InventoryQueries.cs" Link="Services\InventoryQueries.cs" />
     <Compile Include="..\ComponentVault.WinUI\ViewModels\InventoryViewModel.cs" Link="ViewModels\InventoryViewModel.cs" />

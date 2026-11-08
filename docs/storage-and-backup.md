@@ -88,7 +88,7 @@ Windows 使用库存行或详情中的鼠标操作。
 
 | 工作表 | 内容 |
 | --- | --- |
-| meta | 格式 `component-vault`、schemaVersion=1、导出时间 |
+| meta | 格式 `component-vault`、schemaVersion=2、导出时间 |
 | components | 元器件资料、合计数量、阈值、版本及商品图片 |
 | storage_locations | 独立库位编码、名称及删除状态 |
 | allocations | 元器件和库位的数量分配 |
@@ -114,14 +114,17 @@ Windows 使用库存行或详情中的鼠标操作。
 ### 文件格式与字段
 
 工作表顺序为 meta、components、storage_locations、allocations、stock_movements。
-meta 无表头，以 key/value 两列记录 format=component-vault、schemaVersion=1、exportedAt=UTC ISO。
+meta 无表头，以 key/value 两列记录 format=component-vault、schemaVersion=2、exportedAt=UTC ISO。
+新版兼容读取旧 schemaVersion=1；旧备份没有成本字段，恢复后为成本未知，不当作零成本。
 
-- components: id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,image_preview
+- components: id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,image_preview,inventory_unit_cost
 - storage_locations: id,name,updated_at,deleted
 - allocations: component_id,location_id,quantity
-- stock_movements: id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id
+- stock_movements: id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id,purchase_amount,cost_amount
 
 ID/SKU/库位编码为字符串，数量为严格整数，deleted 为 Excel Boolean，null 留空。
+成本字段也是文本单元格，保留十进制精度；明确零金额保存为文本 `0`，未知金额留空。
+`inventory_unit_cost` 为当前人民币库存均价，流水金额说明见[成本指南](inventory-cost.md)。
 内嵌图片位于 components 对应行 image_preview 列，one-cell anchor，PNG/JPEG，每组件最多一张。
 LCSC_android_erp 迁移使用其原始 camelCase 表头、epoch millis 时间，不与本项目格式混淆。
 

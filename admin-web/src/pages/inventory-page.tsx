@@ -287,6 +287,7 @@ export function InventoryPage() {
                 </div>
                 <Detail label={t("默认库位")} value={locationLabel(detail.data.location)} /><Detail label={t("库存 / 最低库存")} value={`${formatCount(detail.data.quantity, locale)} / ${formatCount(detail.data.min_stock, locale)}`} />
                 <Detail label={t("库存模式")} value={detail.data.inventory_managed ? t("独立库位库存") : t("旧版标量库存")} />
+                <Detail label={t("库存平均单价（CNY）")} value={detail.data.quantity === 0 ? "—" : detail.data.inventory_unit_cost ?? t("成本未知")} />
                 <Detail label={t("说明")} value={detail.data.description || "—"} />
                 <Detail label={t("库位分配")} value={detail.data.allocations.length ? detail.data.allocations.map((item) => `${locations.data?.find((location) => location.id === item.location_id)?.name ?? item.location_id}: ${formatCount(item.quantity, locale)}`).join(locale === "zh-CN" ? "；" : "; ") : t("未提供独立库位分配")} />
                 <Detail label={t("更新时间")} value={formatDateTime(detail.data.updated_at, locale)} />

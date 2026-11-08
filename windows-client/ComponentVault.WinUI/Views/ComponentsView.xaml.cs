@@ -555,6 +555,17 @@ public sealed partial class ComponentsView : Page
 				await RunComponentEditorAsync(viewModel, viewModel.SelectedComponent);
 		}
 
+        private async void OnSetCostClicked(object sender, RoutedEventArgs e)
+        {
+            var vm = RuntimeViewModel;
+            if (vm?.SelectedComponent is not { } current) return;
+            var amount = new TextBox { Header = $"当前 {current.Quantity} 件库存总成本（人民币）", PlaceholderText = "最多8位小数；0为零成本" };
+            var dialog = new ContentDialog { Title="补录当前库存成本", Content=amount, PrimaryButtonText="保存", CloseButtonText="取消", XamlRoot=XamlRoot };
+            if(await dialog.ShowAsync()!=ContentDialogResult.Primary)return;
+            try { var result=vm.SetInventoryCost(current.Id,current.UpdatedAt,amount.Text);await ShowMessageAsync("库存成本",result.Message); }
+            catch(InvalidOperationException ex){await ShowMessageAsync("库存成本",ex.Message);}
+        }
+
 		private async void OnDeleteComponentClicked (object sender, RoutedEventArgs e)
 		{
 				var viewModel = RuntimeViewModel;

@@ -177,6 +177,7 @@ internal class MovementBatchCoordinator(
 
             if (errorMessage == null && quantity != null) {
                 drafts += MovementEntryDraft(
+                    purchaseAmount = if (item.movementType == "inbound") item.purchaseAmount.takeIf(String::isNotBlank) else null,
                     componentId = item.componentId,
                     movementType = item.movementType,
                     quantity = quantity,

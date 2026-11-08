@@ -184,7 +184,7 @@ def _upsert_component(
         old_time = _parse_storage_time(existing["updated_at"])
         new_time = _as_utc(component.updated_at)
         fields = ("sku", "name", "category", "package_name", "location", "description",
-                  "quantity", "min_stock", "deleted")
+                  "quantity", "min_stock", "deleted", "inventory_unit_cost")
         incoming = component.model_dump()
         different = any(
             (bool(existing[key]) != bool(incoming[key]) if key == "deleted"
@@ -247,6 +247,8 @@ def _upsert_component(
             sync_revision,
         ),
     )
+    connection.execute("UPDATE components SET inventory_unit_cost = ? WHERE id = ?",
+                       (component.inventory_unit_cost, component.id))
     if component.allocations is not None:
         save_allocations(connection, component)
     return True
@@ -266,7 +268,7 @@ def _upsert_stock_movement(
         old_time = _parse_storage_time(existing["updated_at"])
         new_time = _as_utc(stock_movement.updated_at)
         fields = ("component_id", "movement_type", "quantity", "reason", "note",
-                  "location_id", "destination_location_id", "deleted")
+                  "location_id", "destination_location_id", "deleted", "purchase_amount", "cost_amount")
         incoming = stock_movement.model_dump()
         different = any(
             (bool(existing[key]) != bool(incoming[key]) if key == "deleted"
@@ -323,6 +325,8 @@ def _upsert_stock_movement(
             sync_revision,
         ),
     )
+    connection.execute("UPDATE stock_movements SET purchase_amount = ?, cost_amount = ? WHERE id = ?",
+                       (stock_movement.purchase_amount, stock_movement.cost_amount, stock_movement.id))
     connection.execute(
         "UPDATE stock_movements SET location_id = ?, destination_location_id = ? "
         "WHERE id = ?",
@@ -349,6 +353,7 @@ def _row_to_component(
             "updated_at": row["updated_at"],
             "deleted": bool(row["deleted"]),
             "allocations": allocations,
+            "inventory_unit_cost": row["inventory_unit_cost"],
         }
     )
 
@@ -367,6 +372,8 @@ def _row_to_stock_movement(row: sqlite3.Row) -> StockMovementPayload:
             "deleted": bool(row["deleted"]),
             "location_id": row["location_id"],
             "destination_location_id": row["destination_location_id"],
+            "purchase_amount": row["purchase_amount"],
+            "cost_amount": row["cost_amount"],
         }
     )
 

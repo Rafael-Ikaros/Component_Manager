@@ -18,6 +18,9 @@ internal val ComponentDraftSaver = Saver<ComponentDraft?, String>(
 )
 
 private fun encodeComponentDraft(draft: ComponentDraft) = JSONObject().apply {
+    put("valuationUnitCost", draft.valuationUnitCost ?: JSONObject.NULL)
+    put("valuationAmount", draft.valuationAmount ?: JSONObject.NULL)
+    put("purchaseAmount", draft.purchaseAmount ?: JSONObject.NULL)
     put("id", draft.id)
     put("sku", draft.sku)
     put("name", draft.name)
@@ -30,6 +33,9 @@ private fun encodeComponentDraft(draft: ComponentDraft) = JSONObject().apply {
 }
 
 private fun decodeComponentDraft(json: JSONObject) = ComponentDraft(
+    purchaseAmount = if (json.isNull("purchaseAmount")) null else json.getString("purchaseAmount"),
+    valuationAmount = if (json.isNull("valuationAmount")) null else json.getString("valuationAmount"),
+    valuationUnitCost = if (json.isNull("valuationUnitCost")) null else json.getString("valuationUnitCost"),
     id = json.optString("id").takeIf(String::isNotEmpty),
     sku = json.getString("sku"),
     name = json.getString("name"),
@@ -117,6 +123,7 @@ internal object MovementBatchDraftCodec {
                 put("scanCount", item.scanCount)
                 put("movementType", item.movementType)
                 put("quantityText", item.quantityText)
+                put("purchaseAmount", item.purchaseAmount)
                 put("reason", item.reason)
                 put("note", item.note)
                 put("isDirty", item.isDirty)
@@ -139,6 +146,7 @@ internal object MovementBatchDraftCodec {
                     scanCount = item.getInt("scanCount"),
                     movementType = item.getString("movementType"),
                     quantityText = item.getString("quantityText"),
+                    purchaseAmount = item.optString("purchaseAmount"),
                     reason = item.getString("reason"), note = item.getString("note"),
                     isDirty = item.getBoolean("isDirty"),
                 )

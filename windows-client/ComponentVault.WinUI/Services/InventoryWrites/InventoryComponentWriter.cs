@@ -27,6 +27,9 @@ internal sealed class InventoryComponentWriter
 
         var componentId = draft.Id ?? $"cmp-{Guid.NewGuid():N}";
         var existingComponent = draft.Id is null ? null : InventoryQueries.GetComponentById(connection, componentId);
+        var initialPurchase = existingComponent is null ? InventoryCost.Input(draft.PurchaseAmount) : null;
+        if (initialPurchase is not null && draft.Quantity == 0)
+            throw new InvalidOperationException("填写采购金额时，初始库存数量必须大于 0。");
         var locationChanged = existingComponent is not null
             && !string.Equals(existingComponent.Location, draft.Location.Trim(), StringComparison.Ordinal);
         var updatedAt = UtcNow();
@@ -103,12 +106,47 @@ internal sealed class InventoryComponentWriter
             SetAllocationQuantity(connection, componentId, locationId, (int)adjustedQuantity);
         }
 
+        var average = draft.Quantity == 0 ? null : existingComponent is not null ? existingComponent.InventoryUnitCost : InventoryCost.Average(initialPurchase, draft.Quantity);
+        if (initialPurchase is not null)
+        {
+            var movementId = "mov-" + Guid.NewGuid().ToString("N");
+            using var movement = connection.CreateCommand();
+            movement.CommandText = "INSERT INTO stock_movements(id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id) VALUES($mid,$id,'inbound',$quantity,'初始采购入库','新建库存的实际采购金额',$at,$at,0,$location)";
+            movement.Parameters.AddWithValue("$mid", movementId);
+            movement.Parameters.AddWithValue("$id", componentId);
+            movement.Parameters.AddWithValue("$quantity", draft.Quantity);
+            movement.Parameters.AddWithValue("$at", updatedAt);
+            movement.Parameters.AddWithValue("$location", locationId);
+            movement.ExecuteNonQuery();
+            SetCost(connection, componentId, average, movementId, initialPurchase, initialPurchase);
+            EnqueueEntity(connection, "stock_movement", movementId, updatedAt);
+        }
+        else SetCost(connection, componentId, average);
         EnqueueEntity(connection, "component", componentId, updatedAt);
 
         var savedComponent = InventoryQueries.GetComponentById(connection, componentId)
             ?? throw new InvalidOperationException("保存后未找到元器件。");
         transaction.Commit();
         return savedComponent;
+    }
+
+    public OperationResult SetInventoryCost(string componentId, string expectedUpdatedAt, string amount)
+    {
+        var total = InventoryCost.Input(amount) ?? throw new InvalidOperationException("请填写库存总成本。");
+        using var connection = _database.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var current = InventoryQueries.GetComponentById(connection, componentId);
+        if (current is null || current.Deleted || current.Quantity == 0 || current.UpdatedAt != expectedUpdatedAt)
+            return OperationResult.Failure("库存已变化或为空，请重新核对。");
+        var at = UtcNow();
+        var movementId = "mov-" + Guid.NewGuid().ToString("N");
+        var oldTotal = InventoryCost.Multiply(current.InventoryUnitCost, current.Quantity);
+        using var command = connection.CreateCommand();
+        command.CommandText = "INSERT INTO stock_movements(id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id) VALUES($mid,$id,'adjustment',0,'补录当前库存成本','当前估值调整，不回写历史采购',$at,$at,0,$location); UPDATE components SET updated_at=$at WHERE id=$id";
+        command.Parameters.AddWithValue("$mid",movementId);command.Parameters.AddWithValue("$id",componentId);command.Parameters.AddWithValue("$at",at);command.Parameters.AddWithValue("$location",current.Location);command.ExecuteNonQuery();
+        SetCost(connection, componentId, InventoryCost.Average(total,current.Quantity),movementId,null,oldTotal is null ? total : InventoryCost.Difference(total,oldTotal));
+        EnqueueEntity(connection,"component",componentId,at);EnqueueEntity(connection,"stock_movement",movementId,at);
+        transaction.Commit();return OperationResult.Success("当前库存成本已补录，历史采购未修改。");
     }
 
     public OperationResult SoftDeleteComponent(string componentId)

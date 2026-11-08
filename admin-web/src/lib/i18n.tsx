@@ -9,6 +9,23 @@ function readPreference(): LanguagePreference {
 }
 
 export const en = {
+  "库存平均单价（CNY）": "Inventory weighted-average unit cost (CNY)",
+  "成本未知": "Cost unknown",
+  "购买金额依据": "Purchase amount basis",
+  "商品总金额": "Product total",
+  "购买单价": "Purchase unit price",
+  "购买单价（CNY）": "Purchase unit price (CNY)",
+  "商品总金额（CNY）": "Product total (CNY)",
+  "本次商品金额（CNY）": "This receipt's product amount (CNY)",
+  "请核对金额与数量": "Check the amount and quantity",
+  "留空表示成本未知，明确填写0表示赠品。不含运费、PCB和加工费。": "Blank means unknown cost; enter 0 explicitly for a free gift. Freight, PCB and assembly are excluded.",
+  "补录当前库存成本": "Record current inventory cost",
+  "仅对当前剩余库存估值，不修改数量或历史采购记录。": "Values only the remaining stock, without changing quantities or historical purchases.",
+  "当前数量": "Current quantity",
+  "当前库存总成本（CNY）": "Current total inventory cost (CNY)",
+  "确认补录": "Confirm inventory valuation",
+  "金额必须为非负数，最多8位小数。": "Enter a non-negative amount with at most 8 decimal places.",
+  "当前库存成本已保存，数量与历史采购记录未改变。": "Inventory cost saved. Quantity and historical purchases are unchanged.",
   "更新渠道": "Update channel",
   "此选择用于版本检查和下方更新目标；只有确认更新才会替换容器。渠道偏好保存在此浏览器。": "This selection is used for version checks and the update target below. Containers change only after confirmation. The preference is saved in this browser.",
   "此 API 或更新服务版本尚不支持网页更新，请先在群晖项目中配置配套版本。": "This API or update service does not support Web updates yet. Configure matching versions in the Synology project first.",

@@ -49,7 +49,8 @@ public sealed partial class SyncApiClient
         try
         {
             var (serverBaseUrl, payload) = await ResolveServerAsync(settings, cancellationToken);
-            if (payload.InventoryProtocol != 1)
+            if (payload.CostProtocol != 1) return OperationResult.Failure("请升级服务器以支持成本协议 cost_protocol=1；本地数据已保留。");
+        if (payload.InventoryProtocol != 1)
                 return OperationResult.Failure("服务器不支持多库位库存协议 inventory_protocol=1；本地待同步内容已保留。");
             SyncAccountIdentity identity;
             try
@@ -91,6 +92,7 @@ public sealed partial class SyncApiClient
         try
         {
             var (serverBaseUrl, capability) = await ResolveServerAsync(settings, cancellationToken);
+            if (capability.CostProtocol != 1) return SyncRunResult.Failure("请升级服务器以支持成本协议 cost_protocol=1；本地数据已保留。");
             if (capability.InventoryProtocol != 1)
                 return SyncRunResult.Failure("服务器不支持多库位库存协议 inventory_protocol=1；同步已停止，本地待同步内容已保留。");
             var identity = await GetIdentityAsync(serverBaseUrl, settings.ApiToken, cancellationToken);
@@ -281,6 +283,7 @@ public sealed partial class SyncApiClient
         }
 
         var payload = await DeserializeAsync<SyncPullResponse>(response, cancellationToken);
+        if (payload.CostProtocol != 1) throw new InvalidOperationException("请升级服务器以支持成本协议 cost_protocol=1。");
         if (payload.InventoryProtocol != 1)
             return (null, SyncRunResult.Failure("服务端拉取响应缺少 inventory_protocol=1；本地待同步内容已保留。"));
         if (payload.SyncCursor is < 0)

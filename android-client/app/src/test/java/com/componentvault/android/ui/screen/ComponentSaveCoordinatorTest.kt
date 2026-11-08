@@ -37,7 +37,7 @@ class ComponentSaveCoordinatorTest {
                 assertEquals("R-001", sku)
                 lookup = complete
             },
-            appendImportedStock = { target, quantity, location, complete ->
+            appendImportedStock = { target, quantity, location, _, complete ->
                 assertEquals(existing, target)
                 assertEquals(3, quantity)
                 assertEquals("bin-a", location)
@@ -86,7 +86,7 @@ class ComponentSaveCoordinatorTest {
                 lookups++
                 complete(null)
             },
-            appendImportedStock = { _, _, _, _ -> error("unexpected append") },
+            appendImportedStock = { _, _, _, _, _ -> error("unexpected append") },
         )
         coordinator.submitImportedDraft(draft, candidate, {}) { revealed++ }
         coordinator.submitImportedDraft(draft.copy(id = "component-2"), candidate, {}) { revealed++ }

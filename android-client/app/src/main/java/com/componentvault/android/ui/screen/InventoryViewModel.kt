@@ -305,11 +305,12 @@ class InventoryViewModel(
         target: com.componentvault.android.data.ExistingImportTarget,
         quantity: Int,
         locationId: String,
+        purchaseAmount: String?,
         onComplete: (OperationResult) -> Unit,
     ) {
         viewModelScope.launch {
             uiState = uiState.copy(isBusy = true)
-            val result = repository.appendImportedStock(target, quantity, locationId)
+            val result = repository.appendImportedStock(target, quantity, locationId, purchaseAmount)
             reloadState(statusMessage = result.message, preferredSelectedComponentId = result.entityId)
             onComplete(result)
             if (result.isSuccess && uiState.appPreferences.syncAfterLocalChanges) runSyncInternal()
@@ -554,6 +555,10 @@ class InventoryViewModel(
                 errorMessage = null,
             )
         }
+    }
+
+    fun updateMovementBatchItemPurchaseAmount(componentId: String, amount: String) {
+        updateMovementBatchItem(componentId) { it.copy(purchaseAmount = amount, errorMessage = null) }
     }
 
     fun removeMovementBatchItem(componentId: String) {

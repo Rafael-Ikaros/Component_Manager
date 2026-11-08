@@ -10,11 +10,11 @@ internal object InventoryWorkbookWriter {
     private val instantMillis=DateTimeFormatterBuilder().appendInstant(3).toFormatter()
     fun write(data:InventoryWorkbook, exportedAt:String=instantMillis.format(Instant.now())):ByteArray {
         val sheets=listOf(
-            "meta" to listOf(listOf<Any?>("format","component-vault"),listOf("schemaVersion","1"),listOf("exportedAt",exportedAt)),
-            "components" to (listOf(InventoryWorkbookCodec.componentHeaders.map{it as Any?})+data.components.map{listOf(it.id,it.sku,it.name,it.category,it.packageName,it.location,it.description,it.quantity,it.minStock,it.updatedAt,it.deleted,it.baseUpdatedAt,"")}),
+            "meta" to listOf(listOf<Any?>("format","component-vault"),listOf("schemaVersion","2"),listOf("exportedAt",exportedAt)),
+            "components" to (listOf(InventoryWorkbookCodec.componentHeaders.map{it as Any?})+data.components.map{listOf(it.id,it.sku,it.name,it.category,it.packageName,it.location,it.description,it.quantity,it.minStock,it.updatedAt,it.deleted,it.baseUpdatedAt,"",it.inventoryUnitCost)}),
             "storage_locations" to (listOf(InventoryWorkbookCodec.locationHeaders.map{it as Any?})+data.locations.map{listOf(it.id,it.name,it.updatedAt,it.deleted)}),
             "allocations" to (listOf(InventoryWorkbookCodec.allocationHeaders.map{it as Any?})+data.allocations.map{listOf(it.componentId,it.locationId,it.quantity)}),
-            "stock_movements" to (listOf(InventoryWorkbookCodec.movementHeaders.map{it as Any?})+data.movements.map{listOf(it.id,it.componentId,it.type,it.quantity,it.reason,it.note,it.happenedAt,it.updatedAt,it.deleted,it.locationId,it.destinationLocationId)})
+            "stock_movements" to (listOf(InventoryWorkbookCodec.movementHeaders.map{it as Any?})+data.movements.map{listOf(it.id,it.componentId,it.type,it.quantity,it.reason,it.note,it.happenedAt,it.updatedAt,it.deleted,it.locationId,it.destinationLocationId,it.purchaseAmount,it.costAmount)})
         )
         val output=ByteArrayOutputStream()
         ZipOutputStream(output).use{zip->

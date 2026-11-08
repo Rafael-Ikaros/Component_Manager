@@ -2,6 +2,7 @@ namespace ComponentVault.WinUI.Services;
 
 public sealed class SyncComponentDto
 {
+    public string? InventoryUnitCost { get; init; }
     public required string Id { get; init; }
     public required string Sku { get; init; }
     public required string Name { get; init; }
@@ -33,6 +34,8 @@ public sealed class SyncStorageLocationDto
 
 public sealed class SyncStockMovementDto
 {
+    public string? PurchaseAmount { get; init; }
+    public string? CostAmount { get; init; }
     public required string Id { get; init; }
     public required string ComponentId { get; init; }
     public required string MovementType { get; init; }
@@ -48,6 +51,7 @@ public sealed class SyncStockMovementDto
 
 public sealed class SyncPushRequest
 {
+    public int CostProtocol { get; init; } = 1;
     public int InventoryProtocol { get; init; } = 1;
     public required string DeviceId { get; init; }
     public IReadOnlyList<SyncComponentDto> Components { get; init; } = [];
@@ -65,6 +69,7 @@ public sealed class SyncPushResponse
 public sealed class SyncPullResponse
 {
     public int InventoryProtocol { get; init; }
+    public int CostProtocol { get; init; }
     public required string ServerTime { get; init; }
     public long? SyncCursor { get; init; }
     public IReadOnlyList<SyncComponentDto> Components { get; init; } = [];
@@ -79,6 +84,7 @@ public sealed class SyncTokenStatusResponse
     public required string Status { get; init; }
     public required string ServerTime { get; init; }
     public int InventoryProtocol { get; init; }
+    public int CostProtocol { get; init; }
 }
 
 public sealed class SyncAccountIdentity

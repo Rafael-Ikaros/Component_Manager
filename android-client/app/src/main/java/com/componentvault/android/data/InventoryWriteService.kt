@@ -182,6 +182,7 @@ internal class InventoryWriteService(
         target: ExistingImportTarget,
         quantity: Int,
         locationId: String,
+        purchaseAmount: String? = null,
     ): OperationResult = withContext(Dispatchers.IO) {
         runCatching {
             require(quantity > 0) { "入库数量必须为正整数。" }
@@ -206,13 +207,14 @@ internal class InventoryWriteService(
                     val newAllocation = Math.addExact(allocationQuantity(db, target.componentId, location), quantity)
                     val now = utcNow()
                     db.update("components", ContentValues().apply {
-                        put("quantity", newTotal); put("location", location); put("updated_at", now)
+                        put("inventory_unit_cost", InventoryCost.inbound(current.first, getComponentById(db, target.componentId)?.inventoryUnitCost, quantity, purchaseAmount)); put("quantity", newTotal); put("location", location); put("updated_at", now)
                     }, "id=?", arrayOf(target.componentId))
                     setAllocationQuantity(db, target.componentId, location, newAllocation)
                     verifyAllocationTotal(db, target.componentId, newTotal)
                     val movementId = "mov-" + randomId()
                     db.insertOrThrow("stock_movements", null, ContentValues().apply {
                         put("id", movementId); put("component_id", target.componentId); put("movement_type", "inbound")
+                        put("purchase_amount", InventoryCost.text(InventoryCost.decimal(purchaseAmount))); put("cost_amount", InventoryCost.text(InventoryCost.decimal(purchaseAmount)))
                         put("quantity", quantity); put("reason", "JLC single import inbound"); put("note", "")
                         put("happened_at", now); put("updated_at", now); put("deleted", 0); put("location_id", location)
                     })
@@ -291,11 +293,14 @@ internal class InventoryWriteService(
                             })
                             setAllocationQuantity(db, componentId, location, 0)
                         }
+                        val average = getComponentById(db, componentId)?.inventoryUnitCost
+                        val nextAverage = InventoryCost.inbound(oldTotal, average, quantity, row.purchaseAmount)
                         val oldAllocation = allocationQuantity(db, componentId, location)
                         val newTotal = Math.addExact(oldTotal, quantity)
                         val newAllocation = Math.addExact(oldAllocation, quantity)
                         db.update("components", ContentValues().apply {
                             put("quantity", newTotal)
+                            put("inventory_unit_cost", nextAverage)
                             put("location", location)
                             put("updated_at", now)
                         }, "id=?", arrayOf(componentId))
@@ -308,6 +313,8 @@ internal class InventoryWriteService(
                             put("component_id", componentId)
                             put("movement_type", "inbound")
                             put("quantity", quantity)
+                            put("purchase_amount", InventoryCost.text(InventoryCost.decimal(row.purchaseAmount)))
+                            put("cost_amount", InventoryCost.text(InventoryCost.decimal(row.purchaseAmount)))
                             put("reason", if (row.id.startsWith("order-")) {
                                 "LCSC order statement inbound"
                             } else {
@@ -523,6 +530,13 @@ internal class InventoryWriteService(
         val componentId = draft.id ?: "cmp-${randomId()}"
         val existingComponent = draft.id?.let { getComponentById(db, it) }
         val oldTotal = existingComponent?.quantity ?: 0
+        require(draft.purchaseAmount == null || draft.quantity > 0) { "填写采购金额时数量必须大于零。" }
+        val valuationTotal = InventoryCost.decimal(draft.valuationAmount)
+        val valuation = InventoryCost.text(if (valuationTotal != null) {
+            require(draft.quantity > 0) { "零库存不能补录成本。" }
+            valuationTotal.divide(java.math.BigDecimal(draft.quantity),16,java.math.RoundingMode.HALF_EVEN)
+        } else InventoryCost.decimal(draft.valuationUnitCost, 16))
+        require(valuation == null || draft.quantity > 0) { "零库存不能补录成本。" }
         val baseUpdatedAt = draft.id?.let { id ->
             db.rawQuery("SELECT base_updated_at FROM components WHERE id = ?", arrayOf(id)).use { cursor ->
                 if (cursor.moveToFirst()) cursor.getString(0) else null
@@ -539,6 +553,7 @@ internal class InventoryWriteService(
             put("location", draft.location.trim())
             put("description", draft.description.trim())
             put("quantity", draft.quantity)
+            put("inventory_unit_cost", (valuation ?: if (existingComponent == null && draft.quantity > 0) InventoryCost.inbound(0, null, draft.quantity, draft.purchaseAmount) else existingComponent?.inventoryUnitCost).takeIf { draft.quantity > 0 })
             put("min_stock", draft.minStock)
             put("updated_at", updatedAt)
             put("deleted", 0)
@@ -564,6 +579,27 @@ internal class InventoryWriteService(
             val adjustedAtLocation = Math.addExact(existingAtLocation, draft.quantity - oldTotal)
             check(adjustedAtLocation >= 0) { "The edited total would make the selected location negative." }
             setAllocationQuantity(db, componentId, locationId, adjustedAtLocation)
+        }
+        if (existingComponent == null && draft.quantity > 0 && draft.purchaseAmount != null) {
+            val movementId = "mov-${randomId()}"
+            val paid = InventoryCost.text(InventoryCost.decimal(draft.purchaseAmount))
+            db.insertOrThrow("stock_movements", null, ContentValues().apply {
+                put("id", movementId); put("component_id", componentId); put("movement_type", "inbound")
+                put("quantity", draft.quantity); put("reason", "Initial purchase"); put("note", "")
+                put("purchase_amount", paid); put("cost_amount", paid); put("happened_at", updatedAt)
+                put("updated_at", updatedAt); put("deleted", 0); put("location_id", locationId)
+            })
+            enqueueEntity(db, "stock_movement", movementId, updatedAt)
+        }
+        if (valuation != null) {
+            val auditId = "mov-${randomId()}"
+            db.insertOrThrow("stock_movements", null, ContentValues().apply {
+                put("id", auditId); put("component_id", componentId); put("movement_type", "adjustment")
+                put("quantity", 0); put("reason", "Current inventory valuation"); put("note", "期初当前库存估值 CNY unit cost: $valuation; previous unit cost: ${existingComponent?.inventoryUnitCost ?: "unknown"}")
+                put("cost_amount", InventoryCost.text((valuationTotal ?: java.math.BigDecimal(valuation).multiply(java.math.BigDecimal(draft.quantity))).subtract(java.math.BigDecimal(existingComponent?.inventoryUnitCost ?: "0").multiply(java.math.BigDecimal(draft.quantity))))); put("happened_at", updatedAt)
+                put("updated_at", updatedAt); put("deleted", 0); put("location_id", locationId)
+            })
+            enqueueEntity(db, "stock_movement", auditId, updatedAt)
         }
         verifyAllocationTotal(db, componentId, draft.quantity)
         enqueueEntity(db, "component", componentId, updatedAt)
@@ -633,11 +669,18 @@ internal class InventoryWriteService(
                 val newAllocation = StockAllocationMath.applyDelta(currentAllocation, allocationDelta)
                 setAllocationQuantity(db, draft.componentId, sourceLocation, newAllocation)
             }
+            val nextCost = when {
+                newQuantity == 0 -> null
+                draft.movementType == "inbound" -> InventoryCost.inbound(component.quantity, component.inventoryUnitCost, draft.quantity, draft.purchaseAmount)
+                else -> component.inventoryUnitCost
+            }
             val movementId = "mov-${randomId()}"
             val movementValues = ContentValues().apply {
                 put("id", movementId)
                 put("component_id", draft.componentId)
                 put("movement_type", draft.movementType.lowercase(Locale.US))
+                put("purchase_amount", InventoryCost.text(InventoryCost.decimal(draft.purchaseAmount)))
+                put("cost_amount", if (draft.movementType == "inbound") InventoryCost.text(InventoryCost.decimal(draft.purchaseAmount)) else if (draft.movementType == "transfer") null else InventoryCost.amount(component.inventoryUnitCost, draft.quantity))
                 put("quantity", normalizeMovementQuantity(draft.movementType, draft.quantity))
                 put("reason", draft.reason.trim())
                 put("note", draft.note.trim())
@@ -656,6 +699,7 @@ internal class InventoryWriteService(
 
             val componentValues = ContentValues().apply {
                 put("quantity", newQuantity)
+                put("inventory_unit_cost", nextCost)
                 put("updated_at", updatedAt)
             }
             db.update(
@@ -705,6 +749,7 @@ internal class InventoryWriteService(
                 package_name,
                 location,
                 COALESCE(description, '') AS description,
+                inventory_unit_cost,
                 quantity,
                 min_stock,
                 updated_at,
@@ -723,6 +768,7 @@ internal class InventoryWriteService(
                     packageName = cursor.getString(cursor.getColumnIndexOrThrow("package_name")),
                     location = cursor.getString(cursor.getColumnIndexOrThrow("location")),
                     description = cursor.getString(cursor.getColumnIndexOrThrow("description")),
+                    inventoryUnitCost = cursor.getString(cursor.getColumnIndexOrThrow("inventory_unit_cost")),
                     quantity = cursor.getInt(cursor.getColumnIndexOrThrow("quantity")),
                     minStock = cursor.getInt(cursor.getColumnIndexOrThrow("min_stock")),
                     updatedAt = cursor.getString(cursor.getColumnIndexOrThrow("updated_at")),

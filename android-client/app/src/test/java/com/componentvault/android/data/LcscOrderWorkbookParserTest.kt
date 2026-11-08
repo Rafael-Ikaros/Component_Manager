@@ -22,6 +22,7 @@ class LcscOrderWorkbookParserTest {
         assertEquals(2, parsed.skippedFees)
         assertEquals(182, parsed.rows.map { it.sku }.distinct().size)
         assertTrue(parsed.rows.all { it.quantityText.toInt() > 0 })
+        assertTrue(parsed.rows.all { it.purchaseAmount != null })
     }
 
     @Test
@@ -42,6 +43,11 @@ class LcscOrderWorkbookParserTest {
         assertTrue(row.description.contains("商品名称：Example"))
         assertTrue(row.id.startsWith("order-"))
         assertEquals(row.id, LcscOrderWorkbookParser.parse(ByteArrayInputStream(statement(paddingRows = 2))).rows.single().id)
+    }
+
+    @Test fun usesActualSubtotalBeforeUnitAndAggregatesAmounts() {
+        val row = LcscOrderWorkbookParser.parse(ByteArrayInputStream(statement(priced=true))).rows.single()
+        assertEquals("0.925", row.purchaseAmount)
     }
 
     @Test
@@ -66,16 +72,17 @@ class LcscOrderWorkbookParserTest {
         }
     }
 
-    private fun statement(paddingRows: Int = 0, invalidProduct: Boolean = false, footer: Boolean = false): ByteArray {
+    private fun statement(paddingRows: Int = 0, invalidProduct: Boolean = false, footer: Boolean = false, priced: Boolean = false): ByteArray {
         val output = ByteArrayOutputStream()
         val book = Workbook.createWorkbook(output)
         val sheet = book.createSheet("Order details", 0)
-        val headers = listOf("订单编号", "商品编号", "商品名称", "商品型号", "封装格式", "订购数量", "品牌", "商品类型")
+        val headers = listOf("订单编号", "商品编号", "商品名称", "商品型号", "封装格式", "订购数量", "品牌", "商品类型") + if (priced) listOf("单价（人民币含税）", "小计金额（人民币含税）") else emptyList()
         headers.forEachIndexed { column, value -> sheet.addCell(Label(column, paddingRows, value)) }
         fun item(row: Int, quantity: Double) {
             listOf("SO-1", "C12345", "Example", "M-01", "SMD", "", "Maker", "Resistor")
                 .forEachIndexed { column, value -> if (value.isNotEmpty()) sheet.addCell(Label(column, row + paddingRows, value)) }
             sheet.addCell(XlsNumber(5, row + paddingRows, quantity))
+            if (priced) { sheet.addCell(XlsNumber(8,row + paddingRows,0.125)); if(row==1) sheet.addCell(XlsNumber(9,row + paddingRows,0.3)) }
         }
         item(1, 3.0)
         sheet.addCell(Label(2, 2 + paddingRows, "价外费用（配送费）"))

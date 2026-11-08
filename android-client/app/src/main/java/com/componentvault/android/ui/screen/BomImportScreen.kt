@@ -623,6 +623,13 @@ internal fun BomImportScreen(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(stringResource(R.string.bom_match_counts, readyCount, problemLines.size, skippedRequirements.size), style = MaterialTheme.typography.titleMedium)
+                        val costs = com.componentvault.android.data.bom.BomCostSummary.calculate(current.lines, current.parsed.productionSets)
+                        costs.missingLines.forEach { line ->
+                            Text("${line.componentSku ?: line.requirement.name ?: line.requirement.identity.canonicalKey}：${if (line.componentId == null) "未匹配" else "库存成本未知"}", color = MaterialTheme.colorScheme.error)
+                        }
+                        Text("CNY 材料成本估算，不含运费、PCB 及加工费用；库存不足仍按全部需求估算。")
+                        Text("${if (costs.complete) "整批成本" else "已知成本小计"}（CNY）：${costs.knownSubtotal.setScale(2, java.math.RoundingMode.HALF_EVEN)}；缺成本/未匹配 ${costs.missingLines.size} 项")
+                        Text("单套${if (costs.complete) "成本" else "已知成本小计"}（CNY）：${costs.perSetKnownSubtotal.setScale(2, java.math.RoundingMode.HALF_EVEN)}；跳过项不计价")
                         Text(
                             stringResource(if (current.canCommit) R.string.bom_ready_to_review else if (current.lines.isEmpty()) R.string.bom_restore_to_release else R.string.bom_resolve_hint),
                             color = if (current.canCommit) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,

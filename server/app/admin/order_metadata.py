@@ -294,7 +294,7 @@ def apply_item(connection: sqlite3.Connection, settings: Settings, item: ApplyIt
         now = _now_datetime_after(row["updated_at"])
         if changed:
             managed = bool(row["inventory_managed"])
-            component = ComponentPayload(
+            component = ComponentPayload(inventory_unit_cost=row["inventory_unit_cost"],
                 id=row["id"], sku=row["sku"], name=row["name"], category=category,
                 package_name=package, description=description, location=row["location"],
                 quantity=row["quantity"], min_stock=row["min_stock"], updated_at=now,
@@ -302,7 +302,7 @@ def apply_item(connection: sqlite3.Connection, settings: Settings, item: ApplyIt
                 base_updated_at=item.expected_updated_at if managed else None,
             )
             _save_payload(connection, settings, PushRequest(
-                device_id="admin-web", inventory_protocol=1 if managed else 0, components=[component],
+                device_id="admin-web", cost_protocol=1, inventory_protocol=1 if managed else 0, components=[component],
             ))
         _save_receipt(connection, item.request_id, "order_metadata", item.component_id, payload, _storage_time(now))
         return "updated" if changed else "unchanged"

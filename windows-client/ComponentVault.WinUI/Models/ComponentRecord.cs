@@ -7,6 +7,8 @@ namespace ComponentVault.WinUI.Models;
 
 public sealed class ComponentRecord
 {
+    public string? InventoryUnitCost { get; init; }
+    public string InventoryCostLabel => InventoryUnitCost is null ? "库存成本未知" : $"库存均价 ¥{InventoryUnitCost} / 件 · 总成本 ¥{InventoryCost.Multiply(InventoryUnitCost,Quantity)}";
     public required string Id { get; init; }
     public required string Sku { get; init; }
     public required string Name { get; init; }

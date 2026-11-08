@@ -336,6 +336,8 @@ internal fun BatchJlcInboundScreen(
         return
     }
     val selectedReady = draft.rows.filter { it.status == BatchJlcStatus.Ready && it.selected }
+    val selectedKnown = selectedReady.mapNotNull { it.purchaseAmount?.toBigDecimalOrNull() }
+    val selectedSubtotal = selectedKnown.fold(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
     val planResult = remember(selectedReady) { runCatching { BatchJlcCommitPlanner.plan(selectedReady, emptySet()) } }
     val visibleRows = draft.rows.filter {
         it.status == if (page == BatchPage.Review) BatchJlcStatus.Ready else BatchJlcStatus.Pending
@@ -400,6 +402,7 @@ internal fun BatchJlcInboundScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            item { Text("已选${if (selectedKnown.size == selectedReady.size) "采购金额" else "已知金额小计"}（CNY）：${selectedSubtotal.setScale(2,java.math.RoundingMode.HALF_EVEN)}；未知 ${selectedReady.size-selectedKnown.size} 项") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BatchPage.entries.forEach { candidate ->
@@ -667,6 +670,7 @@ private fun BatchRowCard(row: BatchJlcRow, ready: Boolean, locations: List<Stora
             R.string.batch_row_summary, row.quantityText,
             locations.firstOrNull { it.id == row.location }?.name ?: row.location,
         ))
+        Text("实际采购总额（CNY）：${row.purchaseAmount ?: "成本未知"}")
         if (row.error.isNotBlank()) Text(row.error, color = MaterialTheme.colorScheme.error)
         Row(Modifier.fillMaxWidth()) {
             TextButton(
@@ -687,6 +691,8 @@ private fun BatchRowCard(row: BatchJlcRow, ready: Boolean, locations: List<Stora
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRecord>, onDismiss: () -> Unit, onSave: (BatchJlcRow) -> Unit) {
+    var purchaseIsUnit by rememberSaveable(row.id) { mutableStateOf(false) }
+    var purchaseText by rememberSaveable(row.id) { mutableStateOf(row.purchaseAmount.orEmpty()) }
     var sku by rememberSaveable(row.id) { mutableStateOf(row.sku) }; var quantity by rememberSaveable(row.id) { mutableStateOf(row.quantityText) }
     var location by rememberSaveable(row.id) { mutableStateOf(row.location) }; var name by rememberSaveable(row.id) { mutableStateOf(row.name) }
     var category by rememberSaveable(row.id) { mutableStateOf(row.category) }; var packageName by rememberSaveable(row.id) { mutableStateOf(row.packageName) }
@@ -700,6 +706,7 @@ private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRec
         ) {
             OutlinedTextField(sku, { sku = it.uppercase() }, label = { Text(stringResource(R.string.batch_sku)) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(quantity, { quantity = it }, label = { Text(stringResource(if (row.id.startsWith("order-")) R.string.lcsc_order_quantity else R.string.batch_quantity)) }, modifier = Modifier.fillMaxWidth())
+            PurchaseCostFields(purchaseText,purchaseIsUnit,quantity.toIntOrNull(),{ purchaseText = it },{ purchaseIsUnit = it })
             LocationSelector(locations, location, true) { location = it }
             OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.field_name)) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(category, { category = it }, label = { Text(stringResource(R.string.field_category)) }, modifier = Modifier.fillMaxWidth())
@@ -711,7 +718,7 @@ private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRec
         val savedCategory = if (skuChanged && category == row.category) "" else category
         val savedPackage = if (skuChanged && packageName == row.packageName) "" else packageName
         val savedValid = !skuChanged && valid
-        onSave(row.copy(sku = sku, quantityText = quantity, location = location,
+        onSave(row.copy(purchaseAmount = purchaseTotal(purchaseText,purchaseIsUnit,quantity.toIntOrNull() ?: 0), sku = sku, quantityText = quantity, location = location,
             name = savedName, category = savedCategory, packageName = savedPackage,
             description = if (skuChanged) "" else row.description,
             status = if (savedValid) BatchJlcStatus.Ready else BatchJlcStatus.Pending,

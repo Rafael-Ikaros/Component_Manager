@@ -76,6 +76,7 @@ internal fun MovementsScreen(
     onUpdateMovementBatchItemQuantity: (String, String) -> Unit,
     onUpdateMovementBatchItemReason: (String, String) -> Unit,
     onUpdateMovementBatchItemNote: (String, String) -> Unit,
+    onUpdateMovementBatchItemPurchaseAmount: (String, String) -> Unit = { _, _ -> },
     onRemoveMovementBatchItem: (String) -> Unit,
     onSearchInventoryBySku: (String) -> Unit,
     onImportComponent: () -> Unit,
@@ -97,6 +98,7 @@ internal fun MovementsScreen(
         onUpdateMovementBatchItemQuantity = onUpdateMovementBatchItemQuantity,
         onUpdateMovementBatchItemReason = onUpdateMovementBatchItemReason,
         onUpdateMovementBatchItemNote = onUpdateMovementBatchItemNote,
+        onUpdateMovementBatchItemPurchaseAmount = onUpdateMovementBatchItemPurchaseAmount,
         onRemoveMovementBatchItem = onRemoveMovementBatchItem,
         onSearchInventoryBySku = onSearchInventoryBySku,
         onImportComponent = onImportComponent,
@@ -122,6 +124,7 @@ internal fun MovementsContent(
     onUpdateMovementBatchItemQuantity: (String, String) -> Unit,
     onUpdateMovementBatchItemReason: (String, String) -> Unit,
     onUpdateMovementBatchItemNote: (String, String) -> Unit,
+    onUpdateMovementBatchItemPurchaseAmount: (String, String) -> Unit = { _, _ -> },
     onRemoveMovementBatchItem: (String) -> Unit,
     onSearchInventoryBySku: (String) -> Unit,
     onImportComponent: () -> Unit,
@@ -180,6 +183,7 @@ internal fun MovementsContent(
                         onUpdateMovementBatchItemQuantity = onUpdateMovementBatchItemQuantity,
                         onUpdateMovementBatchItemReason = onUpdateMovementBatchItemReason,
                         onUpdateMovementBatchItemNote = onUpdateMovementBatchItemNote,
+                        onUpdateMovementBatchItemPurchaseAmount = onUpdateMovementBatchItemPurchaseAmount,
                         onRemoveMovementBatchItem = onRemoveMovementBatchItem,
                         onSearchInventoryBySku = onSearchInventoryBySku,
                         onImportComponent = onImportComponent,
@@ -220,6 +224,7 @@ internal fun MovementsContent(
             onUpdateMovementBatchItemQuantity = onUpdateMovementBatchItemQuantity,
             onUpdateMovementBatchItemReason = onUpdateMovementBatchItemReason,
             onUpdateMovementBatchItemNote = onUpdateMovementBatchItemNote,
+            onUpdateMovementBatchItemPurchaseAmount = onUpdateMovementBatchItemPurchaseAmount,
             onRemoveMovementBatchItem = onRemoveMovementBatchItem,
             onSearchInventoryBySku = onSearchInventoryBySku,
             onImportComponent = onImportComponent,
@@ -279,6 +284,7 @@ internal fun MovementBatchReviewRoute(
     onUpdateMovementBatchItemQuantity: (String, String) -> Unit,
     onUpdateMovementBatchItemReason: (String, String) -> Unit,
     onUpdateMovementBatchItemNote: (String, String) -> Unit,
+    onUpdateMovementBatchItemPurchaseAmount: (String, String) -> Unit = { _, _ -> },
     onRemoveMovementBatchItem: (String) -> Unit,
     onUpdateMovementBatchItemLocation: (String, String) -> Unit = { _, _ -> },
 ) {
@@ -315,6 +321,7 @@ internal fun MovementBatchReviewRoute(
                     onQuantityChange = { onUpdateMovementBatchItemQuantity(item.componentId, it) },
                     onReasonChange = { onUpdateMovementBatchItemReason(item.componentId, it) },
                     onNoteChange = { onUpdateMovementBatchItemNote(item.componentId, it) },
+                    onPurchaseChange = { onUpdateMovementBatchItemPurchaseAmount(item.componentId, it) },
                     onLocationChange = { onUpdateMovementBatchItemLocation(item.componentId, it) },
                     onRemove = { onRemoveMovementBatchItem(item.componentId) },
                 )
@@ -342,6 +349,7 @@ private fun MovementMasterPane(
     onUpdateMovementBatchItemQuantity: (String, String) -> Unit,
     onUpdateMovementBatchItemReason: (String, String) -> Unit,
     onUpdateMovementBatchItemNote: (String, String) -> Unit,
+    onUpdateMovementBatchItemPurchaseAmount: (String, String) -> Unit = { _, _ -> },
     onRemoveMovementBatchItem: (String) -> Unit,
     onSearchInventoryBySku: (String) -> Unit,
     onImportComponent: () -> Unit,
@@ -634,6 +642,7 @@ private fun MovementBatchQueueItemCard(
     onQuantityChange: (String) -> Unit,
     onReasonChange: (String) -> Unit,
     onNoteChange: (String) -> Unit,
+    onPurchaseChange: (String) -> Unit = {},
     onLocationChange: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -689,6 +698,7 @@ private fun MovementBatchQueueItemCard(
                 (item.locationQuantities[item.location] ?: 0).coerceAtLeast(0) else Int.MAX_VALUE,
             skipZero = item.movementType == MovementQuickAction.Adjustment.movementType,
         )
+        if (item.movementType == "inbound") OutlinedTextField(item.purchaseAmount, onPurchaseChange, label = { Text("实际采购总额（CNY，留空未知）") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(
             value = item.reason,
             onValueChange = onReasonChange,
@@ -774,6 +784,8 @@ private fun MovementDetailPane(
                     MovementTypePill(movement.movementType)
                     MovementQuantityPill(movement)
                 }
+                ValueBlock(label = "实际采购金额（CNY）", value = movement.purchaseAmount ?: "未知")
+                ValueBlock(label = "库存结转/估值金额（CNY）", value = movement.costAmount ?: "未知")
                 ValueBlock(
                     label = strings.movements.detailHappenedAt,
                     value = formatShortLocalTimestamp(movement.happenedAt),

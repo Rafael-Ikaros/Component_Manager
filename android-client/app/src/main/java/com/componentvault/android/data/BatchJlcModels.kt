@@ -21,6 +21,7 @@ internal data class BatchJlcRow(
     val error: String = "",
     val selected: Boolean = true,
     val description: String = "",
+    val purchaseAmount: String? = null,
 )
 
 internal data class BatchJlcDraft(
@@ -89,6 +90,7 @@ internal object BatchJlcDraftCodec {
                     .put("package_name", row.packageName)
                     .put("description", row.description)
                     .put("quantity", row.quantityText)
+                    .put("purchase_amount", row.purchaseAmount ?: JSONObject.NULL)
                     .put("location", row.location)
                     .put("error", row.error)
                     .put("selected", row.selected))
@@ -108,6 +110,7 @@ internal object BatchJlcDraftCodec {
                 status = BatchJlcStatus.valueOf(row.getString("status")),
                 sku = row.optString("sku"), name = row.optString("name"),
                 category = row.optString("category"), packageName = row.optString("package_name"),
+                purchaseAmount = if (row.isNull("purchase_amount")) null else row.getString("purchase_amount"),
                 description = row.optString("description"), quantityText = row.optString("quantity"),
                 location = row.optString("location"), error = row.optString("error"),
                 selected = row.optBoolean("selected", true),

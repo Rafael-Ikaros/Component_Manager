@@ -85,6 +85,8 @@ internal object LcscOrderWorkbookParser {
                 "第 ${row + 1} 行是取消或退款订单，需要先核对后再导入。"
             }
             val quantity = quantity(sheet, columns.getValue("订购数量"), row)
+            fun money(header: String) = columns[header]?.let { column -> val cell = sheet.getCell(column, row); if (cell is NumberCell) java.math.BigDecimal.valueOf(cell.value).stripTrailingZeros().toPlainString() else cell.contents.trim().takeIf(String::isNotBlank) }?.let { InventoryCost.decimal(it) }
+            val amount = money("小计金额（人民币含税）") ?: money("单价（人民币含税）")?.multiply(java.math.BigDecimal(quantity))
             val model = value("商品型号")
             val brand = value("品牌")
             val category = value("商品类型")
@@ -94,14 +96,14 @@ internal object LcscOrderWorkbookParser {
             if (prior == null) {
                 grouped[key] = OrderLine(
                     sku = sku, productName = productName, category = category, packageName = packageName,
-                    model = model, brand = brand, quantity = quantity,
+                    model = model, brand = brand, quantity = quantity, amount = InventoryCost.text(amount),
                 )
             } else {
                 require(
                     prior.sku == sku && prior.productName == productName && prior.category == category &&
                         prior.packageName == packageName && prior.model == model && prior.brand == brand,
                 ) { "第 ${row + 1} 行与同订单同料号的其他明细不一致，请先核对。" }
-                grouped[key] = prior.copy(quantity = Math.addExact(prior.quantity, quantity))
+                grouped[key] = prior.copy(quantity = Math.addExact(prior.quantity, quantity), amount = if (prior.amount == null || amount == null) null else InventoryCost.text(java.math.BigDecimal(prior.amount).add(amount)))
                 mergedLines++
             }
             require(grouped.size <= BatchJlcDraftCodec.MaxRows) { "对账单超过 500 个不同订单商品，请分批导入。" }
@@ -112,6 +114,7 @@ internal object LcscOrderWorkbookParser {
                     id = id, raw = "lcsc-order:$id", status = BatchJlcStatus.Ready,
                     sku = line.sku, name = displayName(line), category = line.category,
                     packageName = line.packageName, quantityText = line.quantity.toString(),
+                    purchaseAmount = line.amount,
                     description = buildList {
                         line.model.takeIf(String::isNotBlank)?.let { add("型号：$it") }
                         line.brand.takeIf(String::isNotBlank)?.let { add("品牌：$it") }
@@ -153,5 +156,6 @@ internal object LcscOrderWorkbookParser {
         val model: String,
         val brand: String,
         val quantity: Int,
+        val amount: String? = null,
     )
 }

@@ -173,6 +173,9 @@ internal sealed class InventoryDatabase
         EnsureColumnExists(connection, "components", "base_updated_at", "TEXT");
         EnsureColumnExists(connection, "stock_movements", "location_id", "TEXT");
         EnsureColumnExists(connection, "stock_movements", "destination_location_id", "TEXT");
+        EnsureColumnExists(connection, "components", "inventory_unit_cost", "TEXT");
+        EnsureColumnExists(connection, "stock_movements", "purchase_amount", "TEXT");
+        EnsureColumnExists(connection, "stock_movements", "cost_amount", "TEXT");
         if (needsLegacyMigration) MigrateLegacyAllocations(connection);
     }
 

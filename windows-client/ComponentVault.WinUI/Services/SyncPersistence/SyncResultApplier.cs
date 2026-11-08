@@ -240,6 +240,7 @@ internal sealed class SyncResultApplier(InventoryDatabase database)
         command.Parameters.AddWithValue("$updated_at", component.UpdatedAt);
         command.Parameters.AddWithValue("$deleted", component.Deleted ? 1 : 0);
         command.ExecuteNonQuery();
+        SetCost(connection, component.Id, component.InventoryUnitCost);
         var remoteAllocations = component.Allocations ??
             [new SyncAllocationDto { LocationId = NormalizeLocationId(component.Location), Quantity = component.Quantity }];
         if (remoteAllocations.Count == 0 || remoteAllocations.Sum(item => (long)item.Quantity) != component.Quantity)
@@ -340,4 +341,10 @@ internal sealed class SyncResultApplier(InventoryDatabase database)
         command.Parameters.AddWithValue("$location_id", (object?)movement.LocationId ?? DBNull.Value);
         command.Parameters.AddWithValue("$destination_location_id", (object?)movement.DestinationLocationId ?? DBNull.Value);
         command.ExecuteNonQuery();
+        using var costs = connection.CreateCommand();
+        costs.CommandText = "UPDATE stock_movements SET purchase_amount=$purchase,cost_amount=$cost WHERE id=$id";
+        costs.Parameters.AddWithValue("$purchase", (object?)movement.PurchaseAmount ?? DBNull.Value);
+        costs.Parameters.AddWithValue("$cost", (object?)movement.CostAmount ?? DBNull.Value);
+        costs.Parameters.AddWithValue("$id", movement.Id);
+        costs.ExecuteNonQuery();
     }}

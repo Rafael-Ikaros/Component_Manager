@@ -30,7 +30,8 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
                 min_stock INTEGER NOT NULL CHECK (min_stock >= 0),
                 updated_at TEXT NOT NULL,
                 deleted INTEGER NOT NULL DEFAULT 0,
-                base_updated_at TEXT
+                base_updated_at TEXT,
+                inventory_unit_cost TEXT
             )
             """.trimIndent(),
         )
@@ -54,7 +55,9 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
                 updated_at TEXT NOT NULL,
                 deleted INTEGER NOT NULL DEFAULT 0,
                 location_id TEXT,
-                destination_location_id TEXT
+                destination_location_id TEXT,
+                purchase_amount TEXT,
+                cost_amount TEXT
             )
             """.trimIndent(),
         )
@@ -109,6 +112,11 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
         }
         createBackupTables(db)
         if (oldVersion < 5) createBatchJlcTables(db)
+        if (oldVersion < 6) {
+            db.execSQL("ALTER TABLE components ADD COLUMN inventory_unit_cost TEXT")
+            db.execSQL("ALTER TABLE stock_movements ADD COLUMN purchase_amount TEXT")
+            db.execSQL("ALTER TABLE stock_movements ADD COLUMN cost_amount TEXT")
+        }
     }
 
     private fun createImportLearningTables(db: SQLiteDatabase) {
@@ -255,6 +263,6 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
 
     private companion object {
         const val DATABASE_NAME = "component-vault.db"
-        const val DATABASE_VERSION = 5
+        const val DATABASE_VERSION = 6
     }
 }

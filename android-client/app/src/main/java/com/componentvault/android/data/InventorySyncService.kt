@@ -371,6 +371,7 @@ internal class InventorySyncService(
 
             val payload = JSONObject().apply {
                 put("device_id", deviceId)
+                put("cost_protocol", 1)
                 put("inventory_protocol", 1)
                 put("components", JSONArray())
                 put("stock_movements", JSONArray())
@@ -417,7 +418,8 @@ internal class InventorySyncService(
                 min_stock,
                 updated_at,
                 deleted,
-                base_updated_at
+                base_updated_at,
+                inventory_unit_cost
             FROM components
             WHERE id = ?
             """.trimIndent(),
@@ -435,6 +437,7 @@ internal class InventorySyncService(
                 put("location", cursor.getString(cursor.getColumnIndexOrThrow("location")))
                 put("description", cursor.getString(cursor.getColumnIndexOrThrow("description")))
                 put("quantity", cursor.getInt(cursor.getColumnIndexOrThrow("quantity")))
+                put("inventory_unit_cost", cursor.getString(cursor.getColumnIndexOrThrow("inventory_unit_cost")) ?: JSONObject.NULL)
                 put("min_stock", cursor.getInt(cursor.getColumnIndexOrThrow("min_stock")))
                 put("updated_at", cursor.getString(cursor.getColumnIndexOrThrow("updated_at")))
                 put("deleted", cursor.getInt(cursor.getColumnIndexOrThrow("deleted")) == 1)
@@ -471,7 +474,9 @@ internal class InventorySyncService(
                 updated_at,
                 deleted,
                 location_id,
-                destination_location_id
+                destination_location_id,
+                purchase_amount,
+                cost_amount
             FROM stock_movements
             WHERE id = ?
             """.trimIndent(),
@@ -483,6 +488,8 @@ internal class InventorySyncService(
             return JSONObject().apply {
                 put("id", cursor.getString(cursor.getColumnIndexOrThrow("id")))
                 put("component_id", cursor.getString(cursor.getColumnIndexOrThrow("component_id")))
+                put("purchase_amount", cursor.getString(cursor.getColumnIndexOrThrow("purchase_amount")) ?: JSONObject.NULL)
+                put("cost_amount", cursor.getString(cursor.getColumnIndexOrThrow("cost_amount")) ?: JSONObject.NULL)
                 put("movement_type", cursor.getString(cursor.getColumnIndexOrThrow("movement_type")))
                 put("quantity", cursor.getInt(cursor.getColumnIndexOrThrow("quantity")))
                 put("reason", cursor.getString(cursor.getColumnIndexOrThrow("reason")))
@@ -502,6 +509,7 @@ internal class InventorySyncService(
         }
 
     private fun requireSyncIdentity(endpoint: ResolvedSyncEndpoint<JSONObject>): JSONObject {
+        check(endpoint.probe.optInt("cost_protocol", 0) == 1) { "服务器不支持库存成本协议，请先升级服务器。" }
         check(endpoint.probe.optInt("inventory_protocol", 0) == 1) {
             text(R.string.sync_inventory_protocol_unavailable)
         }
@@ -619,6 +627,7 @@ internal class InventorySyncService(
         pullResponse: JSONObject,
         pushedEntities: List<QueuedEntity>,
     ) {
+        check(pullResponse.optInt("cost_protocol", 0) == 1) { "服务器不支持库存成本协议，请先升级服务器。本地数据已保留。" }
         check(pullResponse.optInt("inventory_protocol", 0) == 1) {
             "The sync response is missing inventory_protocol=1. Local changes were kept."
         }
@@ -690,6 +699,7 @@ internal class InventorySyncService(
             put("package_name", component.getString("package_name"))
             put("location", component.getString("location"))
             put("description", if (component.isNull("description")) null as String? else component.optString("description"))
+            put("inventory_unit_cost", if (component.isNull("inventory_unit_cost")) null else InventoryCost.text(InventoryCost.decimal(component.getString("inventory_unit_cost"), 16)))
             put("quantity", component.getInt("quantity"))
             put("min_stock", component.getInt("min_stock"))
             put("updated_at", component.getString("updated_at"))
@@ -749,6 +759,8 @@ internal class InventorySyncService(
             put("id", movement.getString("id"))
             put("component_id", movement.getString("component_id"))
             put("movement_type", movement.getString("movement_type"))
+            put("purchase_amount", if (movement.isNull("purchase_amount")) null else movement.getString("purchase_amount"))
+            put("cost_amount", if (movement.isNull("cost_amount")) null else movement.getString("cost_amount"))
             put("quantity", movement.getInt("quantity"))
             put("reason", movement.getString("reason"))
             put("note", movement.optString("note"))

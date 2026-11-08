@@ -246,6 +246,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         return result;
     }
 
+    public OperationResult SetInventoryCost(string id, string version, string amount)
+    {
+        var result = _store.SetInventoryCost(id, version, amount);
+        if(result.IsSuccess) { Refresh(); _sync.ScheduleAutoSync(); }
+        return result;
+    }
     public OperationResult RecordMovement(MovementEntryDraft draft)
     {
         var result = _movements.Record(draft);

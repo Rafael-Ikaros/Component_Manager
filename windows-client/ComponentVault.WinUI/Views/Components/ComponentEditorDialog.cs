@@ -147,6 +147,10 @@ public sealed class ComponentEditorDialog(
         panel.Children.Add(CreateField("已有库位", locationBox));
         panel.Children.Add(newLocationFields);
         panel.Children.Add(CreateField("当前库存", quantityBox));
+        var purchaseBox = new PurchaseCostInput { InitialAmount=editor.PurchaseAmount, Visibility=existing is null ? Visibility.Visible : Visibility.Collapsed };
+        void UpdatePurchaseQuantity() => purchaseBox.Quantity=double.IsFinite(quantityBox.Value) && quantityBox.Value is > 0 and <= int.MaxValue ? (int)quantityBox.Value : 0;
+        quantityBox.ValueChanged += (_, _) => UpdatePurchaseQuantity();UpdatePurchaseQuantity();
+        panel.Children.Add(purchaseBox);
         panel.Children.Add(CreateField("最低库存", minStockBox));
 
         panel.Children.Add(CreateSectionHeader("备注", "填写用途、风险或替代料信息。"));
@@ -332,6 +336,8 @@ public sealed class ComponentEditorDialog(
             editor.Category = categoryBox.Text;
             editor.PackageName = packageBox.Text;
             editor.Description = descriptionBox.Text;
+            try { editor.PurchaseAmount = existing is null ? purchaseBox.GetPurchaseAmount() : null; }
+            catch (InvalidOperationException ex) { errorText.Text = ex.Message; args.Cancel = true; return; }
             editor.Quantity = quantityBox.Value;
             editor.MinStock = minStockBox.Value;
             editor.SelectedLocationId = (locationBox.SelectedItem as StorageLocationRecord)?.Id;

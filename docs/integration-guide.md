@@ -1,5 +1,33 @@
 # Integration Guide
 
+## 库存成本协议（cost_protocol=1）
+
+`/health`、`/auth/ping` 和 `/sync/pull` 声明 `cost_protocol:1`。
+新客户端必须确认该能力后才上传；缺少能力时保留本地队列并要求升级服务端。
+`POST /sync/push` 增加 `cost_protocol:1`，与既有 `inventory_protocol:1` 同时使用。
+
+- components 每项显式提供 `inventory_unit_cost`，值为非负十进制字符串或 null。
+  null 表示成本未知；quantity=0 时必须为 null。币种固定 CNY。
+- stock_movements 增加 `purchase_amount` 和 `cost_amount`，均为十进制字符串或 null。
+  前者记录实际采购金额；后者记录本次库存结转或估值金额。显式 `"0"` 与 null 含义不同。
+- 平均价最多16位小数，采购金额输入最多8位小数，均使用 HALF_EVEN 处理计算除法。
+  金额不得通过 JSON 浮点数、SQLite REAL 或界面分位舍入值往返。
+
+组件快照包含操作后的完整成本，服务端不根据任意到达顺序的历史流水二次加权。
+库存版本检查、短事务和相同内容重试沿用原协议；并发冲突保留待处理操作，不自动合并采购金额。
+没有声明成本能力的旧请求不会清除已有成本字段；若其修改已有成本元件的数量，返回明确的升级冲突。
+只更新名称、分类等资料且数量不变时继续保留成本。业务规则见[购买价格与材料成本](inventory-cost.md)。
+
+`POST /admin-api/components/{id}/cost` 在 Web 库存写入启用后补录当前库存成本，
+沿用当前账户认证与 Cookie/CSRF。请求为 `{request_id, expected_updated_at, inventory_amount}`，
+其中 inventory_amount 是非负 CNY 当前库存总额字符串，最多8位小数；只接受非零当前库存。
+按当前数量计算均价并写零数量 adjustment 流水。原成本未知时 cost_amount 是初始估值总额，
+原成本已知时是估值差额（可负），reason/note 标识其含义，不将它标为采购支出。
+同请求号重试幂等，版本过期返回冲突，数量及库位不变。
+
+Web 入库 `POST /admin-api/components/{id}/movements` 可提供 `purchase_amount` 商品总额字符串；
+留空为未知，明确 `"0"` 为赠品，出库不能携带采购金额。
+
 ## 网页更新作业（管理员）
 
 首次启用需按[部署说明](server-web-update.md)配置独立 updater 和原 Compose 项目目录；仅更新 0.7.8 的 API/Web 镜像不能自动启用。启用后由管理员选择渠道并明确创建作业，不是后台定时自动更新。未部署 updater 时仍可使用原有部署方式更新。

@@ -8,4 +8,5 @@ data class MovementEntryDraft(
     val note: String,
     val locationId: String? = null,
     val destinationLocationId: String? = null,
+    val purchaseAmount: String? = null,
 )

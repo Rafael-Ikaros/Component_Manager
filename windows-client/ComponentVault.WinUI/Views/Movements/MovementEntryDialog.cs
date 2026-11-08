@@ -147,6 +147,16 @@ public sealed class MovementEntryDialog(
         panel.Children.Add(CreateSectionHeader("数量与原因", "数量将直接影响本地库存。"));
         panel.Children.Add(CreateField("数量", quantityBox));
         panel.Children.Add(helperText);
+        var purchaseBox = new PurchaseCostInput();
+        void UpdatePurchaseInput()
+        {
+            purchaseBox.Visibility = movementTypeCombo.SelectedItem is MovementTypeOption type && type.Value=="inbound" ? Visibility.Visible : Visibility.Collapsed;
+            purchaseBox.Quantity=double.IsFinite(quantityBox.Value) && quantityBox.Value is > 0 and <= int.MaxValue ? (int)quantityBox.Value : 0;
+        }
+        quantityBox.ValueChanged += (_, _) => UpdatePurchaseInput();
+        movementTypeCombo.SelectionChanged += (_, _) => UpdatePurchaseInput();
+        UpdatePurchaseInput();
+        panel.Children.Add(purchaseBox);
         panel.Children.Add(CreateField("原因", reasonBox));
 
         panel.Children.Add(CreateSectionHeader("补充说明", "可填写工单号、批次或盘点备注。"));
@@ -240,8 +250,12 @@ public sealed class MovementEntryDialog(
                 return;
             }
 
+            string? purchaseAmount;
+            try { purchaseAmount = movementType.Value=="inbound" ? purchaseBox.GetPurchaseAmount() : null; }
+            catch (InvalidOperationException ex) { errorText.Text = ex.Message; args.Cancel = true; return; }
             draft = new MovementEntryDraft
             {
+                PurchaseAmount = purchaseAmount,
                 ComponentId = selectedComponent.Component.Id,
                 MovementType = movementType.Value,
                 Quantity = (int)Math.Round(quantityBox.Value),

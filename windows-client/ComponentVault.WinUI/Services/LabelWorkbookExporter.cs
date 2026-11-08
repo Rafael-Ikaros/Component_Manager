@@ -178,7 +178,7 @@ public static class LabelWorkbookExporter
         Id = source.Id, Sku = source.Sku, Name = source.Name, Category = source.Category,
         PackageName = source.PackageName, Location = source.Location, Description = source.Description,
         Quantity = source.Quantity, MinStock = source.MinStock, UpdatedAt = source.UpdatedAt,
-        Deleted = source.Deleted, Allocations = source.Allocations.ToArray(),
+        Deleted = source.Deleted, InventoryUnitCost = source.InventoryUnitCost, Allocations = source.Allocations.ToArray(),
     };
     private sealed record LabelMetadata(string? Model, string? Brand, string? SourceLabel, string? RawPayload);
 }

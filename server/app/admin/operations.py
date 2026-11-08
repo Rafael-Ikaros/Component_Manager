@@ -7,9 +7,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
+from ..costs import backfill_cost, movement_cost
 from ..config import Settings
 from ..repositories import save_sync_payload_in_transaction
 from ..schemas import (
+    AdminInventoryCostUpdate,
     AdminComponentBulkDelete,
     AdminComponentCreate,
     AdminComponentDelete,
@@ -100,6 +102,7 @@ def create_component(
             component_id = f"web-{uuid4()}"
             now = _now_datetime()
             component = ComponentPayload(
+                inventory_unit_cost=None,
                 id=component_id,
                 sku=draft.sku.strip(),
                 name=draft.name.strip(),
@@ -118,7 +121,7 @@ def create_component(
                 connection,
                 settings,
                 PushRequest(
-                    device_id="admin-web",
+                    device_id="admin-web", cost_protocol=1,
                     inventory_protocol=1,
                     components=[component],
                 ),
@@ -175,6 +178,7 @@ def update_component(
                 package_name=draft.package_name.strip(),
                 location=str(row["location"]),
                 description=draft.description,
+                inventory_unit_cost=row["inventory_unit_cost"],
                 quantity=int(row["quantity"]),
                 min_stock=draft.min_stock,
                 updated_at=now,
@@ -185,7 +189,7 @@ def update_component(
                 connection,
                 settings,
                 PushRequest(
-                    device_id="admin-web",
+                    device_id="admin-web", cost_protocol=1,
                     inventory_protocol=1 if allocations is not None else 0,
                     components=[component],
                 ),
@@ -286,6 +290,7 @@ def _delete_component_in_transaction(
         package_name=str(row["package_name"]),
         location=str(row["location"]),
         description=row["description"],
+        inventory_unit_cost=row["inventory_unit_cost"],
         quantity=int(row["quantity"]),
         min_stock=int(row["min_stock"]),
         updated_at=now,
@@ -297,7 +302,7 @@ def _delete_component_in_transaction(
         connection,
         settings,
         PushRequest(
-            device_id="admin-web",
+            device_id="admin-web", cost_protocol=1,
             inventory_protocol=1 if managed else 0,
             components=[component],
         ),
@@ -348,7 +353,10 @@ def record_stock_movement(
                     "Legacy inventory uses its existing location; omit location_id."
                 )
             now = _now_datetime_after(str(row["updated_at"]))
+            unit_cost, cost_amount = movement_cost(int(row["quantity"]), row["inventory_unit_cost"],
+                                                   draft.quantity, draft.purchase_amount, draft.movement_type == "inbound")
             component = ComponentPayload(
+                inventory_unit_cost=unit_cost,
                 id=component_id,
                 sku=str(row["sku"]),
                 name=str(row["name"]),
@@ -367,6 +375,8 @@ def record_stock_movement(
                 component_id=component_id,
                 movement_type=draft.movement_type,
                 quantity=draft.quantity,
+                purchase_amount=draft.purchase_amount,
+                cost_amount=cost_amount,
                 reason=draft.reason.strip(),
                 note=draft.note,
                 happened_at=now,
@@ -377,7 +387,7 @@ def record_stock_movement(
                 connection,
                 settings,
                 PushRequest(
-                    device_id="admin-web",
+                    device_id="admin-web", cost_protocol=1,
                     inventory_protocol=1 if managed else 0,
                     components=[component],
                     stock_movements=[movement],
@@ -398,6 +408,43 @@ def record_stock_movement(
         if isinstance(error, AdminOperationConflict):
             raise
         raise AdminOperationConflict(str(error)) from error
+
+
+def update_inventory_cost(
+    connection: sqlite3.Connection, settings: Settings, component_id: str,
+    draft: AdminInventoryCostUpdate,
+) -> dict[str, object]:
+    payload_json = _canonical_payload(draft)
+    with connection:
+        connection.execute("BEGIN IMMEDIATE")
+        retry_target = _retry_target(connection, draft.request_id, "inventory_cost", component_id, payload_json)
+        if retry_target is not None:
+            return _component(connection, retry_target)
+        row = _component_row(connection, component_id)
+        _require_version(row, draft.expected_updated_at)
+        if row["quantity"] == 0:
+            raise AdminOperationConflict("Receive stock before recording its inventory cost.")
+        unit, delta = backfill_cost(row["quantity"], row["inventory_unit_cost"], draft.inventory_amount)
+        managed = bool(row["inventory_managed"])
+        now = _now_datetime_after(row["updated_at"])
+        component = ComponentPayload(
+            id=row["id"], sku=row["sku"], name=row["name"], category=row["category"],
+            package_name=row["package_name"], location=row["location"], description=row["description"],
+            quantity=row["quantity"], min_stock=row["min_stock"], inventory_unit_cost=unit,
+            updated_at=now, allocations=load_allocations(connection, component_id) if managed else None,
+            base_updated_at=draft.expected_updated_at if managed else None,
+        )
+        movement = StockMovementPayload(
+            id=f"web-movement-{uuid4()}", component_id=component_id, movement_type="adjustment",
+            quantity=0, cost_amount=delta,
+            reason="Inventory cost backfill" if row["inventory_unit_cost"] is None else "Inventory cost revaluation",
+            note="cost_amount is the initial inventory valuation" if row["inventory_unit_cost"] is None else "cost_amount is the inventory valuation difference",
+            happened_at=now, updated_at=now,
+        )
+        _save_payload(connection, settings, PushRequest(device_id="admin-web", cost_protocol=1,
+                      inventory_protocol=1 if managed else 0, components=[component], stock_movements=[movement]))
+        _save_receipt(connection, draft.request_id, "inventory_cost", component_id, payload_json, _storage_time(now))
+        return _component(connection, component_id)
 
 
 def _save_payload(

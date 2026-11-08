@@ -4,6 +4,8 @@ namespace ComponentVault.WinUI.Models;
 
 public sealed class StockMovementRecord
 {
+    public string? PurchaseAmount { get; init; }
+    public string? CostAmount { get; init; }
     public required string Id { get; init; }
     public required string ComponentId { get; init; }
     public required string ComponentSku { get; init; }

@@ -8,6 +8,29 @@ internal static class InventoryWriteSql
     private static readonly object TimestampLock = new();
     private static long _lastTimestampMilliseconds;
 
+    internal static string? GetCost(SqliteConnection connection, string componentId)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText="SELECT inventory_unit_cost FROM components WHERE id=$id";
+        command.Parameters.AddWithValue("$id",componentId);
+        return command.ExecuteScalar() as string;
+    }
+    internal static void SetCost(SqliteConnection connection, string componentId, string? average, string? movementId = null, string? purchaseAmount = null, string? costAmount = null)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE components SET inventory_unit_cost=$average WHERE id=$id";
+        command.Parameters.AddWithValue("$average", (object?)average ?? DBNull.Value);
+        command.Parameters.AddWithValue("$id", componentId);
+        command.ExecuteNonQuery();
+        if (movementId is null) return;
+        using var movement = connection.CreateCommand();
+        movement.CommandText = "UPDATE stock_movements SET purchase_amount=$purchase,cost_amount=$cost WHERE id=$id";
+        movement.Parameters.AddWithValue("$purchase", (object?)purchaseAmount ?? DBNull.Value);
+        movement.Parameters.AddWithValue("$cost", (object?)costAmount ?? DBNull.Value);
+        movement.Parameters.AddWithValue("$id", movementId);
+        movement.ExecuteNonQuery();
+    }
+
     internal static int GetAllocationQuantity(SqliteConnection connection, string componentId, string locationId)
     {
         using var command = connection.CreateCommand();

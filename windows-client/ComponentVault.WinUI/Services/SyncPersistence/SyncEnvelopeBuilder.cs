@@ -105,7 +105,7 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
                 min_stock,
                 updated_at,
                 deleted,
-                base_updated_at
+                base_updated_at, inventory_unit_cost
             FROM components
             WHERE id = $id
             """;
@@ -131,6 +131,7 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
             UpdatedAt = reader.GetString(9),
             Deleted = reader.GetInt32(10) == 1,
             BaseUpdatedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
+            InventoryUnitCost = reader.IsDBNull(12) ? null : reader.GetString(12),
         };
         reader.Close();
         return new SyncComponentDto
@@ -138,7 +139,7 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
             Id = dto.Id, Sku = dto.Sku, Name = dto.Name, Category = dto.Category,
             PackageName = dto.PackageName, Location = dto.Location, Description = dto.Description,
             Quantity = dto.Quantity, MinStock = dto.MinStock, UpdatedAt = dto.UpdatedAt,
-            Deleted = dto.Deleted, BaseUpdatedAt = dto.BaseUpdatedAt,
+            Deleted = dto.Deleted, BaseUpdatedAt = dto.BaseUpdatedAt, InventoryUnitCost = dto.InventoryUnitCost,
             Allocations = InventoryQueries.GetAllocations(connection, componentId).Select(item => new SyncAllocationDto
             {
                 LocationId = item.LocationId, Quantity = item.Quantity,
@@ -190,7 +191,7 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
                 updated_at,
                 deleted,
                 location_id,
-                destination_location_id
+                destination_location_id, purchase_amount, cost_amount
             FROM stock_movements
             WHERE id = $id
             """;
@@ -215,6 +216,8 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
             Deleted = reader.GetInt32(8) == 1,
             LocationId = reader.IsDBNull(9) ? null : reader.GetString(9),
             DestinationLocationId = reader.IsDBNull(10) ? null : reader.GetString(10),
+            PurchaseAmount = reader.IsDBNull(11) ? null : reader.GetString(11),
+            CostAmount = reader.IsDBNull(12) ? null : reader.GetString(12),
         };
     }
 

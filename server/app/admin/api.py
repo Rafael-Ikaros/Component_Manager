@@ -20,6 +20,7 @@ from ..part_lookup import (
     refresh_recognition_rules,
 )
 from ..schemas import (
+    AdminInventoryCostUpdate,
     AdminComponentDetail,
     AdminComponentBulkDelete,
     AdminComponentBulkDeleteResult,
@@ -57,6 +58,7 @@ from .operations import (
     list_storage_locations,
     record_stock_movement,
     update_component,
+    update_inventory_cost,
 )
 from .spec_enrichment import EnrichmentJobs, candidates
 from .order_metadata import router as order_metadata_router
@@ -445,6 +447,18 @@ def post_component_movement(
         AdminComponentDetail,
         lambda: record_stock_movement(connection, _account_settings(settings, account), component_id, draft),
     )
+
+
+@router.post("/components/{component_id}/cost", response_model=AdminComponentDetail)
+def post_inventory_cost(
+    component_id: str, draft: AdminInventoryCostUpdate,
+    settings: Settings = Depends(get_settings),
+    connection: sqlite3.Connection = Depends(get_db),
+    account: Account = Depends(require_token),
+) -> AdminComponentDetail:
+    _require_web_inventory(settings)
+    return _run_admin_operation(AdminComponentDetail, lambda: update_inventory_cost(
+        connection, _account_settings(settings, account), component_id, draft))
 
 
 @router.get("/sync", response_model=AdminSyncResponse)

@@ -50,6 +50,8 @@ public sealed class ComponentEditorViewModel
         _catalogSku = catalogSku.Trim();
     }
 
+    public string? PurchaseAmount { get; set; }
+
     public bool TryCreateRequest(out ComponentEditRequest? request, out string error)
     {
         request = null;
@@ -92,6 +94,7 @@ public sealed class ComponentEditorViewModel
         }
         request = new ComponentEditRequest(new ComponentDraft
         {
+            PurchaseAmount = PurchaseAmount,
             Id = _existing?.Id,
             Sku = Sku,
             Name = Name,

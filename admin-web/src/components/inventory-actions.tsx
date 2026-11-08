@@ -13,6 +13,7 @@ import {
   clearPendingRequest, loadPendingRequest, pendingStorageKey, requestForPayload, savePendingRequest, shouldRetainPending,
 } from "@/lib/pending-request";
 import type { AdminComponentDetail, AdminStorageLocation } from "@/lib/types";
+import { purchaseAmount } from "@/lib/purchase-amount";
 
 interface InventoryActionsProps {
   scope: "create" | "component";
@@ -38,20 +39,26 @@ export function InventoryActions({ scope, enabled, component, locations, onChang
   const [editDraft, setEditDraft] = useState(emptyComponent);
   const [movement, setMovement] = useState({ movement_type: "inbound", quantity: 1, reason: currentTranslation("库存操作"), note: "", location_id: "" });
   const [busy, setBusy] = useState<string | null>(null);
+  const [purchaseValue, setPurchaseValue] = useState("");
+  const [purchaseMode, setPurchaseMode] = useState<"total" | "unit">("total");
+  const [inventoryAmount, setInventoryAmount] = useState("");
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [recoverableMovement, setRecoverableMovement] = useState<ReturnType<typeof loadPendingRequest>>(null);
   const memoryPending = useRef(new Map<string, NonNullable<ReturnType<typeof loadPendingRequest>>>());
   const previousComponentId = useRef<string | null>(null);
   const [createPanel, setCreatePanel] = useState<"location" | "component" | null>(null);
-  const [componentPanel, setComponentPanel] = useState<"edit" | "movement" | "delete" | null>(null);
+  const [componentPanel, setComponentPanel] = useState<"edit" | "movement" | "delete" | "cost" | null>(null);
   const locationCodeId = useId();
   const locationNameId = useId();
   const movementTypeId = useId();
+  const purchaseModeId = useId();
 
   useEffect(() => {
     if (!component) return;
     if (previousComponentId.current !== component.id) {
       setComponentPanel(null);
+      setPurchaseValue("");
+      setInventoryAmount("");
       previousComponentId.current = component.id;
     }
     setEditDraft({
@@ -173,10 +180,38 @@ export function InventoryActions({ scope, enabled, component, locations, onChang
       reason: movement.reason.trim(),
       note: movement.note.trim() || null,
     };
+    try {
+      payload.purchase_amount = movement.movement_type === "inbound"
+        ? purchaseAmount(purchaseValue, Number(movement.quantity), purchaseMode) : null;
+    } catch {
+      setNotice({ kind: "error", text: t("金额必须为非负数，最多8位小数。") });
+      return;
+    }
     payload.location_id = component.inventory_managed ? movement.location_id : null;
     void submit<AdminComponentDetail>(`movement:${component.id}`, payload, (body) => postJson(session!, `/admin-api/components/${encodeURIComponent(component.id)}/movements`, body), (value) => {
       setNotice({ kind: "success", text: `${movement.movement_type === "inbound" ? t("入库") : t("出库")}${t("完成，当前库存")}${formatCount(value.quantity, locale)}${t("。")}` });
       setMovement((item) => ({ ...item, quantity: 1, note: "", location_id: "" }));
+      setPurchaseValue("");
+      onChanged(value);
+    });
+  }
+
+  function backfillCost(event: FormEvent) {
+    event.preventDefault();
+    if (!component) return;
+    let total: string | null;
+    try { total = purchaseAmount(inventoryAmount, component.quantity, "total"); }
+    catch { total = null; }
+    if (total === null) {
+      setNotice({ kind: "error", text: t("金额必须为非负数，最多8位小数。") });
+      return;
+    }
+    void submit<AdminComponentDetail>(`cost:${component.id}`, {
+      expected_updated_at: component.updated_at, inventory_amount: total,
+    }, (body) => postJson(session!, `/admin-api/components/${encodeURIComponent(component.id)}/cost`, body), (value) => {
+      setInventoryAmount("");
+      setComponentPanel(null);
+      setNotice({ kind: "success", text: t("当前库存成本已保存，数量与历史采购记录未改变。") });
       onChanged(value);
     });
   }
@@ -235,6 +270,7 @@ export function InventoryActions({ scope, enabled, component, locations, onChang
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant={componentPanel === "edit" ? "default" : "outline"} onClick={() => setComponentPanel(componentPanel === "edit" ? null : "edit")}>{componentPanel === "edit" ? t("收起编辑") : t("编辑资料")}</Button>
         <Button type="button" variant={componentPanel === "movement" ? "default" : "outline"} onClick={() => setComponentPanel(componentPanel === "movement" ? null : "movement")}>{componentPanel === "movement" ? t("收起入出库") : t("办理入出库")}</Button>
+        <Button type="button" disabled={busy !== null || component.quantity === 0 || recoverableMovement !== null} variant={componentPanel === "cost" ? "default" : "outline"} onClick={() => setComponentPanel(componentPanel === "cost" ? null : "cost")}>{t("补录当前库存成本")}</Button>
         <Button type="button" variant={componentPanel === "delete" ? "destructive" : "outline"} onClick={() => setComponentPanel(componentPanel === "delete" ? null : "delete")}>{t("删除元器件")}</Button>
       </div>
       {componentPanel === "delete" ? <Card className="border-red-200 bg-red-50/70"><CardHeader><CardTitle>{t("删除元器件")} {component.sku}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm">{t("删除后，此元件将从当前账户的库存列表中移除，并同步到客户端。历史流水仍会保留。")}</p><div className="flex flex-wrap gap-2"><Button type="button" variant="destructive" disabled={busy !== null} onClick={removeComponent}>{busy === `delete:${component.id}` ? t("正在删除…") : t("确认删除")}</Button><Button type="button" variant="outline" disabled={busy !== null} onClick={() => setComponentPanel(null)}>{t("取消")}</Button></div></CardContent></Card> : null}
@@ -249,11 +285,25 @@ export function InventoryActions({ scope, enabled, component, locations, onChang
             <Button className="min-h-11 sm:col-span-2" disabled={busy !== null}>{busy === `edit:${component.id}` ? t("正在保存…") : t("保存资料")}</Button>
           </form>
         </CardContent></Card> : null}
+      {componentPanel === "cost" ? <Card className="bg-slate-50/70"><CardHeader><CardTitle>{t("补录当前库存成本")}</CardTitle></CardHeader><CardContent>
+        <form className="space-y-3" onSubmit={backfillCost}>
+          <p className="text-sm">{t("仅对当前剩余库存估值，不修改数量或历史采购记录。")}</p>
+          <p className="text-sm">{t("当前数量")}: {formatCount(component.quantity, locale)}</p>
+          <TextField label={t("当前库存总成本（CNY）")} inputMode="decimal" required pattern="[0-9]+([.][0-9]{1,8})?" value={inventoryAmount} onChange={setInventoryAmount} />
+          <div className="flex gap-2"><Button disabled={busy !== null || recoverableMovement !== null}>{t("确认补录")}</Button><Button type="button" variant="outline" disabled={busy !== null} onClick={() => setComponentPanel(null)}>{t("取消")}</Button></div>
+        </form>
+      </CardContent></Card> : null}
       {componentPanel === "movement" ? <Card className="bg-slate-50/70"><CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{t("库存入出库")}</CardTitle><Button type="button" size="sm" variant="ghost" onClick={() => setComponentPanel(null)}>{t("取消")}</Button></CardHeader><CardContent>
           {!component.inventory_managed ? <p className="mb-4 text-sm text-muted-foreground">{t("这是旧版库存记录，入出库会继续沿用当前默认库位。")}</p> : null}
           <form className="grid gap-3 sm:grid-cols-2" onSubmit={applyMovement}>
             <Field label={t("操作")} labelFor={movementTypeId}><select id={movementTypeId} className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={movement.movement_type} onChange={(event) => setMovement({ ...movement, movement_type: event.target.value, location_id: "" })}><option value="inbound">{t("入库")}</option><option value="outbound">{t("出库")}</option></select></Field>
             <TextField label={t("数量")} type="number" min="1" required value={String(movement.quantity)} onChange={(value) => setMovement({ ...movement, quantity: Number(value) })} />
+            {movement.movement_type === "inbound" ? <>
+              <Field label={t("购买金额依据")} labelFor={purchaseModeId}><select id={purchaseModeId} className="h-11 w-full rounded-xl border bg-white px-3 text-sm" value={purchaseMode} onChange={(event) => { setPurchaseMode(event.target.value as "total" | "unit"); setPurchaseValue(""); }}><option value="total">{t("商品总金额")}</option><option value="unit">{t("购买单价")}</option></select></Field>
+              <TextField label={purchaseMode === "unit" ? t("购买单价（CNY）") : t("商品总金额（CNY）")} inputMode="decimal" pattern="[0-9]+([.][0-9]{1,8})?" value={purchaseValue} onChange={setPurchaseValue} />
+              <p className="text-sm text-muted-foreground sm:col-span-2">{t("留空表示成本未知，明确填写0表示赠品。不含运费、PCB和加工费。")}</p>
+              <p className="text-sm sm:col-span-2" aria-live="polite">{t("本次商品金额（CNY）")}: {(() => { try { return purchaseAmount(purchaseValue, movement.quantity, purchaseMode) ?? t("成本未知"); } catch { return t("请核对金额与数量"); } })()}</p>
+            </> : null}
             {component.inventory_managed ? <LocationSelect label={t("操作库位")} required locations={movementLocations} allocations={component.allocations} value={movement.location_id} onChange={(value) => setMovement({ ...movement, location_id: value })} /> : null}
             <TextField label={t("原因")} required value={movement.reason} onChange={(value) => setMovement({ ...movement, reason: value })} />
             <TextField label={t("备注（可选）")} className="sm:col-span-2" value={movement.note} onChange={(value) => setMovement({ ...movement, note: value })} />

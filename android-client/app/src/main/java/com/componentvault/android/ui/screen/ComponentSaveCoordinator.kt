@@ -27,7 +27,7 @@ internal class ComponentSaveCoordinator(
     private val saveComponent: (ComponentDraft, (OperationResult) -> Unit) -> Unit,
     private val saveImportedComponent: (ComponentDraft, ComponentImportCandidate?, (OperationResult) -> Unit) -> Unit,
     private val findExistingImportTarget: (String, (OperationResult) -> Unit, (ExistingImportTarget?) -> Unit) -> Unit,
-    private val appendImportedStock: (ExistingImportTarget, Int, String, (OperationResult) -> Unit) -> Unit,
+    private val appendImportedStock: (ExistingImportTarget, Int, String, String?, (OperationResult) -> Unit) -> Unit,
 ) {
     var pendingSingleAppend by mutableStateOf<PendingSingleAppend?>(null)
         private set
@@ -85,7 +85,7 @@ internal class ComponentSaveCoordinator(
         val pending = pendingSingleAppend ?: return
         if (singleAppendBusy || appendTotal(pending) == null || pending.draft.quantity <= 0) return
         singleAppendBusy = true
-        appendImportedStock(pending.target, pending.draft.quantity, pending.draft.location) { result ->
+        appendImportedStock(pending.target, pending.draft.quantity, pending.draft.location, pending.draft.purchaseAmount) { result ->
             singleAppendBusy = false
             pending.onComplete(result)
             if (result.isSuccess) {

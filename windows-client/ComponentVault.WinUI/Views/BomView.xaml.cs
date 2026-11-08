@@ -1,3 +1,4 @@
+using ComponentVault.WinUI.Services;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ComponentVault.WinUI.Services.Bom;
@@ -205,6 +206,19 @@ public sealed partial class BomView : Page
         ProjectNameBox.IsEnabled = BatchQuantityBox.IsEnabled = !_confirmed;
         PlanText.Text = string.Join("\n", _preview.Lines.Select(line => $"{PreviewIdentity(line)} · 每套 {line.UnitQuantity} × {batches} 套 = {line.RequiredQuantity} · 库存 {line.AvailableQuantity}\n库位：{AllocationPlan(line)}"));
         if (_preview.Issues.Count > 0) PlanText.Text += "\n" + string.Join("\n", _preview.Issues.Select(issue => issue.Message));
+        var unitTotal = "0";
+        var batchTotal = "0";
+        var missingCost = 0;
+        var missingCostParts = new List<string>();
+        foreach (var line in _preview.Lines)
+        {
+            var cost = ViewModel.AvailableComponents.FirstOrDefault(c => c.Id == line.ComponentId)?.InventoryUnitCost;
+            if (cost is null) { missingCost++; missingCostParts.Add(PreviewIdentity(line)); continue; }
+            unitTotal = InventoryCost.Add(unitTotal, InventoryCost.Multiply(cost, line.UnitQuantity))!;
+            batchTotal = InventoryCost.Add(batchTotal, InventoryCost.Multiply(cost, line.RequiredQuantity))!;
+        }
+        PlanText.Text += $"\n{(missingCost > 0 || _preview.Issues.Any(issue => issue.Code != "insufficient_stock") ? "已知部分" : "合计")}成本（CNY 材料，不含运费、PCB及加工）：每套 ¥{unitTotal} · 整批 ¥{batchTotal}；缺成本 {missingCost} 项，未匹配 {pending} 行；跳过项不计入。";
+        if(missingCostParts.Count>0) PlanText.Text += "\n缺成本元件："+string.Join("、",missingCostParts);
         UpdateSelectionButtons();
     }
 

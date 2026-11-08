@@ -393,6 +393,7 @@ fun ComponentVaultApp(
                     onUpdateMovementBatchItemQuantity = viewModel::updateMovementBatchItemQuantity,
                     onUpdateMovementBatchItemReason = viewModel::updateMovementBatchItemReason,
                     onUpdateMovementBatchItemNote = viewModel::updateMovementBatchItemNote,
+                    onUpdateMovementBatchItemPurchaseAmount = viewModel::updateMovementBatchItemPurchaseAmount,
                     onUpdateMovementBatchItemLocation = viewModel::updateMovementBatchItemLocation,
                     onRemoveMovementBatchItem = viewModel::removeMovementBatchItem,
                 )
@@ -621,6 +622,7 @@ fun ComponentVaultApp(
                         onUpdateMovementBatchItemQuantity = viewModel::updateMovementBatchItemQuantity,
                         onUpdateMovementBatchItemReason = viewModel::updateMovementBatchItemReason,
                         onUpdateMovementBatchItemNote = viewModel::updateMovementBatchItemNote,
+                        onUpdateMovementBatchItemPurchaseAmount = viewModel::updateMovementBatchItemPurchaseAmount,
                         onRemoveMovementBatchItem = viewModel::removeMovementBatchItem,
                         onSearchInventoryBySku = { sku ->
                             destination = InventoryDestination.Inventory

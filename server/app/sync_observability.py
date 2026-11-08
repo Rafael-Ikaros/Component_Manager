@@ -111,7 +111,7 @@ def record_rejected_managed_conflicts(
                 if incoming_time.astimezone(timezone.utc) != server_time.astimezone(timezone.utc):
                     continue
                 fields = ("sku", "name", "category", "package_name", "location",
-                          "description", "quantity", "min_stock")
+                          "description", "quantity", "min_stock", "inventory_unit_cost")
                 changed = any(row[key] != getattr(component, key) for key in fields)
                 changed = changed or (
                     {item.location_id: item.quantity for item in load_allocations(connection, component.id)}

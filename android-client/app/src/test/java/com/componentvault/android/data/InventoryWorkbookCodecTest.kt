@@ -22,6 +22,14 @@ class InventoryWorkbookCodecTest {
         assertEquals(WorkbookSource.ComponentVault,parsed.source);assertEquals(transfer,parsed.movements.last());assertTrue(parsed.fingerprint.length==64)
     }
 
+    @Test fun costFieldsRoundTripIncludingNegativeValuation() {
+        val original = sample()
+        val model = original.copy(components = original.components.map { it.copy(inventoryUnitCost = "0.1234567890123456") }, movements = original.movements.map { it.copy(type = "adjustment", quantity = 0, costAmount = "-2.25") })
+        val parsed = InventoryWorkbookCodec.parse(InventoryWorkbookWriter.write(model))
+        assertEquals(model.components, parsed.components)
+        assertEquals(model.movements, parsed.movements)
+    }
+
     @Test fun duplicateActiveSkuIsRejected(){
         val duplicate=sample().components.first().copy(id="cmp-2")
         val model=sample(sample().components+duplicate).copy(allocations=sample().allocations+WorkbookAllocation("cmp-2","loc-1",4))

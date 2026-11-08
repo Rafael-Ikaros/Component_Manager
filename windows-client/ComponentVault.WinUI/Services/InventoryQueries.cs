@@ -56,7 +56,7 @@ internal sealed class InventoryQueries
                 min_stock,
                 updated_at,
                 deleted,
-                base_updated_at
+                base_updated_at, inventory_unit_cost
             FROM components
             WHERE deleted = 0
             ORDER BY updated_at DESC, name COLLATE NOCASE ASC
@@ -86,7 +86,7 @@ internal sealed class InventoryQueries
                 min_stock,
                 updated_at,
                 deleted,
-                base_updated_at
+                base_updated_at, inventory_unit_cost
             FROM components
             WHERE deleted = 0 AND quantity <= min_stock
             ORDER BY quantity ASC, updated_at DESC
@@ -151,7 +151,7 @@ internal sealed class InventoryQueries
                 m.updated_at,
                 m.deleted,
                 m.location_id,
-                m.destination_location_id
+                m.destination_location_id, m.purchase_amount, m.cost_amount
             FROM stock_movements m
             LEFT JOIN components c ON c.id = m.component_id
             WHERE m.deleted = 0
@@ -209,6 +209,7 @@ internal sealed class InventoryQueries
                     UpdatedAt = reader.GetString(9),
                     Deleted = reader.GetInt32(10) == 1,
                     BaseUpdatedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
+                    InventoryUnitCost = reader.IsDBNull(12) ? null : reader.GetString(12),
                 }
             );
         }
@@ -237,6 +238,8 @@ internal sealed class InventoryQueries
                     Deleted = reader.GetInt32(10) == 1,
                     LocationId = reader.IsDBNull(11) ? null : reader.GetString(11),
                     DestinationLocationId = reader.IsDBNull(12) ? null : reader.GetString(12),
+                    PurchaseAmount = reader.IsDBNull(13) ? null : reader.GetString(13),
+                    CostAmount = reader.IsDBNull(14) ? null : reader.GetString(14),
                 }
             );
         }
@@ -268,7 +271,7 @@ internal sealed class InventoryQueries
                 min_stock,
                 updated_at,
                 deleted,
-                base_updated_at
+                base_updated_at, inventory_unit_cost
             FROM components
             WHERE id = $id
             """;
@@ -290,6 +293,7 @@ internal sealed class InventoryQueries
                 UpdatedAt = reader.GetString(9),
                 Deleted = reader.GetInt32(10) == 1,
                 BaseUpdatedAt = reader.IsDBNull(11) ? null : reader.GetString(11),
+                    InventoryUnitCost = reader.IsDBNull(12) ? null : reader.GetString(12),
             }
             : null;
         reader.Close();
@@ -324,7 +328,7 @@ internal sealed class InventoryQueries
         PackageName = component.PackageName, Location = component.Location, Description = component.Description,
         Quantity = component.Quantity, MinStock = component.MinStock, UpdatedAt = component.UpdatedAt,
         Deleted = component.Deleted, CumulativeOutboundQuantity = component.CumulativeOutboundQuantity,
-        BaseUpdatedAt = component.BaseUpdatedAt, Allocations = allocations,
+        BaseUpdatedAt = component.BaseUpdatedAt, InventoryUnitCost = component.InventoryUnitCost, Allocations = allocations,
     };
 
 }

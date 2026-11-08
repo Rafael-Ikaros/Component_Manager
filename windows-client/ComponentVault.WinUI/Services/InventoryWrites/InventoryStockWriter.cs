@@ -152,6 +152,10 @@ internal sealed class InventoryStockWriter
         updateComponent.Parameters.AddWithValue("$id", draft.ComponentId);
         updateComponent.ExecuteNonQuery();
 
+        var purchase = draft.MovementType.Equals("inbound", StringComparison.OrdinalIgnoreCase) ? InventoryCost.Input(draft.PurchaseAmount) : null;
+        var average = newQuantity == 0 ? null : purchase is not null || draft.MovementType.Equals("inbound", StringComparison.OrdinalIgnoreCase)
+            ? InventoryCost.Inbound(component.Quantity, component.InventoryUnitCost, draft.Quantity, purchase) : component.InventoryUnitCost;
+        SetCost(connection, component.Id, average, movementId, purchase, draft.MovementType.Equals("inbound", StringComparison.OrdinalIgnoreCase) ? purchase : InventoryCost.Multiply(component.InventoryUnitCost, Math.Abs(quantityDelta)));
         EnqueueEntity(connection, "component", draft.ComponentId, happenedAt);
         EnqueueEntity(connection, "stock_movement", movementId, happenedAt);
 

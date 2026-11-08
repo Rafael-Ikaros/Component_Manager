@@ -52,6 +52,8 @@ internal fun QuickStockActionDialog(
     var locationId by remember(item.id, inbound) {
         mutableStateOf(options.firstOrNull { it.id == item.location }?.id ?: options.firstOrNull()?.id.orEmpty())
     }
+    var purchaseIsUnit by remember(item.id, inbound) { mutableStateOf(false) }
+    var purchaseText by remember(item.id, inbound) { mutableStateOf("") }
     var quantityText by remember(item.id, inbound) { mutableStateOf("1") }
     var expanded by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -97,6 +99,7 @@ internal fun QuickStockActionDialog(
                     modifier = Modifier.fillMaxWidth(),
                     fieldTestTag = "quick_quantity",
                 )
+                if (inbound) PurchaseCostFields(purchaseText, purchaseIsUnit, quantity, { purchaseText = it }, { purchaseIsUnit = it })
                 if (options.isEmpty()) Text(stringResource(R.string.inventory_quick_no_location),
                     color = MaterialTheme.colorScheme.error)
                 if (!inbound && quantity != null && quantity > available) Text(
@@ -112,7 +115,7 @@ internal fun QuickStockActionDialog(
                 if (busy || !valid) return@Button
                 busy = true
                 onSubmit(MovementEntryDraft(item.id, if (inbound) "inbound" else "outbound",
-                    requireNotNull(quantity), reason, "", locationId)) { result ->
+                    requireNotNull(quantity), reason, "", locationId, purchaseAmount = if (inbound) purchaseTotal(purchaseText,purchaseIsUnit,requireNotNull(quantity)) else null)) { result ->
                     busy = false
                     if (result.isSuccess) onDismiss() else error = result.message
                 }

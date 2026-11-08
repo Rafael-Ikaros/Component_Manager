@@ -86,6 +86,7 @@ export interface AdminComponentListResponse {
 }
 
 export interface AdminComponentDetail extends AdminComponentListItem {
+  inventory_unit_cost?: string | null;
   description: string | null;
   allocations: Array<{ location_id: string; quantity: number }>;
   inventory_managed: boolean;

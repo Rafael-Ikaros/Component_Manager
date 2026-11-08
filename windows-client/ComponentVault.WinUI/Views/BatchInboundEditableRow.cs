@@ -1,3 +1,4 @@
+using ComponentVault.WinUI.Services;
 using ComponentVault.WinUI.Models;
 using ComponentVault.WinUI.Services.BatchInbound;
 using ComponentVault.WinUI.Services.Catalog;
@@ -8,6 +9,20 @@ namespace ComponentVault.WinUI.Views;
 
 public sealed class BatchInboundEditableRow : ObservableObject
 {
+    private string? _purchaseAmount;
+    public string? PurchaseAmount
+    {
+        get => _purchaseAmount;
+        set { if(SetProperty(ref _purchaseAmount,value)) OnPropertyChanged(nameof(CostPreview)); }
+    }
+    public string CostPreview
+    {
+        get
+        {
+            try { return Quantity is > 0 && InventoryCost.Input(PurchaseAmount) is { } amount ? $"单价 ¥{InventoryCost.Average(amount,Quantity.Value)}" : "采购成本未知"; }
+            catch(InvalidOperationException) { return "金额格式无效"; }
+        }
+    }
     private bool _selected = true;
     private bool _pendingSelected;
     private double _reviewWidth = 540;
@@ -57,7 +72,8 @@ public sealed class BatchInboundEditableRow : ObservableObject
             OnPropertyChanged(nameof(Reason));
         }
     }
-    public double QuantityInput { get; set; } = double.NaN;
+    private double _quantityInput = double.NaN;
+    public double QuantityInput { get => _quantityInput; set { if(SetProperty(ref _quantityInput,value)) { OnPropertyChanged(nameof(Quantity));OnPropertyChanged(nameof(CostPreview)); } } }
     public string LocationId { get; set; } = "";
     public string Name { get; set; } = "";
     public string Category { get; set; } = "";

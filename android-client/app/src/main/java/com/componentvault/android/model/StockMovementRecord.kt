@@ -12,6 +12,8 @@ data class StockMovementRecord(
     val happenedAt: String,
     val updatedAt: String,
     val deleted: Boolean,
+    val purchaseAmount: String? = null,
+    val costAmount: String? = null,
     val locationId: String? = null,
     val destinationLocationId: String? = null,
 ) {

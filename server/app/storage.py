@@ -99,6 +99,23 @@ def save_allocations(connection: sqlite3.Connection, component: ComponentPayload
 
 
 def validate_inventory_push(connection: sqlite3.Connection, payload: PushRequest) -> None:
+    for component in payload.components:
+        existing = connection.execute("SELECT * FROM components WHERE id = ?", (component.id,)).fetchone()
+        if payload.cost_protocol == 1:
+            if "inventory_unit_cost" not in component.model_fields_set:
+                raise ValueError("Cost protocol 1 requires an explicit inventory_unit_cost, including null.")
+        else:
+            if existing and existing["inventory_unit_cost"] is not None and component.quantity != existing["quantity"]:
+                raise ValueError("This inventory has cost data; upgrade to a client with cost support before changing quantity.")
+            component.inventory_unit_cost = existing["inventory_unit_cost"] if existing else None
+    if payload.cost_protocol == 0:
+        for movement in payload.stock_movements:
+            previous = connection.execute("SELECT purchase_amount, cost_amount FROM stock_movements WHERE id = ?", (movement.id,)).fetchone()
+            for field in ("purchase_amount", "cost_amount"):
+                stored = previous[field] if previous else None
+                if field in movement.model_fields_set and getattr(movement, field) != stored:
+                    raise ValueError("Changing cost amounts requires cost_protocol=1.")
+                setattr(movement, field, stored)
     for items in (payload.components, payload.stock_movements, payload.storage_locations):
         ids = [item.id for item in items]
         if len(ids) != len(set(ids)):

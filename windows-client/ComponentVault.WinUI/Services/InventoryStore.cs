@@ -69,8 +69,8 @@ public sealed class InventoryStore
     public bool IsBatchReceiptCommitted(string receiptId) => _batch.IsBatchReceiptCommitted(receiptId);
     public static IReadOnlyList<BatchInboundSummary> SummarizeBatchInbound(IEnumerable<BatchInboundLine> lines) => InventoryBatchWriter.SummarizeBatchInbound(lines);
     public OperationResult CommitBatchInbound(BatchInboundCommitRequest request) => _batch.CommitBatchInbound(request);
-    public OperationResult AppendCatalogInbound(string sku, int quantity, string locationId, string expectedUpdatedAt, string? newLocationName = null) =>
-        _batch.AppendCatalogInbound(sku, quantity, locationId, expectedUpdatedAt, newLocationName);
+    public OperationResult AppendCatalogInbound(string sku, int quantity, string locationId, string expectedUpdatedAt, string? newLocationName = null, string? purchaseAmount = null) =>
+        _batch.AppendCatalogInbound(sku, quantity, locationId, expectedUpdatedAt, newLocationName, purchaseAmount);
 
     public IReadOnlyDictionary<string, long> GetCumulativeOutboundQuantities() => _queries.GetCumulativeOutboundQuantities();
 
@@ -85,6 +85,7 @@ public sealed class InventoryStore
     public sealed record BatchTransferRequest(string SourceLocationId, string DestinationLocationId, IReadOnlyList<BatchTransferLine> Lines);
 
     public OperationResult TransferBatch(BatchTransferRequest request) => _stock.TransferBatch(request);
+    public OperationResult SetInventoryCost(string id, string version, string amount) => _components.SetInventoryCost(id, version, amount);
     public OperationResult RecordMovement(MovementEntryDraft draft) => _stock.RecordMovement(draft);
     public BomConfirmResult ConfirmBomConsumption(BomConfirmRequest request) => _bomImport.ConfirmBomConsumption(request);
     public OperationResult ImportComponentHub(ComponentHubImportRequest request) => _bomImport.ImportComponentHub(request);
