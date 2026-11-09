@@ -1,5 +1,6 @@
 import { useI18n } from "@/lib/i18n";
-import { ClipboardList, DatabaseZap, LayoutDashboard, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { ClipboardList, DatabaseZap, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck } from "lucide-react";
+import { useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,11 +19,12 @@ const navigationItems = [
 export function AppShell() {
   const { t, locale } = useI18n();
   const { identity, logout, session, logoutError } = useAuth();
+  const mobileMenu = useRef<HTMLDialogElement>(null);
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col lg:flex-row">
-        <aside className="border-b border-white/60 bg-white/85 px-4 py-4 backdrop-blur lg:w-72 lg:border-b-0 lg:border-r lg:px-6 lg:py-6">
+        <aside className="hidden w-72 shrink-0 border-r border-white/60 bg-white/85 px-6 py-6 backdrop-blur lg:block">
           <div className="space-y-2">
             <Badge variant="secondary" className="rounded-full px-3 py-1">
               {t("独立管理台")}
@@ -59,12 +61,38 @@ export function AppShell() {
           </nav>
         </aside>
 
-        <div className="flex-1">
-          <header className="sticky top-0 z-20 border-b border-white/70 bg-background/75 px-4 py-3 backdrop-blur md:px-6 md:py-4">
+        <div className="min-w-0 flex-1">
+          <header className="sticky top-0 z-20 flex min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur lg:hidden">
+            <Button variant="ghost" className="h-11 w-11 shrink-0 p-0" aria-label={locale === "zh-CN" ? "打开导航" : "Open navigation"} onClick={() => mobileMenu.current?.showModal()}>
+              <Menu aria-hidden="true" className="h-5 w-5" />
+            </Button>
+            <span className="min-w-0 font-semibold">Component Vault</span>
+          </header>
+          <dialog ref={mobileMenu} aria-label={locale === "zh-CN" ? "导航" : "Navigation"} className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(20rem,calc(100%-2rem))] max-w-none overflow-y-auto border-r bg-background p-4 text-foreground backdrop:bg-slate-950/40">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <span className="font-semibold">Component Vault</span>
+              <Button variant="ghost" className="min-h-11" onClick={() => mobileMenu.current?.close()}>{locale === "zh-CN" ? "关闭" : "Close"}</Button>
+            </div>
+            <nav className="grid gap-1">
+              {navigationItems.map(({ icon: Icon, label, to }) => (
+                <NavLink key={to} to={to} onClick={() => mobileMenu.current?.close()} className={({ isActive }) =>
+                  cn("flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium", isActive && "bg-primary text-primary-foreground")}>
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{t(label)}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="mt-5 space-y-2 border-t pt-4 text-sm">
+              <p className="font-medium">{t("已连接 API")}</p>
+              <p className="break-all text-muted-foreground">{session?.apiBaseUrl}</p>
+              {identity ? <p className="break-words">{identity.name} · {identity.role === "admin" ? t("管理员") : t("普通用户")}</p> : null}
+              <Button variant="outline" className="min-h-11" onClick={() => { mobileMenu.current?.close(); void logout(); }}>{t("退出登录")}</Button>
+            </div>
+          </dialog>
+          <header className="sticky top-0 z-20 hidden border-b border-white/70 bg-background/75 px-6 py-4 backdrop-blur lg:block">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-600">{t("已连接 API")}</p>
-                <p className="text-sm text-slate-500">{session?.apiBaseUrl}</p>
+                <p className="break-all text-sm text-slate-500">{session?.apiBaseUrl}</p>
                 {identity ? <p className="text-sm text-slate-600">{identity.role === "admin" && identity.name === "Administrator" ? t("管理员") : `${identity.name} · ${identity.role === "admin" ? t("管理员") : t("普通用户")}`}</p> : null}
               </div>
               <div className="flex items-center gap-3">

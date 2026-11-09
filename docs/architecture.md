@@ -51,6 +51,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 ## 服务端批量删除与 Docker 渠道
 
 - `POST /admin-api/components/bulk-delete` 使用认证账户的 SQLite、Web 写入开关和同一批次 request_id；每批 1–100 个唯一 ID 与版本。单个短事务复用单删墓碑、同步变更及 MQTT outbox，冲突/缺失全部回滚；数量、分配和历史流水保留，不硬删除业务行。
+- 库存页通过显式多选模式进入当前页批量操作。手机端将主导航收进紧凑顶栏，库存工具独立折叠，元件详情以单独对话框打开并保留原列表位置。
 - `POST /admin-api/about/check-update?channel=stable|dev` 默认 stable。stable 只接受正式版；dev 按语义版本比较有效正式/开发发布（不含草稿）。浏览器按 API 地址保存检测偏好，接口不拉镜像或操作宿主机。
 - `docker-ci.yml` 按相关路径独立检查 API/Web 镜像；`server-image.yml` 独立发布多架构镜像，接受 dev 和正式 tag。`release-from-changelog.yml` 在 sync/tag 后并行调用 Docker 与原生附件流程，不依赖机器人创建 tag 再触发工作流。Docker 凭据/失败不再阻断原生附件 job。
 - Hub Compose 默认 latest/web-latest，`COMPONENT_VAULT_DOCKER_CHANNEL=dev` 改用 dev/web-dev；完整镜像覆盖仍优先。部署助手复用原项目和 Compose 文件，拉取配套镜像后更新 `.env` 和重建，不引入 Docker socket 到 API/Web。详见 [渠道教程](docker-channels.md)。
@@ -66,7 +67,8 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - Android `EasyEdaCatalog` 与 Windows Catalog 模块按中文语言配置请求国内 `pro.lceda.cn/api/eda/product/search`；精确料号按国内返回的 `code` 字段匹配，关键词查询展示候选。英文才使用国际 LCSC 商品页及国际 EasyEDA 关键词查询，均不自动跨站回退或为中文缺价追加国际请求。不新增 Cookie、登录或浏览器会话依赖。
 - 国内分类、型号、封装、图片、数据手册和明确参数来自真实公开响应；过滤设计内部属性。国内参考价取最小有效 `priceList.startNumber` 档对应的正 `price`，按国内官方前端人民币显示语义记录 CNY，保留适用数量、来源及本应用查询时间；接口没有报价更新时间，不声称实时或实际成本。
 - 价格沿用元件 description 的五类可读行：`参考单价：`、`参考币种：`、`参考起订量：`、`价格来源：`、`价格查询时间：`。两端与服务端共用约定；更新替换旧价格行，缺价不清旧价。名称与 RCL 参数索引不拼入价格；数据库和同步 payload schema 不变。
-- Web 的国内资料批量更新复用 `EnrichmentJobs`，采用独立 `catalog_preview` 模式。扫描当前账户有效库存、按 C 料号去重查询，网络等待不持数据库连接/事务；预览每页 50 项，应用每批最多 50 项。选中后复用 operation receipt、updated_at 冲突校验与逐项短事务，只修改勾选资料组；名称、自由备注、图片、数量、库位、分配和流水保持。普通账户仍不发 MQTT，账户删除取消任务；预览仅存内存，服务重启后重新分析。
+- Web 库存资料检查复用 `EnrichmentJobs`。按账户扫描全部有效库存，中文查国内嘉立创 EDA，英文查国际 EasyEDA，按 C 料号或完整型号与品牌去重查询。型号回退要求唯一匹配，并核对可用的封装与电气参数，应用前单独确认。网络等待不持库存事务。
+- 默认生成缺项差异，也可复查已有参数。支持按结果筛选，预览与应用每批最多 50 项。参数按选定字段合并，保留其他参数；价格缺值时保留原报价。写入沿用操作回执、版本检查与逐项短事务，保护名称、SKU、图片、备注、数量、库位、分配、实际成本和流水。普通账户仍不发 MQTT，账户删除取消任务。预览保存在服务进程内，重启后可重新扫描。
 
 客户端按阶段拆分 Windows 库存导入/编辑/库位/保存链路，不更换 WinUI、SQLite 或服务端协议，也不宣称全部客户端已经完成模块化。
 

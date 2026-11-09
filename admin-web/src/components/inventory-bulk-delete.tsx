@@ -14,6 +14,8 @@ import type { AdminComponentListItem } from "@/lib/types";
 
 interface DeleteSelection { id: string; expected_updated_at: string }
 interface BulkDeleteProps {
+  selecting: boolean;
+  onFinishSelection: () => void;
   selected: AdminComponentListItem[];
   disabled: boolean;
   allSelected: boolean;
@@ -23,7 +25,7 @@ interface BulkDeleteProps {
   onRefresh: () => void;
 }
 
-export function InventoryBulkDelete({ selected, disabled, allSelected, onSelectAll, onClear, onDeleted, onRefresh }: BulkDeleteProps) {
+export function InventoryBulkDelete({ selecting, onFinishSelection, selected, disabled, allSelected, onSelectAll, onClear, onDeleted, onRefresh }: BulkDeleteProps) {
   const { t, locale } = useI18n();
   const { session, identity, logout } = useAuth();
   const navigate = useNavigate();
@@ -88,20 +90,22 @@ export function InventoryBulkDelete({ selected, disabled, allSelected, onSelectA
     }
   }
 
-  return <div className="mb-4 space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-slate-50 p-3">
+  return <div className={selecting || pending ? "sticky bottom-0 z-10 mt-4 space-y-2 bg-background pb-[env(safe-area-inset-bottom)]" : "mt-4 space-y-2"}>
+    {selecting || pending ? <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-slate-50 p-2.5">
       <div className="space-y-1 text-sm">
         <p aria-live="polite">{t("本页已选：")}{formatCount(selected.length, locale)}</p>
         <p className="text-xs text-muted-foreground">{t("仅选择当前页；翻页或更改筛选会清空选择。")}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" disabled={disabled || busy || pending !== null} onClick={allSelected ? onClear : onSelectAll}>{allSelected ? t("取消本页选择") : t("选择本页")}</Button>
-        {selected.length > 0 && !allSelected ? <Button variant="ghost" size="sm" disabled={busy || pending !== null} onClick={onClear}>{t("清空选择")}</Button> : null}
-        <Button variant="destructive" size="sm" disabled={disabled || busy || (!selected.length && !pending)} onClick={openConfirmation}>{pending ? t("恢复批量删除") : t("删除所选")}</Button>
+        {selecting && !pending ? <>
+          <Button variant="outline" size="sm" className="min-h-11" disabled={disabled || busy} onClick={allSelected ? onClear : onSelectAll}>{allSelected ? t("取消本页选择") : t("选择本页")}</Button>
+          <Button variant="ghost" size="sm" className="min-h-11" disabled={busy} onClick={onFinishSelection}>{locale === "zh-CN" ? "退出多选" : "Exit selection"}</Button>
+        </> : null}
+        <Button variant="destructive" size="sm" className="min-h-11" disabled={disabled || busy || (!selected.length && !pending)} onClick={openConfirmation}>{pending ? t("恢复批量删除") : t("删除所选")}</Button>
       </div>
-    </div>
+    </div> : null}
     {notice && !dialogOpen ? <Alert variant={notice.error ? "destructive" : "default"}><AlertTitle>{notice.error ? t("批量删除未完成") : t("批量删除已完成")}</AlertTitle><AlertDescription>{notice.text}</AlertDescription></Alert> : null}
-    <dialog ref={dialog} aria-labelledby={titleId} aria-describedby={descriptionId} className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border bg-white p-6 text-foreground shadow-xl backdrop:bg-slate-950/40" onClose={() => setDialogOpen(false)} onCancel={(event) => { if (busy) event.preventDefault(); }}>
+    <dialog ref={dialog} aria-labelledby={titleId} aria-describedby={descriptionId} className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border bg-white p-4 text-foreground shadow-xl backdrop:bg-slate-950/40 sm:p-6" onClose={() => setDialogOpen(false)} onCancel={(event) => { if (busy) event.preventDefault(); }}>
       <div className="space-y-4">
         <h3 id={titleId} className="text-lg font-semibold">{t("确认批量删除")}</h3>
         <div id={descriptionId} className="space-y-2 text-sm">
