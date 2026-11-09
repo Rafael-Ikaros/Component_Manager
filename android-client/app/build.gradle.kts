@@ -12,6 +12,12 @@ val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
 val releaseVersionName = providers.gradleProperty("componentVersionName").orNull
 val releaseVersionCode = providers.gradleProperty("componentVersionCode").orNull?.toIntOrNull()
+val hprtCpclSdkDir = providers.gradleProperty("hprtCpclSdkDir").orNull?.let(::file)
+val hprtCpclJars = hprtCpclSdkDir?.let { sdkDir ->
+    listOf("CPCL_SDK_V1.22.05.jar", "lzo_V1.0.jar").map { sdkDir.resolve(it) }.also { jars ->
+        require(jars.all { it.isFile }) { "hprtCpclSdkDir must point to the official Android CPCL SDK app/libs directory" }
+    }
+}
 val hasReleaseSigning = listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
@@ -75,7 +81,15 @@ android {
         compose = true
     }
 
+    sourceSets.getByName("main").apply {
+        java.srcDir(if (hprtCpclSdkDir == null) "src/noHprtSdk/java" else "src/hprtSdk/java")
+        hprtCpclSdkDir?.let { jniLibs.srcDir(it) }
+    }
+
     packaging {
+        if (hprtCpclSdkDir != null) {
+            jniLibs.excludes += setOf("**/armeabi/**", "**/mips/**", "**/mips64/**")
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
@@ -100,6 +114,7 @@ kotlin {
 }
 
 dependencies {
+    hprtCpclJars?.let { implementation(files(it)) }
     val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
 
     implementation("androidx.core:core-ktx:1.15.0")

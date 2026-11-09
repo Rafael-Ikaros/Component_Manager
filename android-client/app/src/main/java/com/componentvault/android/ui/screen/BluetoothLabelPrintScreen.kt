@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -370,7 +371,8 @@ internal fun BluetoothLabelPrintScreen(
         it.type == LabelElementType.Qr && it.text.isBlank()
     } == true
     val previewError = preview.error.takeIf { preview.request == previewRequest }
-    val canCreate = editable && (if (draftFreeLabel != null) validFree
+    val printerAvailable = activeProfile == LabelPrinterProfile.M1 || controller.transport.hprtSdkAvailable
+    val canCreate = printerAvailable && editable && (if (draftFreeLabel != null) validFree
         else validSelection && printDesigns.size == draftSelections.size) &&
         paper != null && invalidGeometryFields.isEmpty() && !blankQr &&
         preview.request == previewRequest && preview.bitmap != null && preview.error == null
@@ -411,7 +413,7 @@ internal fun BluetoothLabelPrintScreen(
                     }
                 } else {
                     Button(onClick = { selectedCandidate?.let(controller::start) },
-                        enabled = !controller.working && selectedCandidate != null &&
+                        enabled = printerAvailable && !controller.working && selectedCandidate != null &&
                             queue.items.any { it.state == LabelPrintItemState.Pending } &&
                             queue.items.none { it.state in listOf(LabelPrintItemState.Uncertain,
                                 LabelPrintItemState.Failed, LabelPrintItemState.Sending) },
@@ -569,7 +571,7 @@ internal fun BluetoothLabelPrintScreen(
                             label = { Text(if (profile == LabelPrinterProfile.M1) "M1" else "HM-A300E CPCL") })
                     }
                     if (activeProfile == LabelPrinterProfile.HmA300eCpcl) {
-                        Text(stringResource(R.string.label_hm_experimental))
+                        Text(stringResource(if (printerAvailable) R.string.label_hm_experimental else R.string.label_hm_sdk_missing))
                         LabelMediaType.entries.forEach { media ->
                             FilterChip(selected = (if (hasQueue) queue.mediaType else controller.selectedMediaType) == media.id,
                                 onClick = { controller.selectMedia(media.id) }, enabled = editable,
@@ -603,10 +605,17 @@ internal fun BluetoothLabelPrintScreen(
                     TextButton(onClick = { troubleshootingExpanded = !troubleshootingExpanded }) {
                         Text(stringResource(R.string.label_editor_troubleshooting))
                     }
-                    if (troubleshootingExpanded) TextButton(onClick = {
-                        clipboard.setText(AnnotatedString(controller.transport.report))
-                    }, enabled = controller.transport.report.isNotBlank()) {
-                        Text(stringResource(R.string.bluetooth_label_print_copy_report))
+                    if (troubleshootingExpanded) {
+                        if (activeProfile == LabelPrinterProfile.HmA300eCpcl && controller.transport.report.isNotBlank()) {
+                            SelectionContainer {
+                                Text(controller.transport.report, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        TextButton(onClick = {
+                            clipboard.setText(AnnotatedString(controller.transport.report))
+                        }, enabled = controller.transport.report.isNotBlank()) {
+                            Text(stringResource(R.string.bluetooth_label_print_copy_report))
+                        }
                     }
                     if (controller.pauseRequested) Text(stringResource(R.string.bluetooth_label_print_pausing))
                 }
@@ -963,6 +972,7 @@ private fun printErrorText(code: String, context: android.content.Context): Stri
     "printer_permission_required" -> R.string.bluetooth_label_print_permission
     "printer_not_m1" -> R.string.bluetooth_label_print_error_not_m1
     "printer_no_response" -> R.string.bluetooth_label_print_error_no_response
+    "printer_hprt_sdk_missing" -> R.string.label_hm_sdk_missing
     else -> R.string.bluetooth_label_print_error_not_ready
 })
 

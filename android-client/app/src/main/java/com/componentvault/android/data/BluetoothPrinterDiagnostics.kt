@@ -19,6 +19,18 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal data class PrinterDeviceCandidate(
     val device: BluetoothDevice,
@@ -107,6 +119,11 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     private val sppOwnershipLock = Any()
     private val m1Connections = ReusableResourceSlot<M1Connection> { it.close() }
     private var m1IdleCloseTask: Runnable? = null
+    private val hprtPort: HprtCpclPort? by lazy { createHprtCpclPort(this.context) }
+    private var hprtSession: HprtCpclSession? = null
+    private var hprtOperation: Deferred<HprtCpclOutcome>? = null
+    private var hprtIdleCloseTask: Runnable? = null
+    val hprtSdkAvailable get() = hprtPort != null
 
     var candidates by mutableStateOf<List<PrinterDeviceCandidate>>(emptyList())
         private set
@@ -311,97 +328,85 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     fun printM1Label(candidate: PrinterDeviceCandidate, bitmap: Bitmap, paper: M1TestPaperProfile) =
         printM1Bitmap(candidate, bitmap, paper, M1FeedMode.Label, "m1_component_label")
 
-    /** Experimental CPCL; a completed socket write never confirms a printed label. */
-    fun printHmA300eLabel(
+    /** A successful SDK write leaves the label pending physical verification. */
+    suspend fun printHmA300eLabel(
         candidate: PrinterDeviceCandidate,
         bitmap: Bitmap,
         paper: M1TestPaperProfile,
         continuous: Boolean,
     ) {
-        prepareM1Operation(candidate.address)
+        if (hprtSession == null) stopInternal(recordPrintInterruption = false)
+        hprtIdleCloseTask?.let(handler::removeCallbacks)
+        hprtIdleCloseTask = null
         printResult = M1TestPrintResult.None
         canContinueBatch = false
-        report = "transport=spp\nprobe=hma300e_cpcl_label\nprotocol_verified=false\n" +
-            "sdk_command_structure_checked=true\nphysical_printer_verified=false\n" +
+        report = "transport=hprt_sdk_spp\nprobe=hma300e_cpcl_label\nsdk_version=1.22.05\n" +
             "media=${if (continuous) "continuous" else "gap"}\n" +
             "paper_width_mm=${paper.widthMm}\npaper_height_mm=${paper.heightMm}\n" +
             "bitmap_width_dots=${bitmap.width}\nbitmap_height_dots=${bitmap.height}\n"
+        val port = hprtPort
+        if (port == null) {
+            finish(PrinterProbeStatus.Unsupported, "error=hprt_sdk_missing")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
         if (!candidate.paired || candidate.type !in setOf(
                 BluetoothDevice.DEVICE_TYPE_CLASSIC, BluetoothDevice.DEVICE_TYPE_DUAL,
             )
         ) {
-            finish(PrinterProbeStatus.Unsupported, "error=unsupported_device")
+            finish(PrinterProbeStatus.Unsupported, "error=hprt_unsupported_device")
             printResult = M1TestPrintResult.Rejected
             return
         }
-        val parts = try {
-            HmA300eCpclProtocol.parts(bitmap, continuous)
-        } catch (_: RuntimeException) {
-            finish(PrinterProbeStatus.ConnectionFailed, "error=invalid_bitmap")
-            printResult = M1TestPrintResult.Rejected
-            return
-        }
-        try {
-            if (adapter?.isEnabled != true) {
-                finish(PrinterProbeStatus.BluetoothOff, "error=bluetooth_off")
-                printResult = M1TestPrintResult.Rejected
-                return
-            }
-            status = PrinterProbeStatus.Connecting
-            val session = SppSession(generation, candidate.address, isPrint = true)
-            sppSession = session
-            Thread({ runHmA300ePrint(candidate, parts, session) }, "hma300e-cpcl-print").start()
+        val bluetoothEnabled = try {
+            adapter?.isEnabled == true
         } catch (_: SecurityException) {
             finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
             printResult = M1TestPrintResult.Rejected
-        } catch (_: RuntimeException) {
-            finish(PrinterProbeStatus.ConnectionFailed, "error=worker_start")
+            return
+        }
+        if (!bluetoothEnabled) {
+            finish(PrinterProbeStatus.BluetoothOff, "error=bluetooth_off")
             printResult = M1TestPrintResult.Rejected
+            return
+        }
+        val session = hprtSession ?: HprtCpclSession(port).also { hprtSession = it }
+        status = PrinterProbeStatus.Connecting
+        coroutineScope {
+            val attempt = async(start = CoroutineStart.LAZY) {
+                session.print(candidate.address, bitmap, continuous) {
+                    withContext(Dispatchers.Main.immediate) { status = PrinterProbeStatus.Printing }
+                }
+            }
+            hprtOperation = attempt
+            try {
+                val outcome = attempt.await()
+                report += outcome.report
+                report += "print_result=${outcome.result.name.lowercase()}\n"
+                status = outcome.status
+                printResult = outcome.result
+                if (outcome.result == M1TestPrintResult.SentUnconfirmed) {
+                    hprtIdleCloseTask = Runnable { releaseHprtSession() }
+                        .also { handler.postDelayed(it, PRINTER_IDLE_TIMEOUT_MS) }
+                } else {
+                    hprtSession = null
+                }
+            } catch (_: CancellationException) {
+                currentCoroutineContext().ensureActive()
+            } finally {
+                if (hprtOperation === attempt) hprtOperation = null
+            }
         }
     }
 
-    private fun runHmA300ePrint(
-        candidate: PrinterDeviceCandidate,
-        parts: List<M1PrintPart>,
-        session: SppSession,
-    ) {
-        try {
-            // Reuse only RFCOMM connection ownership; never send the M1 query/print protocol.
-            val connection = acquireM1Connection(candidate, session) ?: return
-            postSpp(session) { status = PrinterProbeStatus.Printing; report += "stage=sending\n" }
-            scheduleSppDeadline(session, PRINT_STAGE_TIMEOUT_MS, "cpcl_write")
-            parts.forEach { part ->
-                if (!writePrintPart(connection.output, part.bytes, session)) return
-                if (part.isImageFrame) session.framesSent++
-                if (part.isFormFeed) session.formFeedCommands++
-            }
-            session.printWriteComplete = true
-            cancelSppDeadline(session)
-            postSpp(session) {
-                appendPrintProgress(session)
-                canContinueBatch = false
-                report += "batch_ready=false\nprint_confirmation=unavailable\n"
-                finish(PrinterProbeStatus.Complete, "print_result=sent_unconfirmed")
-                printResult = M1TestPrintResult.SentUnconfirmed
-            }
-        } catch (_: SecurityException) {
-            postSpp(session) {
-                appendPrintProgress(session)
-                finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
-                printResult = failedPrintResult(session.bytesAttempted)
-            }
-        } catch (_: Exception) {
-            postSpp(session) {
-                appendPrintProgress(session)
-                val result = failedPrintResult(session.bytesAttempted)
-                finish(PrinterProbeStatus.ConnectionFailed, "print_result=${result.name.lowercase()}")
-                printResult = result
-            }
-        } finally {
-            cancelSppDeadline(session)
-            session.sockets.closeCurrent()
-            session.connection?.let(m1Connections::closeIfOwned)
-        }
+    private fun releaseHprtSession() {
+        hprtIdleCloseTask?.let(handler::removeCallbacks)
+        hprtIdleCloseTask = null
+        hprtOperation?.cancel()
+        hprtOperation = null
+        val session = hprtSession
+        hprtSession = null
+        if (session != null) hprtCleanup.launch { session.disconnect() }
     }
 
     private fun printM1Bitmap(
@@ -486,6 +491,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     }
 
     private fun prepareM1Operation(address: String) {
+        releaseHprtSession()
         stopScan()
         timeoutTask?.let(handler::removeCallbacks)
         timeoutTask = null
@@ -579,7 +585,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
             }
         }
         m1IdleCloseTask = idleClose
-        handler.postDelayed(idleClose, M1_IDLE_TIMEOUT_MS)
+        handler.postDelayed(idleClose, PRINTER_IDLE_TIMEOUT_MS)
     }
 
     private fun runM1TestPrint(
@@ -961,6 +967,11 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     fun stop() = stopInternal(recordPrintInterruption = true)
 
     private fun stopInternal(recordPrintInterruption: Boolean) {
+        if (recordPrintInterruption && hprtOperation != null && busy) {
+            printResult = if (status == PrinterProbeStatus.Printing) M1TestPrintResult.Partial else M1TestPrintResult.Interrupted
+            report += "error=hprt_cancelled\n"
+        }
+        releaseHprtSession()
         val session = synchronized(sppOwnershipLock) {
             generation++
             m1IdleCloseTask?.let(handler::removeCallbacks)
@@ -1002,7 +1013,8 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         private const val POST_FEED_READ_TIMEOUT_MS = 1_000L
         private const val POST_PRINT_MODEL_TIMEOUT_MS = MODEL_QUERY_TIMEOUT_MS
         private const val POST_PRINT_DRAIN_TIMEOUT_MS = 250L
-        private const val M1_IDLE_TIMEOUT_MS = 60_000L
+        private const val PRINTER_IDLE_TIMEOUT_MS = 60_000L
+        private val hprtCleanup = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private const val PRINT_WRITE_CHUNK_BYTES = 1_024
         private const val READ_QUIET_MS = 150L
         private const val READ_POLL_MS = 20L

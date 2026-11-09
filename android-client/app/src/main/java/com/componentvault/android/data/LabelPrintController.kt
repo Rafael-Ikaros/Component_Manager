@@ -158,6 +158,10 @@ internal class LabelPrintController(context: Context) {
 
     fun start(candidate: PrinterDeviceCandidate) {
         if (!loaded || working || running || closed || transport.busy) return
+        if (queue.printerProfileId == LabelPrinterProfile.HmA300eCpcl.id && !transport.hprtSdkAvailable) {
+            error = "printer_hprt_sdk_missing"
+            return
+        }
         if (queue.items.any { it.state in setOf(LabelPrintItemState.Uncertain, LabelPrintItemState.Failed, LabelPrintItemState.Sending) }) {
             error = "queue_review_required"
             return
@@ -281,5 +285,7 @@ private fun printerProblem(report: String): String = when {
     "error=permission_required" in report -> "printer_permission_required"
     "error=unsupported_device" in report || "error=model_unrecognized_response" in report -> "printer_not_m1"
     "error=model_no_response" in report -> "printer_no_response"
+    "error=hprt_sdk_missing" in report -> "printer_hprt_sdk_missing"
+    "error=hprt_status_no_response" in report -> "printer_no_response"
     else -> "printer_not_ready"
 }

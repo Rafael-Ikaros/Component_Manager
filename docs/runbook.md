@@ -265,6 +265,9 @@ python tools/versioning/sync_version.py --check
 
 The Android client is a Gradle/Compose app in `android-client/`.
 
+For an HM-A300E test build, pass the vendor SDK directory through `hprtCpclSdkDir`.
+See the [HM-A300E SDK build instructions](hm-a300e.md#构建-sdk-测试包).
+
 Known machine requirements:
 
 - Android SDK installed

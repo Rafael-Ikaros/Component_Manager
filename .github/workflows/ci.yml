@@ -182,7 +182,7 @@ jobs:
           --tests 'com.componentvault.android.model.ReferencePriceNotesTest'
           --tests 'com.componentvault.android.data.BluetoothPrinterDiagnosticsTest'
           --tests 'com.componentvault.android.data.M1Spp*Test'
-          --tests 'com.componentvault.android.data.HmA300eCpclProtocolTest'
+          --tests 'com.componentvault.android.data.HprtCpclSessionTest'
           --tests 'com.componentvault.android.data.M1ComponentLabelRendererTest'
           --tests 'com.componentvault.android.data.LabelPrint*Test'
           --tests 'com.componentvault.android.ui.screen.BluetoothLabelPrintUiTest'
