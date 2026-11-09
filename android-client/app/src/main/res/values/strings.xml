@@ -366,6 +366,17 @@
     <string name="importer_action_parse_supplier_text">Parse supplier text</string>
     <string name="importer_action_scan_qr">Scan package QR</string>
     <string name="importer_action_scan_supplier_text">Scan package text</string>
+    <string name="import_reel_capture">Photograph label</string>
+    <string name="import_reel_choose_photo">Choose photo</string>
+    <string name="import_reel_source">Reel or package label</string>
+    <string name="import_reel_choose_model">Select the complete manufacturer part number.</string>
+    <string name="import_reel_nominal_quantity">Read from label: %1$d pcs. Verify and enter the actual quantity below.</string>
+    <string name="import_reel_mpn">Manufacturer part number</string>
+    <string name="import_reel_actual_quantity">Enter the actual quantity before continuing.</string>
+    <string name="import_reel_no_exact">No exact catalog match. Check the model or continue with the label details.</string>
+    <string name="import_reel_photo_failed">Could not read this photo. Choose another image or photograph the label up close.</string>
+    <string name="import_reel_show_text">Show recognized text</string>
+    <string name="import_reel_hide_text">Hide recognized text</string>
     <string name="importer_action_capture_text">Capture text</string>
     <string name="importer_action_open_full_editor">Open full editor</string>
     <string name="importer_recognized_title">Recognized fields</string>

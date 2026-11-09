@@ -312,7 +312,14 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   an inline `OutlinedTextField`, with results visible while typing, fixed horizontal filters and denser inventory rows instead
   of the older stacked filter-card layout. It also includes quantity-first
   import flows for JLC copied mobile product text, package QR payloads,
-  supplier packaging OCR, and generated warehouse labels.
+  supplier packaging and reel label OCR, and generated warehouse labels.
+  The same import screen accepts a camera photo or an image from the device.
+  Reel OCR prioritizes explicit manufacturer part numbers, recognizes common
+  spaced label formats, and shows alternatives when a label has multiple codes.
+  Only the selected model goes to the existing catalog search. Exact model
+  matches can enrich the draft after selection, while a catalog miss leaves
+  the label details editable. Printed pack quantity is a hint and the actual
+  inbound quantity must be entered separately.
 - Package QR scanning runs through an in-app CameraX surface backed by the
   bundled ML Kit Barcode Scanning API, so first use does not depend on Google
   Play services downloading an external scanner module.

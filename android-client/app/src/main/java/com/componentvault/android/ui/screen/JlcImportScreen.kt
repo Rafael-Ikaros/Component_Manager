@@ -1,6 +1,9 @@
 package com.componentvault.android.ui.screen
 
+import android.graphics.ImageDecoder
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
@@ -32,19 +35,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.componentvault.android.R
 import com.componentvault.android.data.ComponentImportParser
 import com.componentvault.android.data.CategoryLearningStore
 import com.componentvault.android.data.AppDiagnostics
 import com.componentvault.android.data.InventoryRepository
 import com.componentvault.android.data.ImportLookupRequestGate
-import com.componentvault.android.data.LcscDomesticCatalog
 import com.componentvault.android.data.LcscDomesticProduct
 import com.componentvault.android.data.LcscPublicCatalog
+import com.componentvault.android.data.LcscDomesticCatalog
+import com.componentvault.android.data.ReelLabel
+import com.componentvault.android.data.ReelLabelParser
+import com.componentvault.android.data.ocr.OcrEngineFactory
+import com.componentvault.android.data.ocr.OcrResult
 import com.componentvault.android.model.AppPreferences
 import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.ComponentImportCandidate
@@ -56,6 +65,7 @@ import com.componentvault.android.model.LocalComponentSku
 import com.componentvault.android.model.StorageLocationRecord
 import com.componentvault.android.model.SyncConfiguration
 import com.componentvault.android.model.isJlcSource
+import com.componentvault.android.model.officialParameterKind
 import com.componentvault.android.model.referenceDisplayName
 import com.componentvault.android.model.withOfficialMetadata
 import kotlinx.coroutines.Dispatchers
@@ -102,6 +112,10 @@ internal fun JlcImportSurface(
     var domesticSearchMessage by remember { mutableStateOf<String?>(null) }
     var domesticSearchIsError by remember { mutableStateOf(false) }
     var domesticSearchJob by remember { mutableStateOf<Job?>(null) }
+    var reelLabel by remember { mutableStateOf<ReelLabel?>(null) }
+    var photoOcrText by remember { mutableStateOf("") }
+    var showPhotoText by remember { mutableStateOf(false) }
+    var photoRecognitionInProgress by remember { mutableStateOf(false) }
     var selectedDomesticSku by remember { mutableStateOf<String?>(null) }
     var baseCandidate by remember { mutableStateOf<ComponentImportCandidate?>(null) }
     var displayedCandidate by remember { mutableStateOf<ComponentImportCandidate?>(null) }
@@ -220,8 +234,19 @@ internal fun JlcImportSurface(
         feedbackMessage = null
     }
 
-    fun setBaseCandidate(candidate: ComponentImportCandidate) {
+    fun clearCatalogSearch() {
         domesticSearchJob?.cancel()
+        domesticSearchJob = null
+        domesticResults = emptyList()
+        domesticSearchMessage = null
+        domesticSearchInProgress = false
+        domesticSearchIsError = false
+    }
+
+    fun setBaseCandidate(candidate: ComponentImportCandidate, photoLabel: ReelLabel? = null) {
+        clearCatalogSearch()
+        reelLabel = photoLabel
+        if (photoLabel == null) photoOcrText = ""
         selectedDomesticSku = null
         val attempt = lookupGate.begin(candidate.rawPayload, displayedCandidate != null)
         lookupGeneration = attempt.generation
@@ -232,19 +257,40 @@ internal fun JlcImportSurface(
         lookupMessage = if (willLookup) strings.importer.lookupLoading else context.getString(com.componentvault.android.R.string.importer_scan_recognized)
         lookupIsError = false
         lookupInProgress = willLookup
-        if (attempt.replaceDisplayedCandidate) applyDisplayedCandidate(candidate, preserveUserEdits = false)
+        if (attempt.replaceDisplayedCandidate) {
+            applyDisplayedCandidate(candidate, preserveUserEdits = false)
+            if (photoLabel != null) quantityText = ""
+        }
         else feedbackMessage = null
     }
 
     fun applyDomesticProduct(product: LcscDomesticProduct) {
         val currentQuantity = quantityText
-        val candidate = categoryLearningStore.apply(
+        val photo = reelLabel
+        val source = if (photo == null) {
             ComponentImportParser.parseScannedQr(requireNotNull(product.metadata.sku))
-                .withOfficialMetadata(product.metadata),
-        )
+        } else {
+            photo.candidate(product.metadata.model, context.getString(R.string.import_reel_source))
+        }
+        val metadata = product.metadata
+        val catalogParameterKinds = metadata.parameters.keys.mapNotNull(::officialParameterKind).toSet()
+        val catalogCandidate = if (photo == null) source.withOfficialMetadata(metadata) else {
+            val localNotes = photo.parameters.filterKeys { officialParameterKind(it) !in catalogParameterKinds }
+                .map { (key, value) -> "参数：$key：$value" }
+            source.copy(
+                packageName = if (metadata.packageName.isNullOrBlank()) source.packageName else "",
+                notes = localNotes,
+            ).withOfficialMetadata(metadata.copy(matchedBy = "mpn", confidence = "exact"))
+        }
+        val candidate = categoryLearningStore.apply(catalogCandidate)
         lookupGeneration = lookupGate.begin(candidate.rawPayload, displayedCandidate != null).generation
         baseCandidate = candidate
         selectedDomesticSku = product.metadata.sku
+        if (photo != null) {
+            skuEdited = false
+            modelEdited = false
+            brandEdited = false
+        }
         applyDisplayedCandidate(candidate, preserveUserEdits = displayedCandidate != null)
         quantityText = currentQuantity
         domesticSearchMessage = context.getString(com.componentvault.android.R.string.import_domestic_selected)
@@ -258,6 +304,101 @@ internal fun JlcImportSurface(
         val candidate = ComponentImportParser.parseScannedQr(skuValue)
         setBaseCandidate(candidate)
         quantityText = currentQuantity
+    }
+
+    fun searchCatalog() {
+        val keyword = partNumberInput.trim()
+        if (keyword.isBlank()) return
+        val photo = reelLabel
+        if (photo == null) {
+            LcscPublicCatalog.normalizeSku(keyword)?.let { normalized ->
+                applyInternationalFallback(normalized)
+                return
+            }
+        }
+        clearCatalogSearch()
+        domesticSearchInProgress = true
+        domesticSearchJob = coroutineScope.launch {
+            try {
+                val results = withContext(Dispatchers.IO) {
+                    repository.searchPublicCatalog(keyword, appPreferences.appLanguage)
+                }
+                if (keyword != partNumberInput.trim() || photo !== reelLabel) return@launch
+                val matches = if (photo == null) results else ReelLabelParser.exactProducts(keyword, results)
+                AppDiagnostics.record("lookup_eda", "success" to true, "count" to matches.size)
+                domesticResults = matches
+                domesticSearchMessage = when {
+                    photo != null && matches.isEmpty() -> context.getString(R.string.import_reel_no_exact)
+                    matches.isEmpty() -> context.getString(R.string.import_catalog_empty)
+                    else -> context.getString(R.string.import_catalog_choose, matches.size)
+                }
+                domesticSearchInProgress = false
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppDiagnostics.record("lookup_eda", "success" to false, "type" to error.javaClass)
+                domesticSearchInProgress = false
+                domesticSearchIsError = true
+                domesticSearchMessage = context.getString(R.string.catalog_keyword_failed)
+            }
+        }
+    }
+
+    fun selectPhotoModel(label: ReelLabel, selected: String?) {
+        val candidate = label.candidate(selected, context.getString(R.string.import_reel_source))
+        setBaseCandidate(candidate, label)
+        partNumberInput = selected.orEmpty()
+        if (selected != null && appPreferences.enablePublicJlcLookup) searchCatalog()
+    }
+
+    fun applyPhotoOcr(result: OcrResult) {
+        val label = ReelLabelParser.parse(result.lines.map { it.text })
+        if (label != null) {
+            photoOcrText = result.fullText
+            showPhotoText = false
+            displayedCandidate = null
+            selectPhotoModel(label, label.automaticModel)
+            return
+        }
+        runCatching { ComponentImportParser.parseSupplierOcr(result) }
+            .onSuccess {
+                setBaseCandidate(it.copy(suggestedQuantity = null))
+                quantityText = ""
+            }
+            .onFailure {
+                rawInput = result.fullText
+                feedbackMessage = it.message ?: strings.importer.supplierScanFailedDescription
+            }
+    }
+
+    val pickLabelPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null || photoRecognitionInProgress) return@rememberLauncherForActivityResult
+        photoRecognitionInProgress = true
+        coroutineScope.launch {
+            try {
+                val bitmap = withContext(Dispatchers.IO) {
+                    ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
+                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                        val longestSide = maxOf(info.size.width, info.size.height)
+                        if (longestSide > 2560) {
+                            decoder.setTargetSize(
+                                (info.size.width * (2560.0 / longestSide)).toInt().coerceAtLeast(1),
+                                (info.size.height * (2560.0 / longestSide)).toInt().coerceAtLeast(1),
+                            )
+                        }
+                    }
+                }
+                val result = OcrEngineFactory.create(appPreferences.ocrEngineMode).recognize(bitmap)
+                bitmap.recycle()
+                applyPhotoOcr(result)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                feedbackMessage = context.getString(R.string.import_reel_photo_failed)
+            } finally {
+                photoRecognitionInProgress = false
+            }
+        }
     }
 
     fun buildQuickSaveDraftOrNull(): ComponentDraft? {
@@ -301,6 +442,10 @@ internal fun JlcImportSurface(
         val candidate = displayedCandidate
         if (candidate == null) {
             feedbackMessage = strings.importer.parseFirstError
+            return null
+        }
+        if (reelLabel != null && quantityText.toIntOrNull()?.let { it >= 0 } != true) {
+            feedbackMessage = context.getString(R.string.import_reel_actual_quantity)
             return null
         }
 
@@ -349,7 +494,7 @@ internal fun JlcImportSurface(
                         onLocationCodeScan(result)
                     } else {
                         runCatching { ComponentImportParser.parseScannedQr(result) }
-                            .onSuccess(::setBaseCandidate)
+                            .onSuccess { setBaseCandidate(it) }
                             .onFailure {
                                 AppDiagnostics.record("scanner_choice", "valid" to false, "type" to it.javaClass)
                                 rawInput = result
@@ -369,12 +514,7 @@ internal fun JlcImportSurface(
                 preferredOcrEngineMode = appPreferences.ocrEngineMode,
                 onOcrScanned = { result ->
                     scannerMode = null
-                    runCatching { ComponentImportParser.parseSupplierOcr(result) }
-                        .onSuccess(::setBaseCandidate)
-                        .onFailure {
-                            rawInput = result.fullText
-                            feedbackMessage = it.message ?: strings.importer.supplierScanFailedDescription
-                        }
+                    applyPhotoOcr(result)
                 },
             )
             return
@@ -483,6 +623,7 @@ internal fun JlcImportSurface(
             ) {
                 FilledTonalButton(
                     onClick = { scannerMode = ImportScannerMode.Qr },
+                    enabled = !photoRecognitionInProgress,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(strings.importer.actionScanQr)
@@ -507,70 +648,57 @@ internal fun JlcImportSurface(
                         color = if (lookupIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     )
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { scannerMode = ImportScannerMode.SupplierText },
+                        enabled = !photoRecognitionInProgress,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.import_reel_capture)) }
+                    OutlinedButton(
+                        onClick = { pickLabelPhoto.launch("image/*") },
+                        enabled = !photoRecognitionInProgress,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.import_reel_choose_photo)) }
+                }
+                if (photoRecognitionInProgress) {
+                    Text(strings.importer.supplierScannerRecognizing)
+                }
+                reelLabel?.let { label ->
+                    Text(stringResource(R.string.import_reel_source), style = MaterialTheme.typography.titleSmall)
+                    label.nominalQuantity?.let {
+                        Text(stringResource(R.string.import_reel_nominal_quantity, it), style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (label.models.size > 1 || label.automaticModel == null) {
+                        Text(stringResource(R.string.import_reel_choose_model), style = MaterialTheme.typography.bodySmall)
+                        label.models.forEach { option ->
+                            TextButton(onClick = { selectPhotoModel(label, option) }) { Text(option) }
+                        }
+                    }
+                    val summary = (listOfNotNull(label.brand, label.packageName.takeIf { it.isNotBlank() }) +
+                        label.parameters.values).joinToString(" · ")
+                    if (summary.isNotBlank()) Text(summary, style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { showPhotoText = !showPhotoText }) {
+                        Text(stringResource(if (showPhotoText) R.string.import_reel_hide_text else R.string.import_reel_show_text))
+                    }
+                    if (showPhotoText) Text(photoOcrText, style = MaterialTheme.typography.bodySmall)
+                }
                 OutlinedTextField(
                     value = partNumberInput,
                     onValueChange = {
-                        domesticSearchJob?.cancel()
-                        domesticSearchJob = null
-                        domesticSearchInProgress = false
+                        clearCatalogSearch()
                         partNumberInput = it
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_search_label)) },
-                    placeholder = { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_search_placeholder)) },
+                    label = { Text(stringResource(
+                        if (reelLabel == null) R.string.import_catalog_search_label else R.string.import_reel_mpn,
+                    )) },
+                    placeholder = { if (reelLabel == null) Text(stringResource(R.string.import_catalog_search_placeholder)) },
                 )
                 FilledTonalButton(
-                    onClick = {
-                        val keyword = partNumberInput.trim()
-                        if (keyword.isBlank()) return@FilledTonalButton
-                        LcscPublicCatalog.normalizeSku(keyword)?.let { normalized ->
-                            applyInternationalFallback(normalized)
-                            domesticSearchMessage = context.getString(com.componentvault.android.R.string.import_catalog_searching)
-                            return@FilledTonalButton
-                        }
-                        domesticSearchInProgress = true
-                        domesticSearchMessage = if (appPreferences.appLanguage == com.componentvault.android.model.AppLanguage.English) {
-                            context.getString(com.componentvault.android.R.string.catalog_keyword_domestic_only)
-                        } else null
-                        domesticSearchIsError = false
-                        domesticResults = emptyList()
-                        domesticSearchJob?.cancel()
-                        domesticSearchJob = coroutineScope.launch {
-                            runCatching {
-                                withContext(Dispatchers.IO) {
-                                    repository.searchPublicCatalog(keyword, appPreferences.appLanguage)
-                                }
-                            }.onSuccess { results ->
-                                AppDiagnostics.record("lookup_eda", "success" to true, "count" to results.size)
-                                if (keyword != partNumberInput.trim()) return@onSuccess
-                                domesticSearchInProgress = false
-                                val normalized = LcscPublicCatalog.normalizeSku(keyword)
-                                val exact = normalized?.let { LcscDomesticCatalog.exactMatch(it, results) }
-                                if (exact != null) {
-                                    domesticResults = listOf(exact)
-                                    applyDomesticProduct(exact)
-                                } else {
-                                    domesticResults = results
-                                    domesticSearchMessage = if (results.isEmpty()) {
-                                        context.getString(com.componentvault.android.R.string.import_catalog_empty)
-                                    } else {
-                                        context.getString(com.componentvault.android.R.string.import_catalog_choose, results.size)
-                                    }
-                                    normalized?.let(::applyInternationalFallback)
-                                }
-                            }.onFailure { error ->
-                                if (error is CancellationException || keyword != partNumberInput.trim()) return@onFailure
-                                AppDiagnostics.record("lookup_eda", "success" to false, "type" to error.javaClass)
-                                domesticSearchInProgress = false
-                                domesticSearchIsError = true
-                                domesticSearchMessage = context.getString(com.componentvault.android.R.string.catalog_keyword_failed)
-                                LcscPublicCatalog.normalizeSku(keyword)?.let(::applyInternationalFallback)
-                            }
-                        }
-                    },
+                    onClick = ::searchCatalog,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !domesticSearchInProgress,
+                    enabled = !domesticSearchInProgress && !photoRecognitionInProgress && partNumberInput.isNotBlank(),
                 ) {
                     Row(
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
@@ -580,13 +708,9 @@ internal fun JlcImportSurface(
                         if (domesticSearchInProgress) {
                             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                         }
-                        Text(
-                            if (domesticSearchInProgress) {
-                                androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_searching)
-                            } else {
-                                androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_search_action)
-                            },
-                        )
+                        Text(stringResource(
+                            if (domesticSearchInProgress) R.string.import_catalog_searching else R.string.import_catalog_search_action,
+                        ))
                     }
                 }
                 domesticSearchMessage?.let { message ->
@@ -598,39 +722,14 @@ internal fun JlcImportSurface(
                     )
                 }
                 if (domesticSearchIsError) {
-                    TextButton(onClick = {
-                        val keyword = partNumberInput.trim()
-                        if (keyword.isNotEmpty()) {
-                            domesticSearchInProgress = true
-                            domesticSearchIsError = false
-                            domesticSearchMessage = context.getString(com.componentvault.android.R.string.import_catalog_searching)
-                            domesticSearchJob?.cancel()
-                            domesticSearchJob = coroutineScope.launch {
-                                runCatching { withContext(Dispatchers.IO) { repository.searchPublicCatalog(keyword, appPreferences.appLanguage) } }
-                                    .onSuccess { results ->
-                                        domesticSearchInProgress = false
-                                        domesticResults = results
-                                        LcscPublicCatalog.normalizeSku(keyword)?.let { normalized ->
-                                            LcscDomesticCatalog.exactMatch(normalized, results)?.let(::applyDomesticProduct)
-                                                ?: applyInternationalFallback(normalized)
-                                        }
-                                        domesticSearchMessage = if (results.isEmpty()) context.getString(com.componentvault.android.R.string.import_catalog_empty)
-                                        else context.getString(com.componentvault.android.R.string.import_catalog_choose, results.size)
-                                    }.onFailure { error ->
-                                        if (error is CancellationException) return@onFailure
-                                        domesticSearchInProgress = false; domesticSearchIsError = true
-                                        domesticSearchMessage = error.message ?: context.getString(com.componentvault.android.R.string.catalog_keyword_failed)
-                                    }
-                            }
-                        }
-                    }) { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.catalog_retry_eda)) }
+                    TextButton(onClick = ::searchCatalog) { Text(stringResource(R.string.catalog_retry_eda)) }
                     (if (appPreferences.appLanguage == com.componentvault.android.model.AppLanguage.ZhCn)
                         LcscDomesticCatalog.searchUrl(partNumberInput)
                     else partNumberInput.trim().takeIf { it.isNotEmpty() }?.let {
                         "https://www.lcsc.com/search?q=${java.net.URLEncoder.encode(it, Charsets.UTF_8.name())}"
                     })?.let { searchUrl ->
                         TextButton(onClick = { uriHandler.openUri(searchUrl) }) {
-                            Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_open_browser))
+                            Text(stringResource(R.string.import_catalog_open_browser))
                         }
                     }
                 }
@@ -666,43 +765,35 @@ internal fun JlcImportSurface(
                         }
                     }
                 }
-                Text(
-                    androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_ocr_secondary_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                OutlinedButton(
-                    onClick = { scannerMode = ImportScannerMode.SupplierText },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(strings.importer.actionScanSupplierText)
-                }
-                OutlinedTextField(
-                    value = rawInput,
-                    onValueChange = { rawInput = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.importer.rawInputLabel) },
-                    placeholder = { Text(strings.importer.rawInputPlaceholder) },
-                    minLines = 6,
-                )
-                OutlinedButton(
-                    onClick = {
-                        runCatching { ComponentImportParser.parseJlcText(rawInput) }
-                            .onSuccess { candidate -> AppDiagnostics.record("scanner_choice", "valid" to true);setBaseCandidate(candidate) }
-                            .onFailure { AppDiagnostics.record("scanner_choice", "valid" to false, "type" to it.javaClass);feedbackMessage = it.message ?: strings.importer.parseFirstError }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(strings.importer.actionParseText)
-                }
-                OutlinedButton(
-                    onClick = {
-                        runCatching { ComponentImportParser.parseSupplierText(rawInput) }
-                            .onSuccess(::setBaseCandidate)
-                            .onFailure { feedbackMessage = it.message ?: strings.importer.parseSupplierTextError }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(strings.importer.actionParseSupplierText)
+                if (reelLabel == null) {
+                    OutlinedTextField(
+                        value = rawInput,
+                        onValueChange = { rawInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.importer.rawInputLabel) },
+                        placeholder = { Text(strings.importer.rawInputPlaceholder) },
+                        minLines = 6,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            runCatching { ComponentImportParser.parseJlcText(rawInput) }
+                                .onSuccess { candidate -> AppDiagnostics.record("scanner_choice", "valid" to true);setBaseCandidate(candidate) }
+                                .onFailure { AppDiagnostics.record("scanner_choice", "valid" to false, "type" to it.javaClass);feedbackMessage = it.message ?: strings.importer.parseFirstError }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(strings.importer.actionParseText)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            runCatching { ComponentImportParser.parseSupplierText(rawInput) }
+                                .onSuccess { setBaseCandidate(it) }
+                                .onFailure { feedbackMessage = it.message ?: strings.importer.parseSupplierTextError }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(strings.importer.actionParseSupplierText)
+                    }
                 }
             }
         }
@@ -711,7 +802,7 @@ internal fun JlcImportSurface(
             val referenceName = candidate.referenceDisplayName()?.takeIf { reference ->
                 !reference.equals(name.trim(), ignoreCase = true)
             }
-            item {
+            if (reelLabel == null) item {
                 SectionPane(
                     title = strings.importer.enrichmentTitle,
                     supporting = strings.importer.enrichmentSubtitle,

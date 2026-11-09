@@ -348,6 +348,17 @@
     <string name="importer_action_parse_supplier_text">解析供应商文本</string>
     <string name="importer_action_scan_qr">扫描包装二维码</string>
     <string name="importer_action_scan_supplier_text">扫描包装文字</string>
+    <string name="import_reel_capture">拍照识别标签</string>
+    <string name="import_reel_choose_photo">从相册选图</string>
+    <string name="import_reel_source">料盘或包装标签</string>
+    <string name="import_reel_choose_model">请选择标签上的完整厂商型号。</string>
+    <string name="import_reel_nominal_quantity">识别到包装标称 %1$d 件，请核对并填写实际数量。</string>
+    <string name="import_reel_mpn">厂商型号</string>
+    <string name="import_reel_actual_quantity">请先填写实际数量。</string>
+    <string name="import_reel_no_exact">目录中没有完全匹配的型号。可以核对型号后重查，也可以用标签资料继续录入。</string>
+    <string name="import_reel_photo_failed">无法读取这张照片。请换一张图，或靠近标签重新拍摄。</string>
+    <string name="import_reel_show_text">查看原始识别文字</string>
+    <string name="import_reel_hide_text">收起识别文字</string>
     <string name="importer_action_capture_text">拍摄识别</string>
     <string name="importer_action_open_full_editor">打开完整编辑器</string>
     <string name="importer_recognized_title">识别结果</string>
