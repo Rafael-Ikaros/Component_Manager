@@ -123,6 +123,7 @@ internal class LabelPrintController(context: Context) {
         mutate {
             // Clear label snapshots but retain the last explicitly chosen paper and templates.
             persist(queue.copy(items = emptyList()))
+            releaseFinishedHprtQueue()
             loaded = true
         }
     }
@@ -132,7 +133,16 @@ internal class LabelPrintController(context: Context) {
         val current = queue.items.firstOrNull { it.id == id } ?: return
         if (current.state !in setOf(LabelPrintItemState.Failed, LabelPrintItemState.Uncertain)) return
         if (state !in setOf(LabelPrintItemState.Pending, LabelPrintItemState.Sent, LabelPrintItemState.Skipped)) return
-        mutate { persist(queue.update(id, state)) }
+        mutate {
+            persist(queue.update(id, state))
+            releaseFinishedHprtQueue()
+        }
+    }
+
+    private fun releaseFinishedHprtQueue() {
+        if (queue.printerProfileId == LabelPrinterProfile.HmA300eCpcl.id &&
+            queue.items.all { it.state == LabelPrintItemState.Sent || it.state == LabelPrintItemState.Skipped }
+        ) transport.stop()
     }
 
     private fun mutate(block: suspend () -> Unit) {

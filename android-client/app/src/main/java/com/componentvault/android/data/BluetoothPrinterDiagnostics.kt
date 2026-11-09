@@ -122,7 +122,6 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     private val hprtPort: HprtCpclPort? by lazy { createHprtCpclPort(this.context) }
     private var hprtSession: HprtCpclSession? = null
     private var hprtOperation: Deferred<HprtCpclOutcome>? = null
-    private var hprtIdleCloseTask: Runnable? = null
     val hprtSdkAvailable get() = hprtPort != null
 
     var candidates by mutableStateOf<List<PrinterDeviceCandidate>>(emptyList())
@@ -336,8 +335,6 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         continuous: Boolean,
     ) {
         if (hprtSession == null) stopInternal(recordPrintInterruption = false)
-        hprtIdleCloseTask?.let(handler::removeCallbacks)
-        hprtIdleCloseTask = null
         printResult = M1TestPrintResult.None
         canContinueBatch = false
         report = "transport=hprt_sdk_spp\nprobe=hma300e_cpcl_label\nsdk_version=1.22.05\n" +
@@ -385,10 +382,8 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
                 report += "print_result=${outcome.result.name.lowercase()}\n"
                 status = outcome.status
                 printResult = outcome.result
-                if (outcome.result == M1TestPrintResult.SentUnconfirmed) {
-                    hprtIdleCloseTask = Runnable { releaseHprtSession() }
-                        .also { handler.postDelayed(it, PRINTER_IDLE_TIMEOUT_MS) }
-                } else {
+                // Manual review can outlast an idle timer. Keep the SDK port for the active queue.
+                if (outcome.result != M1TestPrintResult.SentUnconfirmed) {
                     hprtSession = null
                 }
             } catch (_: CancellationException) {
@@ -400,8 +395,6 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     }
 
     private fun releaseHprtSession() {
-        hprtIdleCloseTask?.let(handler::removeCallbacks)
-        hprtIdleCloseTask = null
         hprtOperation?.cancel()
         hprtOperation = null
         val session = hprtSession
@@ -585,7 +578,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
             }
         }
         m1IdleCloseTask = idleClose
-        handler.postDelayed(idleClose, PRINTER_IDLE_TIMEOUT_MS)
+        handler.postDelayed(idleClose, M1_IDLE_TIMEOUT_MS)
     }
 
     private fun runM1TestPrint(
@@ -1013,7 +1006,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         private const val POST_FEED_READ_TIMEOUT_MS = 1_000L
         private const val POST_PRINT_MODEL_TIMEOUT_MS = MODEL_QUERY_TIMEOUT_MS
         private const val POST_PRINT_DRAIN_TIMEOUT_MS = 250L
-        private const val PRINTER_IDLE_TIMEOUT_MS = 60_000L
+        private const val M1_IDLE_TIMEOUT_MS = 60_000L
         private val hprtCleanup = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private const val PRINT_WRITE_CHUNK_BYTES = 1_024
         private const val READ_QUIET_MS = 150L
