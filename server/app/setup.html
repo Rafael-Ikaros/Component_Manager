@@ -8,32 +8,33 @@
     :root{color-scheme:light dark;--bg:#f4f7f7;--panel:#fff;--text:#162c2b;--muted:#4f6563;--line:#cddad8;--accent:#086b60;--soft:#e1f1ed;--error:#9f2828;--radius:16px;font:16px/1.6 system-ui,"Microsoft YaHei",sans-serif}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}main{max-width:960px;margin:auto;padding:40px 20px 64px}header{margin-bottom:24px}h1{font-size:clamp(26px,4vw,36px);line-height:1.25;margin:8px 0 12px}h2{font-size:20px;margin:0 0 8px}p{margin:8px 0;color:var(--muted)}.brand{color:var(--accent);font-weight:650;font-size:14px;letter-spacing:.06em}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin:16px 0}.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.field{margin:20px 0}label{display:block;font-weight:600;margin-bottom:8px}input,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font:inherit}textarea{resize:vertical;min-height:104px}input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}.check{display:flex;gap:12px;align-items:center;font-weight:500}.hint{font-size:14px}.primary,button{border-radius:8px;min-height:44px;padding:10px 16px;font:inherit;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.55;cursor:default}button:hover:not(:disabled){filter:brightness(.94)}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}code{overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:var(--bg);padding:16px;border-radius:8px;font-size:13px}.notice{border-left:4px solid var(--accent);background:var(--soft);padding:12px 16px;border-radius:8px;color:var(--text)}.error{border-color:var(--error);color:var(--error)}[hidden]{display:none!important}dl{display:grid;grid-template-columns:110px 1fr;gap:8px 16px;margin-bottom:0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}.step{font-size:13px;font-weight:650;color:var(--accent)}footer{margin-top:24px;font-size:13px;color:var(--muted)}a{color:var(--accent)}@media(max-width:520px){main{padding:24px 16px}.card{padding:20px}dl{grid-template-columns:1fr;gap:4px}dd{margin-bottom:12px}.row>button{flex:1}}@media(prefers-color-scheme:dark){:root{--bg:#101a19;--panel:#182624;--text:#e1edea;--muted:#aabeb9;--line:#3a504a;--accent:#328e7f;--soft:#203d36;--error:#ffb4ab}}
     a.primary{display:inline-flex;align-items:center;background:var(--accent);color:#fff;border-color:var(--accent);text-decoration:none}a.primary:hover{filter:brightness(.94)}.header-row{display:flex;justify-content:space-between;align-items:center;gap:16px}.language-picker{display:flex;align-items:center;gap:8px;font-size:14px}.language-picker label{margin:0;white-space:nowrap}.language-picker select{min-height:44px;max-width:180px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font:inherit}@media(max-width:520px){.header-row{align-items:flex-start;flex-direction:column}}
+    header>p{max-width:65ch}details summary{padding:10px 0;cursor:pointer;font-weight:600}details.card>summary{min-height:44px}details.card>summary h2{display:inline;margin:0}details.card:not([open])>summary{padding-bottom:0}.check{min-height:44px}.check input{flex:none}@media(max-width:520px){.token-actions{gap:8px}.token-actions>button{padding-inline:8px;font-size:14px;white-space:nowrap}}
   </style>
 </head>
 <body><main>
-  <header><div class="header-row"><div class="brand">COMPONENT VAULT / 服务端</div><div class="language-picker"><label for="language">语言</label><select id="language"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></div></div><h1 id="heading">连接与配置</h1><p>设置访问令牌，查看配置文件与运行日志。库存保存在你自己的服务器上。</p></header>
+  <header><div class="header-row"><div class="brand">COMPONENT VAULT / 服务端</div><div class="language-picker"><label for="language">语言</label><select id="language"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option><option value="en">English</option></select></div></div><h1 id="heading">连接与配置</h1><p id="intro">设置管理员访问凭据，管理服务端配置。</p></header>
   <div id="message" class="notice" role="status" aria-live="polite">正在检查服务端状态…</div>
   <section id="loginCard" class="card" hidden>
-    <h2>登录服务端配置</h2><p>使用首次配置的管理员 API Token。普通用户请在 Web 管理台使用自己的账户密钥登录。</p>
-    <form id="loginForm"><div class="field"><label for="loginToken">当前 API Token</label><input id="loginToken" type="password" autocomplete="current-password" required></div>
+    <h2>管理员登录</h2><p id="loginHelp">使用当前的管理员 API Token。普通用户可在 Web 管理台使用各自的账户密钥登录。</p>
+    <form id="loginForm"><div class="field"><label for="loginToken">管理员 API Token</label><input id="loginToken" type="password" autocomplete="current-password" aria-describedby="loginHelp" required></div>
       <div class="row"><button class="primary" type="submit">登录</button><button type="button" data-toggle="loginToken">显示令牌</button></div>
     </form>
-    <details class="field"><summary>找不到 API Token？</summary><p class="hint">环境变量部署：群晖 Container Manager → 本应用 API 容器 → 详情 → 环境变量 → <code>API_TOKEN</code>；也可查看部署目录的 <code>.env</code>。网页配置部署：查看映射目录中的 <code>config.json</code> 的 <code>API_TOKEN</code>。非部署者请联系管理员。<code>GPG_KEY</code> 是基础镜像的公钥指纹，无需填写。</p></details>
+    <details class="field"><summary>在哪里查找管理员令牌？</summary><p class="hint">通过此页面保存的令牌位于服务端数据目录的配置文件中。容器默认路径为 /data/config.json，字段名为 API_TOKEN。</p><p class="hint">如果部署时显式设置了非空的 API_TOKEN 环境变量，请使用该值。可以在部署配置或 API 容器的环境变量中查看。其他用户请联系管理员。</p></details>
   </section>
   <form id="configuration" hidden>
-    <section class="card"><div class="step">01 / 连接凭据</div><h2>API Token</h2><p id="tokenHelp">首次生成的令牌属于管理员账户，并保留原有库存。以后在管理台创建普通账户；各账户的设备使用自己的密钥同步。</p>
-      <div class="field"><label for="apiToken">访问令牌</label><input id="apiToken" type="password" autocomplete="new-password" placeholder="至少 16 个字符"><p id="tokenLock" class="hint" hidden>由 API_TOKEN 环境变量控制。要更改它，请在容器配置中修改并重新创建容器。</p></div>
-      <div class="row"><button type="button" id="generate">生成令牌</button><button type="button" data-toggle="apiToken">显示令牌</button><button type="button" id="copyToken" disabled>复制令牌</button></div>
+    <section class="card"><h2>管理员凭据</h2><p id="tokenHelp">生成令牌，或填写至少 16 个可见 ASCII 字符。请把令牌保存到密码管理器，以便登录服务端配置和 Web 管理台。</p>
+      <div class="field"><label for="apiToken">管理员 API Token</label><input id="apiToken" type="password" autocomplete="new-password" aria-describedby="tokenHelp tokenLock"><p id="tokenLock" class="hint" hidden>此项为只读。要更改令牌，请更新 API_TOKEN 环境变量并重新创建容器。</p></div>
+      <div class="row token-actions"><button type="button" id="generate">生成令牌</button><button type="button" data-toggle="apiToken">显示令牌</button><button type="button" id="copyToken" disabled>复制令牌</button></div>
     </section>
-    <section class="card"><div class="step">02 / 可选功能</div><h2>Web 管理台</h2><p>首次配置页无需安装额外镜像。完整库存管理台是独立 Web 镜像，通常使用 8081 端口。</p>
-      <div class="field"><label for="origins">允许访问 API 的管理台地址</label><textarea id="origins" placeholder="http://192.168.1.10:8081" aria-describedby="originHelp"></textarea><p id="originHelp" class="hint">每行一个浏览器管理台的地址（协议、主机、端口），不填 API 的 8787 地址，也不带页面路径。仅使用原生客户端时可保持默认。</p><p id="originLock" class="hint" hidden>由 ADMIN_WEB_ORIGINS 环境变量控制。</p></div>
-      <div class="field"><label for="adminWebUrl">Web 管理台实际访问地址</label><input id="adminWebUrl" type="url" placeholder="http://192.168.1.10:8081/" autocomplete="url"><p class="hint">可留空；单独部署管理台时填写浏览器实际访问的完整 URL，反向代理的子路径也可保留。此地址用于首次配置完成后的跳转。</p><p id="adminWebUrlLock" class="hint" hidden>由 ADMIN_WEB_URL 环境变量控制。</p></div>
-      <label class="check"><input id="webWrites" type="checkbox">允许已登录的 Web 管理台修改库存</label><p id="writesLock" class="hint" hidden>由 WEB_INVENTORY_ENABLED 环境变量控制。</p>
-    </section>
+    <details id="webCard" class="card"><summary><h2 id="webHeading">Web 管理台（可选）</h2></summary><p>Web 管理台独立部署。只使用 Android 或 Windows 客户端时，可跳过此处。</p>
+      <div class="field"><label for="adminWebUrl">Web 管理台访问地址</label><input id="adminWebUrl" type="url" autocomplete="url" aria-describedby="adminWebUrlHelp adminWebUrlLock"><p id="adminWebUrlHelp" class="hint">填写浏览器打开管理台的完整 URL，可包含反向代理子路径。保存后可从此页打开管理台。</p><p id="adminWebUrlLock" class="hint" hidden>此项为只读，由 ADMIN_WEB_URL 环境变量控制。</p></div>
+      <div class="field"><label for="origins">允许访问 API 的 Web 来源</label><textarea id="origins" aria-describedby="originHelp originLock"></textarea><p id="originHelp" class="hint">跨域访问时，每行填写一个管理台来源，包含协议、主机和端口（如有）。只填到主机或端口，例如 https://vault.example.com。</p><p id="originLock" class="hint" hidden>此项为只读，由 ADMIN_WEB_ORIGINS 环境变量控制。</p></div>
+      <label class="check"><input id="webWrites" type="checkbox" aria-describedby="writesLock">允许已登录的 Web 用户修改库存</label><p id="writesLock" class="hint" hidden>此项为只读，由 WEB_INVENTORY_ENABLED 环境变量控制。</p>
+    </details>
     <div class="row"><button id="save" class="primary" type="submit">保存配置</button><button id="logout" type="button" hidden>退出配置</button></div>
   </form>
-  <section id="adminLinkCard" class="card" tabindex="-1" hidden><h2>进入 Web 管理台</h2><p>管理台需要使用刚保存的 API Token 重新登录。请先在上方复制并保存令牌，再打开管理台。</p><div class="row"><a id="adminLink" class="primary" href="#">进入管理台</a></div></section>
-  <section id="filesCard" class="card" hidden><h2>文件位置与运行日志</h2><p>群晖使用目录映射后，可在 File Station 的对应目录找到这些文件。使用 Docker named volume 时，文件由 Docker 管理。</p><dl><dt>配置文件</dt><dd><code id="configPath"></code></dd><dt>运行日志</dt><dd><code id="logPath"></code></dd></dl><p id="overrides" class="hint"></p><p class="hint">环境变量的非空值优先于配置文件。数据库、MQTT 配置和元件资料继续保留在原数据目录中。</p><button id="loadLogs" type="button">查看最近日志</button><pre id="logs" tabindex="0" hidden></pre></section>
+  <section id="adminLinkCard" class="card" tabindex="-1" hidden><h2>进入 Web 管理台</h2><p>打开后可使用管理员 API Token 登录。请先保存一份令牌。</p><div class="row"><a id="adminLink" class="primary" href="#">进入管理台</a></div></section>
+  <section id="filesCard" class="card" hidden><h2>配置文件与运行日志</h2><p>使用宿主机目录映射时，可在映射目录中找到这些文件。使用 Docker 命名卷时，文件由 Docker 管理。</p><dl><dt>配置文件</dt><dd><code id="configPath"></code></dd><dt>运行日志</dt><dd><code id="logPath"></code></dd></dl><p id="overrides" class="hint"></p><button id="loadLogs" type="button">查看最近日志</button><pre id="logs" tabindex="0" hidden></pre></section>
   <footer>Component Vault · Rafael-Ikaros · <a href="https://github.com/Rafael-Ikaros/Component_Manager" target="_blank" rel="noopener noreferrer">项目与部署教程</a></footer>
 </main>
 <script>
@@ -43,43 +44,44 @@
     'COMPONENT VAULT / 服务端':'COMPONENT VAULT / Server',
     '语言':'Language', '跟随系统':'Follow system', '简体中文':'简体中文',
     '连接与配置':'Connection and settings',
-    '设置访问令牌，查看配置文件与运行日志。库存保存在你自己的服务器上。':'Set an access token and view configuration files and operational logs. Your inventory stays on your own server.',
+    '设置管理员访问凭据，管理服务端配置。':'Set administrator credentials and manage server settings.',
+    '生成或填写管理员 API Token。通过此页保存的令牌写入服务端数据目录，容器默认路径为 /data/config.json。API_TOKEN 环境变量仅用于高级部署。':'Generate or enter the administrator API Token. This page saves it in the server data directory, at /data/config.json by default in Docker. The API_TOKEN environment variable is an optional override for advanced deployments.',
+    '管理管理员凭据、Web 管理台访问和运行日志。':'Manage administrator credentials, Web console access, and operational logs.',
     '正在检查服务端状态…':'Checking server status…',
-    '登录服务端配置':'Sign in to server settings',
-    '使用首次配置的管理员 API Token。普通用户请在 Web 管理台使用自己的账户密钥登录。':'Use the administrator API Token from initial setup. Regular users sign in to the Web console with their own account key.',
-    '当前 API Token':'Current API Token', '登录':'Sign in', '显示令牌':'Show token', '隐藏令牌':'Hide token',
-    '找不到 API Token？':'Cannot find the API Token?',
-    '环境变量部署：群晖 Container Manager → 本应用 API 容器 → 详情 → 环境变量 →':'Environment variable deployment: Synology Container Manager → this app’s API container → Details → Environment variables →',
-    '；也可查看部署目录的':'; or check', '。网页配置部署：查看映射目录中的': 'in the deployment directory. Web configuration deployment: check',
-    '的':'for', '。非部署者请联系管理员。':'. Ask the administrator if you do not manage the deployment.',
-    '是基础镜像的公钥指纹，无需填写。':'is the base image’s public key fingerprint; you do not need to enter it.',
-    '01 / 连接凭据':'01 / Connection credentials',
-    '首次生成的令牌属于管理员账户，并保留原有库存。以后在管理台创建普通账户；各账户的设备使用自己的密钥同步。':'The first token belongs to the administrator and keeps the existing inventory. Create regular accounts in the console; each account’s devices sync using its own key.',
-    '访问令牌':'Access token', '至少 16 个字符':'At least 16 characters',
-    '由 API_TOKEN 环境变量控制。要更改它，请在容器配置中修改并重新创建容器。':'Controlled by the API_TOKEN environment variable. To change it, update the container configuration and recreate the container.',
+    '管理员登录':'Administrator sign-in',
+    '使用当前的管理员 API Token。普通用户可在 Web 管理台使用各自的账户密钥登录。':'Use the current administrator API Token. Regular users sign in to the Web console with their own account keys.',
+    '管理员 API Token':'Administrator API Token', '登录':'Sign in', '显示令牌':'Show token', '隐藏令牌':'Hide token',
+    '在哪里查找管理员令牌？':'Where can I find the administrator token?',
+    '通过此页面保存的令牌位于服务端数据目录的配置文件中。容器默认路径为 /data/config.json，字段名为 API_TOKEN。':'Find a token saved through this page in the server configuration file. In Docker, the default path is /data/config.json and the field is API_TOKEN.',
+    '如果部署时显式设置了非空的 API_TOKEN 环境变量，请使用该值。可以在部署配置或 API 容器的环境变量中查看。其他用户请联系管理员。':'If your deployment sets a non-empty API_TOKEN environment variable, use its value. Check your deployment configuration or the API container’s environment. Other users can contact the administrator.',
+    '管理员凭据':'Administrator credentials',
+    '生成令牌，或填写至少 16 个可见 ASCII 字符。请把令牌保存到密码管理器，以便登录服务端配置和 Web 管理台。':'Generate a token or enter at least 16 visible ASCII characters. Store the token in your password manager for server settings and Web console sign-in.',
+    '可显示或复制当前令牌。更换令牌时，可生成新令牌，或填写至少 16 个可见 ASCII 字符。':'You can show or copy the current token. To replace it, generate a new token or enter at least 16 visible ASCII characters.',
+    '可显示或复制当前令牌。':'You can show or copy the current token.',
+    '此项为只读。要更改令牌，请更新 API_TOKEN 环境变量并重新创建容器。':'Read-only. To change the token, update the API_TOKEN environment variable and recreate the container.',
     '生成令牌':'Generate token', '复制令牌':'Copy token',
-    '02 / 可选功能':'02 / Optional features', 'Web 管理台':'Web admin console',
-    '首次配置页无需安装额外镜像。完整库存管理台是独立 Web 镜像，通常使用 8081 端口。':'This setup page needs no extra image. The full inventory console is a separate Web image, usually on port 8081.',
-    '允许访问 API 的管理台地址':'Admin console addresses allowed to access the API',
-    '每行一个浏览器管理台的地址（协议、主机、端口），不填 API 的 8787 地址，也不带页面路径。仅使用原生客户端时可保持默认。':'Enter one browser admin console address per line (scheme, host, port). Do not enter the API address on port 8787 or a page path. Keep the default if you only use native clients.',
-    '由 ADMIN_WEB_ORIGINS 环境变量控制。':'Controlled by the ADMIN_WEB_ORIGINS environment variable.',
-    'Web 管理台实际访问地址':'Web admin console URL',
-    '可留空；单独部署管理台时填写浏览器实际访问的完整 URL，反向代理的子路径也可保留。此地址用于首次配置完成后的跳转。':'Optional. If the console is deployed separately, enter its full browser URL, including any reverse proxy subpath. This URL is used for the link after setup.',
-    '由 ADMIN_WEB_URL 环境变量控制。':'Controlled by the ADMIN_WEB_URL environment variable.',
-    '允许已登录的 Web 管理台修改库存':'Allow signed-in Web admin users to edit inventory',
-    '由 WEB_INVENTORY_ENABLED 环境变量控制。':'Controlled by the WEB_INVENTORY_ENABLED environment variable.',
-    '保存配置':'Save settings', '退出配置':'Sign out',
+    'Web 管理台（可选）':'Web admin console (optional)', 'Web 管理台':'Web admin console',
+    'Web 管理台独立部署。只使用 Android 或 Windows 客户端时，可跳过此处。':'The Web console is deployed separately. Skip this section if you only use the Android or Windows client.',
+    '允许访问 API 的 Web 来源':'Web origins allowed to access the API',
+    '跨域访问时，每行填写一个管理台来源，包含协议、主机和端口（如有）。只填到主机或端口，例如 https://vault.example.com。':'For cross-origin access, enter one console origin per line. Include the scheme, host, and port if applicable, for example https://vault.example.com.',
+    '此项为只读，由 ADMIN_WEB_ORIGINS 环境变量控制。':'Read-only. Controlled by the ADMIN_WEB_ORIGINS environment variable.',
+    'Web 管理台访问地址':'Web admin console URL',
+    '填写浏览器打开管理台的完整 URL，可包含反向代理子路径。保存后可从此页打开管理台。':'Enter the full browser URL for the console, including any reverse proxy subpath. After saving, you can open the console from this page.',
+    '此项为只读，由 ADMIN_WEB_URL 环境变量控制。':'Read-only. Controlled by the ADMIN_WEB_URL environment variable.',
+    '允许已登录的 Web 用户修改库存':'Allow signed-in Web users to edit inventory',
+    '此项为只读，由 WEB_INVENTORY_ENABLED 环境变量控制。':'Read-only. Controlled by the WEB_INVENTORY_ENABLED environment variable.',
+    '保存配置':'Save settings', '保存并完成设置':'Save and finish setup', '退出配置':'Sign out',
     '进入 Web 管理台':'Open Web admin console',
-    '管理台需要使用刚保存的 API Token 重新登录。请先在上方复制并保存令牌，再打开管理台。':'The console requires you to sign in again with the API Token you just saved. Copy and store the token above before opening the console.',
-    '进入管理台':'Open console', '文件位置与运行日志':'File locations and operational logs',
-    '群晖使用目录映射后，可在 File Station 的对应目录找到这些文件。使用 Docker named volume 时，文件由 Docker 管理。':'With a Synology directory mapping, find these files in the matching File Station directory. With a Docker named volume, Docker manages the files.',
+    '打开后可使用管理员 API Token 登录。请先保存一份令牌。':'Save a copy of the administrator API Token, then use it to sign in to the console.',
+    '进入管理台':'Open console', '配置文件与运行日志':'Configuration file and logs',
+    '使用宿主机目录映射时，可在映射目录中找到这些文件。使用 Docker 命名卷时，文件由 Docker 管理。':'With a bind mount, find these files in the mapped host directory. With a named volume, Docker manages the files.',
     '配置文件':'Configuration file', '运行日志':'Operational log',
-    '环境变量的非空值优先于配置文件。数据库、MQTT 配置和元件资料继续保留在原数据目录中。':'Non-empty environment variables override the configuration file. The database, MQTT settings, and component data remain in the original data directory.',
     '查看最近日志':'View recent logs', '项目与部署教程':'Project and deployment guide',
-    '由环境变量控制：':'Controlled by environment variables: ', '当前设置可在此网页中修改。':'You can change the current settings on this page.',
-    '服务端配置':'Server settings', '欢迎，先配置你的服务端':'Welcome, set up your server',
-    '服务端已配置。登录后可查看文件位置和日志。':'The server is configured. Sign in to view file locations and logs.',
-    '首次设置：请先生成或填写 API Token，保存后初始化入口将关闭。':'First setup: generate or enter an API Token. The initial setup endpoint closes after you save.',
+    '以下设置由非空环境变量覆盖，在此页为只读：':'Non-empty environment variables override these settings, which are read-only here: ',
+    '网页修改将保存到配置文件。':'Changes made here are saved to the configuration file.',
+    '服务端配置':'Server settings', '首次设置':'Initial setup',
+    '服务端已配置。请登录以管理配置或查看日志。':'The server is configured. Sign in to manage settings or view logs.',
+    '首次设置尚未完成。':'Initial setup is pending.',
     '暂时无法读取服务端状态，请刷新页面重试。':'Cannot read server status right now. Refresh the page and try again.',
     '已登录。令牌默认隐藏，可按需显示或复制。':'Signed in. The token is hidden by default; you can show or copy it.',
     '登录失败，请检查令牌。':'Sign-in failed. Check the token.',
@@ -93,7 +95,6 @@
     '配置已保存。请先复制并保存 API Token，再点击“进入管理台”；管理台会要求重新登录。':'Settings saved. Copy and store the API Token before opening the console; you will need to sign in again.',
     '配置已保存。可进入 Web 管理台。':'Settings saved. You can open the Web admin console.',
     '配置已保存。未设置 Web 管理台地址，可继续使用此页面修改服务端配置。':'Settings saved. No Web admin console URL is set. You can continue editing server settings here.',
-    '若连接中断，请刷新后使用刚填写的令牌登录，确认是否已保存。':'If the connection was interrupted, refresh and sign in with the token you entered to check whether the settings were saved.',
     '保存失败。若连接中断，请刷新后使用刚填写的令牌登录，确认是否已保存。':'Could not save settings. If the connection was interrupted, refresh and sign in with the token you entered to check whether the settings were saved.',
     '读取日志失败。':'Could not load logs.',
     '已退出配置。':'Signed out of settings.', '暂无运行日志。':'No operational logs yet.',
@@ -120,10 +121,18 @@
     document.documentElement.lang = currentLanguage;
     document.title = translate('服务端配置 · Component Vault');
     for (const [node, original] of staticText) node.textContent = original.replace(/^(\s*)(.*?)(\s*)$/s, (_, leading, content, trailing) => leading + translate(content) + trailing);
-    el('apiToken').placeholder = translate('至少 16 个字符');
     el('language').value = languageChoice;
-    el('heading').textContent = translate(configured ? '服务端配置' : el('configuration').hidden ? '连接与配置' : '欢迎，先配置你的服务端');
-    el('overrides').textContent = locked.length ? translate('由环境变量控制：') + locked.join(currentLanguage === 'en' ? ', ' : '、') : el('configuration').hidden ? '' : translate('当前设置可在此网页中修改。');
+    const firstSetup = !configured && !el('configuration').hidden;
+    el('heading').textContent = translate(configured ? '服务端配置' : firstSetup ? '首次设置' : '连接与配置');
+    el('intro').textContent = translate(configured ? '管理管理员凭据、Web 管理台访问和运行日志。' : firstSetup
+      ? '生成或填写管理员 API Token。通过此页保存的令牌写入服务端数据目录，容器默认路径为 /data/config.json。API_TOKEN 环境变量仅用于高级部署。'
+      : '设置管理员访问凭据，管理服务端配置。');
+    const tokenHelp = !configured ? '生成令牌，或填写至少 16 个可见 ASCII 字符。请把令牌保存到密码管理器，以便登录服务端配置和 Web 管理台。'
+      : el('apiToken').readOnly ? '可显示或复制当前令牌。' : '可显示或复制当前令牌。更换令牌时，可生成新令牌，或填写至少 16 个可见 ASCII 字符。';
+    el('tokenHelp').textContent = translate(tokenHelp);
+    el('webHeading').textContent = translate(configured ? 'Web 管理台' : 'Web 管理台（可选）');
+    el('save').textContent = translate(configured ? '保存配置' : '保存并完成设置');
+    el('overrides').textContent = locked.length ? translate('以下设置由非空环境变量覆盖，在此页为只读：') + locked.join(currentLanguage === 'en' ? ', ' : '、') : translate('网页修改将保存到配置文件。');
     document.querySelectorAll('[data-toggle]').forEach(button => { button.textContent = translate(el(button.dataset.toggle).type === 'password' ? '显示令牌' : '隐藏令牌'); });
     if (emptyLogs) el('logs').textContent = translate('暂无运行日志。');
     message(notice.text, notice.error, notice.detail);
@@ -146,13 +155,12 @@
     locked = data.environment_overrides || [];
     el('apiToken').value = configured ? token : el('apiToken').value;
     el('apiToken').type = 'password';
-    document.querySelectorAll('[data-toggle]').forEach(button => { button.textContent = translate('显示令牌'); });
     el('apiToken').readOnly = locked.includes('API_TOKEN');
     el('generate').disabled = locked.includes('API_TOKEN');
     el('apiToken').required = !configured;
     el('tokenLock').hidden = !locked.includes('API_TOKEN');
     el('copyToken').disabled = !el('apiToken').value;
-    el('origins').value = (data.admin_web_origins || ['http://localhost:8081']).join('\n');
+    el('origins').value = (data.admin_web_origins || []).join('\n');
     el('origins').disabled = locked.includes('ADMIN_WEB_ORIGINS');
     el('originLock').hidden = !el('origins').disabled;
     el('adminWebUrl').value = data.admin_web_url || '';
@@ -165,13 +173,13 @@
     el('writesLock').hidden = !el('webWrites').disabled;
     el('configPath').textContent = data.config_path || '';
     el('logPath').textContent = data.log_path || '';
-    el('overrides').textContent = locked.length ? translate('由环境变量控制：') + locked.join(currentLanguage === 'en' ? ', ' : '、') : translate('当前设置可在此网页中修改。');
-    el('heading').textContent = translate(configured ? '服务端配置' : '欢迎，先配置你的服务端');
+    el('webCard').open = configured;
+    applyLanguage();
   }
   async function start() {
     try { const state = await request('/setup/status'); configured = state.configured;
-      if (configured) { el('loginCard').hidden = false; message('服务端已配置。登录后可查看文件位置和日志。'); }
-      else { renderConfig({}); message('首次设置：请先生成或填写 API Token，保存后初始化入口将关闭。'); }
+      if (configured) { el('loginCard').hidden = false; applyLanguage(); message('服务端已配置。请登录以管理配置或查看日志。'); }
+      else { renderConfig({}); message('首次设置尚未完成。'); }
     } catch { message('暂时无法读取服务端状态，请刷新页面重试。', true); }
   }
   el('loginForm').onsubmit = async event => { event.preventDefault(); const button = event.submitter; button.disabled = true;
@@ -185,10 +193,14 @@
     el('copyToken').disabled = false; message('已生成令牌，保存配置后才会生效。');
   };
   el('apiToken').oninput = () => { el('copyToken').disabled = !el('apiToken').value; };
+  let suggestedOrigin = '';
   el('adminWebUrl').onchange = () => {
+    const origins = el('origins');
+    if (configured || origins.disabled || origins.value.trim() !== suggestedOrigin) return;
     try {
-      const origin = new URL(el('adminWebUrl').value).origin;
-      if (el('origins').value.trim() === 'http://localhost:8081') el('origins').value = origin;
+      const url = el('adminWebUrl').value;
+      suggestedOrigin = url ? new URL(url).origin : '';
+      origins.value = suggestedOrigin;
     } catch { /* The server reports an invalid URL on save. */ }
   };
   document.querySelectorAll('[data-toggle]').forEach(button => { button.onclick = () => {
@@ -226,7 +238,7 @@
       message('保存失败。若连接中断，请刷新后使用刚填写的令牌登录，确认是否已保存。', true, error.message);
     } finally { el('save').disabled = false; }
   };
-  el('logout').onclick = () => { token = ''; el('apiToken').value = ''; emptyLogs = false; el('logs').textContent = ''; el('configuration').hidden = true; el('filesCard').hidden = true; el('loginCard').hidden = false; message('已退出配置。'); };
+  el('logout').onclick = () => { token = ''; el('apiToken').value = ''; emptyLogs = false; el('logs').textContent = ''; el('logs').hidden = true; el('configuration').hidden = true; el('filesCard').hidden = true; el('adminLinkCard').hidden = true; el('loginCard').hidden = false; el('loginToken').type = 'password'; applyLanguage(); el('loginToken').focus(); message('已退出配置。'); };
   el('loadLogs').onclick = async () => {
     el('loadLogs').disabled = true;
     try { const data = await request('/setup/logs'); emptyLogs = !data.lines?.length; el('logs').hidden = false; el('logs').textContent = emptyLogs ? translate('暂无运行日志。') : data.lines.join('\n'); }
