@@ -8,57 +8,6 @@
 以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
 构建、双角色启动及发布后的真实更新均须通过 CI；下方 dev.7 摘要记录的是旧三镜像结构。
 
-2026-11-03 已回读 **0.7.9-dev.9** 的发布结果：
-
-| 镜像 | 固定标签／浮动标签 | 实际清单摘要 |
-| --- | --- | --- |
-| API | `0.7.9-dev.9` / `dev` | `sha256:5542e951de068dbe96bb65287f735073094eef71c37761d0d4d624d22b573d20` |
-| Web 与 updater 共用 | `web-0.7.9-dev.9` / `web-dev` | `sha256:422449ff18201556da0a7a4f2eb03c921480b2f97bcc12dc7f4224da19e7a40f` |
-
-两种镜像均包含 amd64/arm64，实际 amd64 OCI 版本为 `0.7.9-dev.9`，提交为
-`28ba7a940bde797a09c9e841bde50aac0af303cb`。管理镜像入口及默认 Web 模式已核对。
-[Docker 发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191393/job/125826740833)
-通过双角色启动、健康检查、认证、任务持久化，以及真实临时 Compose 更新与数据保留验收。
-正式 `latest / web-latest` 和历史 `updater-dev` 的摘要均未改变；未在真实群晖或 ARM 设备上运行验收。
-
-当前 Docker CI / 发布已独立为 **Docker CI / Docker Images**。正式镜像继续使用 latest/web-latest，开发镜像使用 dev/web-dev；不必手改标签的操作见 [部署切换助手与渠道教程](docker-channels.md)。下面的 0.7.0 / 0.7.8 摘要是历史发布证据，不代表开发渠道当前版本。
-
-### 历史：0.7.9-dev.7 的独立镜像
-
-2026-11-02 核对的 **0.7.9-dev.7** 如下；该版本使用独立 updater，不适用当前共享镜像模板：
-
-| 镜像标签 | 固定标签 | 实际清单摘要 |
-| --- | --- | --- |
-| `dev` | `0.7.9-dev.7` | `sha256:62a22716adde13eeb53f9a38f5f9bdefe3c90556cd380a84ba02812eef59d927` |
-| `web-dev` | `web-0.7.9-dev.7` | `sha256:c3439c6899423a8c6bd7cae7cedde99038b7356a22e696f8ab1e87354d2ca0b7` |
-| `updater-dev` | `updater-0.7.9-dev.7` | `sha256:7580fc873c774fbfad4e82e41ee46b68c83441b58ff34f508f7ee85d020633c2` |
-
-三组均有 amd64/arm64，实际 amd64 OCI version 为 0.7.9-dev.7、revision 为
-`6567a3d0faeeab3f50bfab8d5fa64d10729c4a4d`；API/Web 具有网页更新能力标签。
-[发布与 Docker 任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059575)成功，
-包括真实临时项目经管理员 API 更新、API/Web 替换与数据/端口/挂载保留验收。
-正式 latest/web-latest 仍为下文 0.7.8 摘要，没有被 dev 发布替换；尚无正式 updater-latest。
-dev.6 虽已推镜像，发布末尾验收暴露 `.env` 属性丢失，本版已修正，请勿再采用 dev.6 启用更新。
-群晖可用[完整单文件配置](../docker-compose.hub-web-update.yml)避免手动合并；真实 NAS 尚未执行验收。
-
-普通部署者请先看 [Docker 快速部署与 API Token 查找](docker-quickstart.md)。拉取公开镜像不需要 Docker Hub 登录、Docker Hub Token 或 GitHub PAT；快速入门包含生成、查找和忘记 `API_TOKEN` 时的处理方法。
-
-本文保留仓库维护者的发布配置、发布验证，以及部署者的升级、迁移和备份细节。
-
-`v0.6.0` 首次发布时 Docker Hub 任务因凭据未配置而 skipped。`v0.7.0` 正式发布时，仓库已具备发布配置，[发布任务](https://github.com/Rafael-ban/Component_Manager/actions/runs/35722942557) 成功。2026-09-22 已直接核对 Docker Hub：API `0.7.0` 与 Web `web-0.7.0` 均为 active，并包含 `linux/amd64`、`linux/arm64`。前六节只供维护者首次配置、Token 轮换和手动补发；普通部署者不需要这些发布凭据。
-
-已核对的版本 digest：
-
-- API：`sha256:81985ac9cced8b12de193d67818e9fd5d814be4af46c0a42a32a87d174bf98dc`
-- Web：`sha256:5e022b6aa65025fc360bdfda8b12a40ac4ef4d83a0a10e29ed69bd14219ef076`
-
-以上 digest 是 `0.7.0` 的历史记录。**2026-10-28 已核对 0.7.8 正式镜像**：[发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/40710180699)成功，Docker Hub 的固定与浮动标签分别一致，均包含 `linux/amd64` 和 `linux/arm64`：
-
-- API `0.7.8` / `latest`：`sha256:66727a8b28ea304af2027de96aa1f10148a5b1dcb7b497112c6c35eab3b7eabe`。
-- Web `web-0.7.8` / `web-latest`：`sha256:3e007d091436cac675c0f6ca5cb27f98e55467963922a36000d855a0fe11488f`。
-
-0.7.8 包含照片、BOM 预设同步及从订单更新已有资料；API、Web 需成对升级。保留原项目和整个 `/data`，先备份再拉取并重建，不能只重启旧容器。后续浮动标签仍可能更新，部署时请核对 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)，不能仅凭 GitHub Release 存在推断镜像发布成功。
-
 ## 先分清账号、仓库和两种 Token
 
 本项目使用以下固定身份：
@@ -119,7 +68,7 @@ Docker 官方说明见 [Personal access tokens](https://docs.docker.com/security
 
 **Settings → Secrets and variables → Actions → Variables**
 
-核对下面两个 Repository variable。它们上一轮已经设置，本轮通常只需检查，无需重复创建：
+核对下面两个 Repository variable。已有变量时核对值即可：
 
 | Name | Value |
 | --- | --- |
@@ -151,14 +100,14 @@ GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs
 1. 左侧选择 **Docker Images**，点击 **Run workflow**。
 2. **Use workflow from** 选择 `master`。
 3. `source_ref` 留空，默认检出下方 tag；也可显式填相同提交或 tag。
-4. `release_tag` 填已经存在且通过验证的目标 tag，例如 `v0.7.9-dev.7`。
+4. `release_tag` 填已经存在且通过验证的目标 tag，例如 `v0.7.9-dev.14`。
 5. `push_image` 选择 `true`，运行并等待独立任务结束。
 
 `source_ref` 决定源码，`release_tag` 决定版本与渠道；发布前会检查二者指向同一提交。
 独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
 手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
-以 dev.8 为例会推送 API `0.7.9-dev.8 / dev`、管理镜像 `web-0.7.9-dev.8 / web-dev`。
+以 dev.14 为例会推送 API `0.7.9-dev.14 / dev`、管理镜像 `web-0.7.9-dev.14 / web-dev`。
 正式版本使用相同固定前缀，但浮动渠道为 `latest / web-latest`。
 旧 dev.7 的 `updater-*` 标签保留历史用途，不再随新版本更新。补发历史版本会移动**该渠道**的浮动标签，操作前应确认目标，
 不要为了补旧版本附件而无意回退当前渠道。
@@ -195,3 +144,52 @@ docker buildx imagetools inspect rafaelikaros/component_manager:web-dev
 安装、密钥、挂载及故障排查见[快速部署](docker-quickstart.md)。
 正式/dev切换见[渠道指南](docker-channels.md)；网页操作更新见[网页更新](server-web-update.md)。
 这些步骤不需要本页的发布凭据。
+
+## 历史镜像摘要
+
+这些摘要用于核对已发布版本。浮动标签以 Docker Hub 当前结果为准。
+
+### 0.7.9-dev.9 的共享管理镜像
+
+2026-11-03 已回读 **0.7.9-dev.9** 的发布结果：
+
+| 镜像 | 固定标签／浮动标签 | 实际清单摘要 |
+| --- | --- | --- |
+| API | `0.7.9-dev.9` / `dev` | `sha256:5542e951de068dbe96bb65287f735073094eef71c37761d0d4d624d22b573d20` |
+| Web 与 updater 共用 | `web-0.7.9-dev.9` / `web-dev` | `sha256:422449ff18201556da0a7a4f2eb03c921480b2f97bcc12dc7f4224da19e7a40f` |
+
+两种镜像均包含 amd64/arm64，实际 amd64 OCI 版本为 `0.7.9-dev.9`，提交为
+`28ba7a940bde797a09c9e841bde50aac0af303cb`。管理镜像入口及默认 Web 模式已核对。
+[Docker 发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41609191393/job/125826740833)
+通过双角色启动、健康检查、认证、任务持久化，以及真实临时 Compose 更新与数据保留验收。
+正式 `latest / web-latest` 和历史 `updater-dev` 的摘要均未改变；未在真实群晖或 ARM 设备上运行验收。
+
+### 0.7.9-dev.7 的独立镜像
+
+2026-11-02 核对的 **0.7.9-dev.7** 如下；该版本使用独立 updater，不适用当前共享镜像模板：
+
+| 镜像标签 | 固定标签 | 实际清单摘要 |
+| --- | --- | --- |
+| `dev` | `0.7.9-dev.7` | `sha256:62a22716adde13eeb53f9a38f5f9bdefe3c90556cd380a84ba02812eef59d927` |
+| `web-dev` | `web-0.7.9-dev.7` | `sha256:c3439c6899423a8c6bd7cae7cedde99038b7356a22e696f8ab1e87354d2ca0b7` |
+| `updater-dev` | `updater-0.7.9-dev.7` | `sha256:7580fc873c774fbfad4e82e41ee46b68c83441b58ff34f508f7ee85d020633c2` |
+
+三组均有 amd64/arm64，实际 amd64 OCI version 为 0.7.9-dev.7、revision 为
+`6567a3d0faeeab3f50bfab8d5fa64d10729c4a4d`；API/Web 具有网页更新能力标签。
+[发布与 Docker 任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/41392059575)成功，
+包括真实临时项目经管理员 API 更新、API/Web 替换与数据/端口/挂载保留验收。
+dev.7 发布保留了当时的 0.7.8 正式渠道。
+
+### 0.7.0 与 0.7.8 正式镜像
+
+`v0.6.0` 首次发布时 Docker Hub 任务因凭据未配置而 skipped。`v0.7.0` 正式发布时，仓库已具备发布配置，[发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/35722942557) 成功。2026-09-22 已直接核对 Docker Hub：API `0.7.0` 与 Web `web-0.7.0` 均为 active，并包含 `linux/amd64`、`linux/arm64`。
+
+已核对的版本 digest：
+
+- API：`sha256:81985ac9cced8b12de193d67818e9fd5d814be4af46c0a42a32a87d174bf98dc`
+- Web：`sha256:5e022b6aa65025fc360bdfda8b12a40ac4ef4d83a0a10e29ed69bd14219ef076`
+
+以上 digest 是 `0.7.0` 的历史记录。**2026-10-28 已核对 0.7.8 正式镜像**：[发布任务](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/40710180699)成功，Docker Hub 的固定与浮动标签分别一致，均包含 `linux/amd64` 和 `linux/arm64`：
+
+- API `0.7.8` / `latest`：`sha256:66727a8b28ea304af2027de96aa1f10148a5b1dcb7b497112c6c35eab3b7eabe`。
+- Web `web-0.7.8` / `web-latest`：`sha256:3e007d091436cac675c0f6ca5cb27f98e55467963922a36000d855a0fe11488f`。

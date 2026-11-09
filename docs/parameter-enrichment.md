@@ -31,17 +31,7 @@
 - 「清除预览」仅清除本次任务结果。旧的「补全旧元件参数」面向完全没有参数的旧元件，
   全库缺项与差异请使用「库存资料检查」。
 
-## 开发版部署
+## 版本要求
 
-此功能可随 dev 源码、Web 附件或对应开发镜像使用。dev 不替换 Docker Hub 的 latest /
-web-latest；只拉旧的正式镜像不会得到新接口。API 与 Web 必须配套更新。
-从 dev.5 起开发镜像使用 dev/web-dev，切换步骤见[Docker 渠道教程](docker-channels.md)，
-需以独立 Docker 发布成功且配套标签可拉取为准。
-
-源码 Compose 部署可在对应 dev 标签目录中，保留**原 Compose 项目名**、原 .env
-及完整 /data 挂载，先备份再构建：
-
-    docker compose --project-name <原项目名> -f docker-compose.yml up -d --build
-
-这条命令用于源码构建，不适用于直接拉镜像的 docker-compose.hub.yml。
-群晖等自定义部署也应沿用原端口和数据映射，避免误连新建的空数据库。
+API 与 Web 管理台应使用同一版本。找不到「库存资料检查」或「全选可更新资料」时，
+先核对当前部署版本与更新日志，再按 [Docker 渠道教程](docker-channels.md)更新。

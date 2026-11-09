@@ -32,9 +32,10 @@ broker 凭据，应按服务器配置保护。尚未通过网页保存时，使�
 本地启动时在服务进程环境中设置这些变量。也可以复制 `server/.env.example` 为
 `server/.env`，填写后在 `server` 目录执行
 `.\.venv\Scripts\python.exe -m uvicorn app.main:app --env-file .env --host 0.0.0.0 --port 8787`；
-现有 `run-dev.ps1` 不会自动读取 `.env`。Docker Compose 使用仓库根目录
-的 `.env` 或 shell 环境中的 `MQTT_*`，并将它们传给 `api` 容器。只修改
-`server/.env` 不会自动改变 Compose 的环境。示例（替换 broker 地址）：
+现有 `run-dev.ps1` 需要显式加载 `.env`。Docker 部署推荐通过管理台设置。
+如需使用环境变量，在 Compose 的 `api.environment` 下传入所需的 `MQTT_*`。
+例如填入 `MQTT_HOST: ${MQTT_HOST:-}`，才会读取部署目录 `.env` 中的
+`MQTT_HOST`。以下是可传入的配置示例：
 
 ```dotenv
 MQTT_ENABLED=true
@@ -45,8 +46,8 @@ MQTT_TOPIC_PREFIX=component-vault
 MQTT_CLIENT_ID=component-vault-server
 ```
 
-按 broker 的实际认证要求设置用户名和密码。环境配置修改后重启 API；已有网页保存
-配置时应从网页修改。容器内的
+按 broker 的实际认证要求设置用户名和密码。修改 Docker 环境变量后，重新创建 API
+容器以加载配置。已有网页保存配置时应从网页修改。容器内的
 `localhost` 是 API 容器本身；请使用容器能访问到的 broker 地址。当前支持一个
 API 进程、一个 publisher，启动 Uvicorn 时不要增加 `--workers`。
 

@@ -6,7 +6,7 @@
 ## 功能与代码入口
 
 应用提供首页、库存、记录、设置四个主入口。库存中的“导入与扫码”包含添加元件、
-批量嘉立创入库和项目用料；标签模板、预览、编辑及 M1 打印共用编辑器。
+批量嘉立创入库和项目用料。添加元件时可以扫描包装二维码、手工录入，或用照片识别料盘标签并核对厂商型号。标签模板、预览、编辑及打印共用编辑器。
 中文目录查询使用国内嘉立创 EDA，英文使用国际来源，不依赖识别服务器或 OpenAPI 密钥。
 
 `app/src/main/java/com/componentvault/android/` 下的 UI、数据和同步按功能分工。
@@ -37,4 +37,4 @@ Windows 也可使用 `scripts/android-gradle.ps1`。签名发布所需的四个 
 Compose 使用 Preview / Live Edit，不使用 XML 拖放设计器。
 
 涉及升级或同步的设备检查须保留应用数据。已记录的验证路径和未覆盖边界见
-[验证记录](../docs/history/verification.md)，M1 的纸张与设备限制见[打印指南](../docs/m1-printing-feature-matrix.md)。
+[验证记录](../docs/history/verification.md)。M1 的纸张与设备限制见[打印指南](../docs/m1-printing-feature-matrix.md)，HM-A300E 需使用含对应 SDK 的构建，见[适配说明](../docs/hm-a300e.md)。

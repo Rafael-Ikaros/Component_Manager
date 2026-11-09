@@ -57,7 +57,7 @@
 ## 群晖不使用 SSH
 
 在 Container Manager 打开原项目，备份数据并记录原项目名、端口和目录。
-使用采用渠道变量的 `docker-compose.hub.yml`。在原项目目录创建或修改 `.env`，
+保留原 Compose 文件。若它使用渠道变量，在原项目目录创建或修改 `.env`，
 保留既有应用配置，将渠道键设为 `dev` 或 `latest`：
 
 ```dotenv
@@ -65,7 +65,7 @@ COMPONENT_VAULT_DOCKER_CHANNEL=dev
 ```
 
 已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，应清空，以便按渠道取镜像。
-重新下载镜像并重新构建**原项目**，沿用原挂载。
+下载配套镜像并重新部署**原项目**，沿用原挂载。若原 Compose 写死了镜像名，在原文件中成对修改 API 和 Web 的 `image`。
 不要新建空项目或删除数据卷。只使用单独容器而非项目时，仍需在 GUI 中为 API、Web 选择配套镜像。
 
 ## Watchtower 与版本确认

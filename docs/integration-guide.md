@@ -30,7 +30,7 @@ Web 入库 `POST /admin-api/components/{id}/movements` 可提供 `purchase_amoun
 
 ## 网页更新作业（管理员）
 
-首次启用需按[部署说明](server-web-update.md)配置独立 updater 和原 Compose 项目目录；仅更新 0.7.8 的 API/Web 镜像不能自动启用。启用后由管理员选择渠道并明确创建作业，不是后台定时自动更新。未部署 updater 时仍可使用原有部署方式更新。
+按[部署说明](server-web-update.md)将独立 updater 加入原 Compose 项目，指定原项目目录并挂载同一数据卷。Compose 项目名用于定位原服务。启用后由管理员选择渠道并明确创建作业。未部署 updater 时，由部署者更新配套 API/Web 镜像。
 
 `GET /admin-api/server-update/status` 返回 enabled/current_version/current_channel/active_job/latest_job。
 未配置 UPDATER_URL 时 enabled=false，不创建内部令牌或执行更新。
@@ -76,21 +76,24 @@ Examples in this document assume `http://localhost:8787`.
 
 ## Deployment configuration
 
-From 0.7.1, `GET /` redirects to the built-in `GET /setup` page. It is served on
+The `GET /` route redirects to the built-in `GET /setup` page. It is served on
 the API's own origin, so initial setup does not depend on the React admin app.
 `GET /setup/status` returns only `{ "configured": true | false }` anonymously.
-`GET /setup/config` and `GET /setup/logs` require the current administrator Bearer token.
+`GET /setup/config` and `GET /setup/logs` accept the current administrator key or an administrator Web session.
 
 `POST /setup/config` accepts `api_token`, `admin_web_origins` (an array of HTTP(S)
-origins), and `web_inventory_enabled`. A fresh, unconfigured deployment accepts
-its first write without a token. Once configured, all further writes require
-the current token; a concurrent stale initial write receives 409. Later updates
-can leave `api_token` empty to retain it. Non-empty environment overrides lock
+origins), `admin_web_url`, and `web_inventory_enabled`. The first write on an
+unconfigured server requires a new key of at least 16 visible ASCII characters.
+Once configured, further writes require the current administrator key or an
+administrator Web session with CSRF protection. A concurrent stale first write
+receives 409. Later updates can leave `api_token` empty to retain the key and
+omit `admin_web_url` to retain the address. Include the intended allowed origins
+and Web write switch on each save. Non-empty environment overrides lock
 the corresponding field; attempts to change it receive 409. Responses never
 return the token. Configuration and authentication changes take effect after a
 successful atomic save; the browser supplies the new token on later requests.
 
-The configuration response includes effective origins, the Web write switch,
+The configuration response includes the effective origins, Web console URL, Web write switch,
 `environment_overrides`, `config_path`, and `log_path`. The logs response contains
 up to 200 recent application event lines. It does not include request bodies,
 queries or credentials. File locations and recovery steps are in the
@@ -572,11 +575,10 @@ Push and pull within a cycle always use the chosen endpoint; a failed write is n
 replayed against the other address. The next cycle retries primary. No new sync
 endpoint or protocol version is introduced.
 
-`API_TOKEN` comes from the server deployment environment. With Docker Compose,
-the repository-root `.env` supplies it; for direct uvicorn launches explicitly
-export it or use `--env-file .env`. The web console may show/copy the token already
-held in its authenticated browser session. No endpoint reveals the server token
-without authentication, and GitHub issue-report credentials are unrelated.
+The administrator key comes from the saved deployment configuration or a
+non-empty `API_TOKEN` environment override. The browser exchanges the key for a
+Web session Cookie. Setup and session responses omit the administrator key. For
+key lookup and rotation, see the [deployment guide](docker-quickstart.md#4-api-token-在哪里).
 
 ## 库存参数检索
 
@@ -585,9 +587,9 @@ without authentication, and GitHub issue-report credentials are unrelated.
 保留数字之间的小数点，不做可能混淆规格的数字编辑距离推测。说明中的品牌与官方参数也可被检索。
 现有分页、总数、低库存和软删除过滤行为保留，查询不修改库存记录。
 
-## 元件参数与名称分离（0.7.7-dev.3）
+## 元件参数与名称分离
 
-`/admin-api/lcsc/lookup` 与 `/admin-api/part-lookup` 新增可选 `description` 和 `parameters`（键值对象，缺失为空对象）。参数只取上游明确值；无参数时不从型号解码。默认展示名称使用品牌和型号，长商品说明进入 `description`。
+`/admin-api/lcsc/lookup` 与 `/admin-api/part-lookup` 返回可选 `description` 和 `parameters`（键值对象，缺失为空对象）。参数只取上游明确值；无参数时不从型号解码。默认展示名称使用品牌和型号，长商品说明进入 `description`。
 
 Android 和 Windows 将官方参数保存在既有元件 `description` 的参数行中，保持现有同步和备份格式；无需新增数据库字段。客户端基本信息与 Web 详情解析中英参数行，检索覆盖原值、单位及常见字段别名。已有名称不批量改写，旧记录未保存过的参数仍需要重新联网查询。
 
@@ -614,11 +616,11 @@ Android 和 Windows 将官方参数保存在既有元件 `description` 的参数
 - `GET /admin-api/sync/devices` returns `{items:[...]}` with device ID, first/last seen and push/pull counts. It registers on activity, not by trusting a client-provided database path. This is an activity registry, not hardware attestation.
 - `GET /admin-api/sync/audit?limit=100` returns per-device direction, observed_at, status, accepted entity counts and pull cursor. For GET `/sync/pull`, clients may add `X-Component-Vault-Device-Id`; absent IDs remain null. Existing sync payloads and account-binding requirements are unchanged.
 - `GET /admin-api/sync/conflicts?limit=100` returns detected conflict snapshots, submitted device_id, known server_device_id, kind, timestamp and resolutions. `POST /admin-api/sync/conflicts/{id}/resolve` accepts `{resolution:"server_kept"|"client_resubmitted",note?:string}` (note at most 1000 chars); it records a human decision only. Refresh/edit/sync from a client to actually change inventory.
-- `GET /admin-api/about` reports author, build version/revision and container/source-or-service detection. `POST /admin-api/about/check-update` checks the latest stable GitHub release. `update_available:null` means source/unknown version cannot be compared; failure is 502 rather than a false “up to date”. No self-update endpoint is provided.
+- `GET /admin-api/about` reports author, build version/revision and container/source-or-service detection. `POST /admin-api/about/check-update` checks the selected channel and defaults to stable. `update_available:null` means the installed version cannot be compared. An upstream failure returns 502. An explicitly submitted [update job](#网页更新作业管理员) is required to update containers through the optional updater.
 
 All device/audit/conflict APIs use the authenticated account inventory database. Old activity is not reconstructed. About/update checks require authentication but do not change deployment.
 
-## 删除 Web 库存元件（0.7.8-dev.7）
+## 删除 Web 库存元件
 
 `DELETE /admin-api/components/{component_id}`，请求 JSON：`{"request_id":"唯一操作ID","expected_updated_at":"详情返回的更新时间"}`。需要有效账户认证，并启用 Web 库存写入；Cookie 会话仍需 CSRF 头。返回 `{id, deleted, updated_at}`。相同请求 ID 与载荷可安全重试，版本过期返回冲突，重新读取后再确认。服务端保存删除墓碑并同步给客户端，保留流水；不会访问其他账户的库存。
 
@@ -648,7 +650,7 @@ content 的字段为 `schema_version:1,project_name,production_sets,source_name,
 `/health`、`/auth/ping` 增加 `photo_protocol:1`。旧服务端不支持时保留本地图片并显示照片未同步。照片交换不改库存数量、库存游标或出入库流水；成功库存不因照片失败重放。每次从当前元件引用与两端文件可用情况推导剩余工作，支持无库存增量时恢复。
 
 
-## 订单资料更新（dev.21）
+## 订单资料更新
 
 认证、账户数据库隔离和 Web 会话 CSRF 规则沿用现有 `/admin-api/*`。没有改动 `/sync/push`、`/sync/pull` 格式；应用资料更新后增加既有同步版本。
 
@@ -680,6 +682,7 @@ content 的字段为 `schema_version:1,project_name,production_sets,source_name,
 `parameter_keys` 指定本次确认的参数，省略时使用预览中该元件的所有拟更新参数。
 按厂商型号匹配的结果需要 `confirm_match: true`。候选值与版本取自服务端预览。
 应用需启用 Web 库存操作，逐元件检查版本并以短事务写入、保存幂等回执；冲突不覆盖。
+管理台跨页全选后按每批最多 50 项提交。网络中断后，重试未完成的条目并复用其请求 ID。
 参数仅合并已选项。名称、SKU、图片、自由备注、数量、库位、分配、实际成本和流水保持原值，目录缺价时保留旧参考价。
 
 价格沿用元件 description 中的五类可读行：`参考单价：`、`参考币种：`、`参考起订量：`、`价格来源：`、`价格查询时间：`，无需修改同步 schema。

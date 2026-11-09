@@ -38,9 +38,9 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 只给 updater 挂载 Docker socket、原部署目录和任务卷。更新 API/Web 时不重建 updater，
 同一镜像产物不要求两个容器始终运行同一版本。旧独立 updater 的迁移见[部署教程](server-web-update.md#从独立-updater-镜像迁移)。
 
-网页更新是可选部署能力，首次启用必须配置独立 updater、原 Compose 部署目录及内部连接；仅将 0.7.8 的 API/Web 换成新镜像不会自动完成这些配置。配置后，管理员日常可选择正式或 Dev 渠道并明确提交更新作业；服务不会定时自动安装新版本。渠道检测与实际更新作业是不同操作。
+网页更新是可选部署能力。首次启用时，将独立 updater 加入原 Compose 项目并共享原数据卷。完整模板从 Compose 取得项目名，管理员通过 `COMPONENT_VAULT_DEPLOY_DIR` 指定原项目目录。启用后由管理员选择渠道、确认并提交更新作业，版本检测仍是独立的只读操作。
 
-`docker-compose.hub-web-update.yml` 提供适合群晖项目的完整单文件声明，与 Hub 基础配置加 updater override 保持一致，仅让 Web 默认启动；CI 核对渲染结果，避免两份模板漂移。既有自定义端口、数据来源及网络仍由原部署声明保留。
+`docker-compose.hub-web-update.yml` 提供适合群晖项目的完整单文件声明，与 Hub 基础配置加 updater override 的差别是 Web 默认启动。CI 核对两者渲染结果。既有自定义端口、数据来源及网络仍由原部署声明保留。SQLite 路径由 API 镜像提供，MQTT 与目录的高级环境覆盖仅在需要时由部署显式传入。
 
 - `server/app/admin/update_agent.py` 只为管理员代理固定 `UPDATER_URL` 的内部作业接口，沿用会话/CSRF；读取3秒、写入5秒超时。内部令牌自动原子创建，使用显式 `UPDATE_TOKEN_FILE` 或原数据库父目录，绝不返回浏览器，不修改账户密钥。
 - 独立 `updater/app.py` 以单 worker 和 SQLite 持久化任务，按项目串行执行现有 Compose helper。API 重建不终止更新任务；updater 重启后将未完成作业重新排队。只保留最近100条终态记录，支持幂等请求和失败重试。
@@ -120,9 +120,9 @@ The API and admin Web containers are built independently. `server-image.yml`
 always builds and starts amd64 validation images, checks API/auth/database
 startup, then fetches the Web index and its emitted JS/CSS assets. When Docker
 Hub variables and token are configured, releases publish API tags `<version>`
-and `latest`, plus Web tags `web-<version>` and `web-latest`, for amd64/arm64.
-The 0.7.0 API and Web tags were verified published. Each subsequent release must
-still verify its own publication. SQLite persists under `/data`.
+and Web tags `web-<version>` for amd64/arm64. Stable releases also publish
+`latest` and `web-latest`. Dev releases publish `dev` and `web-dev`.
+SQLite persists under `/data`.
 `docker-compose.hub.yml` retains the source Compose data volume and exposes the
 Web image through the optional `web` profile. Its default API/Web images use
 `latest` / `web-latest`; updating requires pulling and recreating the containers.
@@ -295,7 +295,7 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   bounded LazyColumn with collapsible summaries and fixed confirmation actions;
   editor fields scroll independently inside their dialog. Current user workflows
   are documented in [README](../README.md); historical UI evidence is kept in
-  [the implementation report](ui-consistency-implementation.md).
+  [the early UI verification record](history/verification.md#早期界面验收2026-09-16).
 - `SecondaryPageScaffold` provides shared app bars, insets and busy-aware Back
   handling for location management, backup, BOM and batch pages. The import
   chooser overlays the existing inventory route and dismisses back to it.
@@ -534,29 +534,30 @@ from server/MQTT payloads and inventory Excel exports. See
 - `GET /admin-api/lcsc/lookup` remains available as a token-protected direct
   compatibility lookup against international LCSC public pages, with in-memory
   response caching. This explicit request is independent of the automatic
-  recognition fallback switch and does not require supplier credentials.
-- SQLite is used for a single-user self-hosted deployment.
+  recognition fallback switch. All supplier catalog paths use public data.
+- SQLite stores the administrator's original inventory and account registry.
+  Each ordinary account uses a separate inventory database.
 - Legacy incoming entities and location metadata use last-write-wins on `updated_at`;
   managed inventory uses a checked `base_updated_at` and a complete allocation snapshot.
 - `GET /health` is public.
-- `POST /auth/ping`, `POST /sync/push`, and `GET /sync/pull` require the shared
-  bearer token.
+- `POST /auth/ping`, `POST /sync/push`, and `GET /sync/pull` require an account
+  key. Sync resolves inventory from the authenticated account.
 - Duplicate active `sku` values are rejected with a conflict response.
 - CORS is enabled for the configured admin web origins.
 
 ## Server Admin Web
 
-- `admin-web/` provides a separated `shadcn/ui` admin console for inventory
-  administrators.
-- Initial pages cover:
+- `admin-web/` provides a separate `shadcn/ui` inventory console with
+  administrator-only deployment and account settings.
+- Pages cover:
   - dashboard metrics
   - searched and paginated active inventory
   - component details and optional inventory operations
   - recent stock movements
   - runtime and sync posture details
 - Inventory reads `GET /admin-api/components` with bounded page/page-size,
-  optional low-stock filtering, literal substring matching across SKU, name,
-  category and default location, and deterministic
+  optional low-stock filtering, normalized term matching across inventory
+  fields and the description, and deterministic
   `updated_at DESC, id ASC` ordering. `GET /admin-api/components/{id}` returns
   reliable component fields and location allocations. Both exclude deleted
   components; the original `/admin-api/inventory` overview remains unchanged.
@@ -564,8 +565,8 @@ from server/MQTT payloads and inventory Excel exports. See
   With `WEB_INVENTORY_ENABLED=false` inventory stays read-only. When enabled,
   authenticated users can create locations and zero-stock components, edit
   metadata, and record inbound/outbound movements.
-- The admin web app authenticates with the same shared bearer token already
-  used by sync clients.
+- The Web console exchanges an account key for an HttpOnly session Cookie.
+  Mutating requests using that session require a CSRF token.
 - Admin writes use `expected_updated_at` compare-and-swap and a persistent
   `admin_operation_receipts` row keyed by `request_id`. Receipt, component,
   allocation, movement, sync revision, and MQTT outbox changes share one short
@@ -890,7 +891,7 @@ Web 库存页的 `SpecEnrichmentPanel` 使用 `/admin-api/components/spec-enrich
 - 成功写入和审计在短事务中提交；失败的 CAS 推送回滚后保存冲突快照及失败审计。legacy 旧版本/同时间戳异值被丢弃也留记录。没有共同基线的 LWW 不能完整检测所有并发覆盖，不把正常新版本覆盖伪造为冲突。
 - 处理冲突接口只追加“保留服务端/已从客户端重新提交”的处理记录、账户、时间和备注，不盲目重放旧快照。需要实际修改时重新拉取、编辑、同步。
 - 删除普通账户先撤销访问并取消该账户参数补全，待任务停止后删除其数据库与 SQLite sidecar，再删除注册记录和会话。失败保留停用状态可重试；管理员原库与其他用户数据不动。已有本地客户端副本不会远程删除。
-- 设置关于仅检测更新，容器更新交给部署者选择的 Watchtower；应用本身不挂宿主 Docker socket。
+- 「关于服务端」可检测更新。启用独立 updater 后，管理员也可提交更新任务。Docker socket 只挂载到选择启用的更新组件。
 - Android 标签工具复用既有编辑器/队列；新增模板与选纸步骤，自定义尺寸遵循当前 M1 打印头范围。保存草稿的旋转不强制归零，只有新建纸张为 0°。记录页过滤是展示层行为，不修改流水或同步墓碑。
 
 ### Android 库存扫码测试

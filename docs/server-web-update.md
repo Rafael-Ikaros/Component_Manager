@@ -15,7 +15,7 @@
 | 0.7.8 保留库存升级到 dev | 支持；在原项目成对更新 API 和 Web，沿用完整 `/data` 和应用配置 |
 | 只换 dev 镜像，部署一项不改，就能在网页更新 | 不支持；镜像升级不会自动创建 updater 或补上它需要的挂载 |
 | 已启用 updater 后更新到后续兼容正式版或 dev | 支持；网页选择并确认即可，日常无需手改部署 |
-| 从 dev 在网页切回当前旧正式 0.7.8 | 不支持；旧目标缺少网页更新能力 |
+| 从 dev 在网页切回 0.7.8 | 不支持；旧目标缺少网页更新能力 |
 | 网页检查到新版就自动安装 | 不会；updater 需要管理员确认，定时跟随当前标签应选择 Watchtower |
 
 保留原数据升级不等于零部署配置启用网页更新。第一次可把升级和启用 updater 合并为一次操作。
@@ -23,8 +23,7 @@ updater 自身的镜像维护仍通过原项目完成，不承诺所有未来部
 
 ## 已有正式版先升级到 dev
 
-不需要重新安装或重新初始化库存。2026-11-03 已核实的正式镜像为
-`latest / web-latest`（0.7.8），已验证开发镜像为 `dev / web-dev`（0.7.9-dev.9）。
+已有库存可以直接沿用。正式渠道使用 `latest / web-latest`，开发渠道使用 `dev / web-dev`。部署前在 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 核对两种镜像的实际版本。
 保持原 Compose 项目名称、完整 `/data`、现有环境变量、端口和网络，在 Container Manager
 原项目中成对改用并拉取开发镜像，然后重新部署。只更新 Web 或只重启旧 API 都不算完成升级。
 如果原文件已经使用本仓库的渠道变量，可设 `COMPONENT_VAULT_DOCKER_CHANNEL=dev`，
@@ -57,15 +56,13 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 - 当前共享管理镜像模板需使用 `0.7.9-dev.8` 或更新兼容版本；`web-0.7.9-dev.7`
   及旧正式镜像不能通过 `command: [updater]` 运行更新服务。已部署的独立 dev.7 updater
   可以继续使用，采用新模板时按下方迁移步骤操作。
-- dev.6 的发布验收暴露了更新后 `.env` 所有者/权限丢失的问题，请勿用于首次启用。
-- 当前正式版 0.7.8 不包含网页更新入口。在线更新会在替换前检查目标 API/Web 的
+- 0.7.8 不包含网页更新入口。在线更新会在替换前检查目标 API/Web 的
   `io.componentvault.server-update=1` 能力标识；不支持的旧版本会被拒绝，现有容器不变。
-  待包含此能力的正式版通过验证并发布后，才能在受支持的正式版与 dev 之间在线切换。
+  正式版与 dev 均支持此能力时，可以在线切换。
 - 只更新本项目 API 和已部署的 Web；不管理其它应用，不自动更新 updater 自身，不自动回滚数据库。
 - updater 使用 Docker CLI 28.x / 配套 Compose 并保留 API 自动协商，照顾尚未更新 Engine 的 NAS。
   Docker 29 移除了针对较旧 Engine API 的部分客户端兼容处理，见[官方说明](https://docs.docker.com/engine/release-notes/29/)。这不是所有 DSM/Engine 组合都已经实测的承诺。
-- 群晖实际按钮以 DSM / Container Manager 版本为准。以下配置是 Compose 项目操作，
-  不是单独创建三个互不关联的容器；未在用户 NAS 上验证的步骤应先在测试项目试用。
+- 群晖请在 Container Manager 的“项目”中导入 Compose 文件。
 
 ## 群晖一次性配置
 
@@ -73,14 +70,14 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 无法通过普通网页请求给自己补上挂载。无需开放群晖 SSH，也不需填写 Docker Hub 密钥。
 新部署可直接采用完整模板，从一开始就启用；已有部署需在原项目保存并重新部署一次。
 
-1. **新建项目**时，在 File Station 准备固定项目目录，例如 `/volume1/docker/component-vault`。
+1. **新建项目**时，在 File Station 准备固定项目目录，例如 `/volume1/docker/component_manager`。
    如果要使用宿主目录保存数据，先建好其中的 `data/` 子目录。将完整模板放入项目目录，
    在 Container Manager 创建项目时选择同一目录并导入模板。**已有项目**应在原目录修改原项目，
    先备份整个 API `/data`，记录原项目名、端口、数据来源和原 Compose 文件。
 2. 在部署目录中放置 `.env`。新建 dev 项目填写目录和渠道，已有项目在原 `.env` 上修改：
 
    ```dotenv
-   COMPONENT_VAULT_DEPLOY_DIR=/volume1/docker/component-vault
+   COMPONENT_VAULT_DEPLOY_DIR=/volume1/docker/component_manager
    COMPONENT_VAULT_DOCKER_CHANNEL=dev
    ```
 
@@ -102,10 +99,10 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    | `/var/run/docker.sock` | 主机同路径 | 通过 Docker/Compose 重建本项目服务 |
    | `/data:ro` | **API 实际使用的同一数据目录或卷** | 读取自动生成的内部认证文件 |
    | `/state` | 独立持久卷 | 保存更新任务，API 重启不丢失进度 |
-   | 原部署目录的相同绝对路径 | 例如 `/volume1/docker/component-vault` → 同路径 | 读取原 Compose 并保存渠道配置 |
+   | 原部署目录的相同绝对路径 | 例如 `/volume1/docker/component_manager` → 同路径 | 读取原 Compose 并保存渠道配置 |
 
    模板默认使用 named volume `component_vault_data`。若新建项目选择宿主 `data/`，
-   或现有 API 已使用 `/volume1/docker/component-vault/data:/data`，updater 也应使用同一来源并加 `:ro`，
+   或现有 API 已使用 `/volume1/docker/component_manager/data:/data`，保留该 API 映射，updater 使用 `/volume1/docker/component_manager/data:/data:ro`，
    不能另挂一个空 named volume。默认数据库布局下，API 自动创建 `/data/.updater-token`，updater 从同一数据卷读取。
    已定制数据库或令牌路径的项目继续在 API 和 updater 保留同一个 `UPDATE_TOKEN_FILE`。无需手动填写或复制密钥。
 5. updater 必须加入 API 所在的同一网络；默认 Hub 的 default network 已满足。
@@ -113,9 +110,9 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    原部署目录以外若还有 Compose override、env/config 文件，需以相同绝对路径映射到 updater。
 6. 若使用 Watchtower，API/Web 的 `com.centurylinklabs.watchtower.enable` 设为 `false`，
    避免两个更新服务同时重建；其它应用仍可沿用 Watchtower。
-7. 在 GUI 中保存项目，拉取配套镜像并部署。新安装先在 `http://NAS地址:8787/setup` 设置管理员密钥和 Web 允许来源，
-   应用设置写入 `/data/config.json`。登录 Web 管理台，管理员在关于区看到可用的
-   “服务端更新”后，日常升级只需网页操作。
+7. 在 Container Manager 的「映像」中更新项目使用的 API 和管理镜像标签；尚未下载的标签从「注册表」下载。dev 使用 `dev` 和 `web-dev`，其中 `web-dev` 同时供 Web 和 updater 使用。[群晖映像管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_image?version=7)
+8. 在「项目 → 原项目 → YAML 配置」保存并部署。对照原设置核对 API/Web 端口、`/data` 和 updater 的 `/state`；只点「重新启动」会继续运行已有容器。更新已有项目时，先确认没有进行中的网页更新任务；换用新模板或更新 updater 自身需要重新部署 updater。避免使用「清除」或「删除」项目。[群晖项目管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_project?version=7)
+9. 在原 API 地址打开 `/health` 核对版本，再登录管理台检查库存与「设置 → 关于服务端」的更新状态。新安装应先在 `/setup` 保存管理员密钥和 Web 地址，应用设置会写入 `/data/config.json`。
 
 Docker socket 具有主机 Docker 管理能力，仅挂载到 updater；API、Web 不挂载 socket，
 updater 不映射主机端口。实际更新接口仅管理员可调用，普通账户没有更新入口。

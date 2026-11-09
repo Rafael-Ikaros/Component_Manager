@@ -149,9 +149,12 @@ dev.6 曾在真实更新门禁中因 `.env` 所有者/权限丢失失败，dev.7
   单张及连续两张完整、位置一致、无额外空白纸，二维码匹配正确元件。
   该台水平调整为 +0.5 mm，不能推广为所有设备默认值。协议依据见[M1 分析](../m1-apk-analysis.md)，
   使用限制见[打印指南](../m1-printing-feature-matrix.md)。
-- UI：保留[2026-09-16 报告和截图](../ui-consistency-implementation.md)。
-  其中 Robolectric 绘制、浏览器验证、Windows 构建各有独立边界，不能当作相机、高 DPI 或完整无障碍验收。
 - 平板：0.7.8-dev.24 只实施库存和设置首阶段；[提案](../design/tablet-ui-proposal.md)中的其它工作区不是现有功能。
+
+## 早期界面验收（2026-09-16）
+
+当时验证了 Android 导入弹层、BOM 和库位表单，以及 Web 库存页的桌面和窄屏布局。Android 截图由 Robolectric 生成，Web 使用隔离库存，Windows 验证覆盖构建。相机、实机输入法、Windows 高 DPI 和完整无障碍验收在该记录范围之外。
+[原报告和截图](https://github.com/Rafael-Ikaros/Component_Manager/blob/8a884889c91a11a56d270c6c2384ac69b6854754/docs/ui-consistency-implementation.md) · [CI](https://github.com/Rafael-Ikaros/Component_Manager/actions/runs/35013684763)
 
 ## 原始记录索引
 

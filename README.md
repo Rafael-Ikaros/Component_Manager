@@ -36,8 +36,7 @@ Android 和 Windows 将数据保存在本机 SQLite，**不用部署服务器，
 需要多设备使用时，再连接自己的服务端。
 
 > [!NOTE]
-> 上方下载按钮提供正式版。首页按当前开发版介绍；国内 EDA 查询、参考价格、统一项目用料和网页更新等新能力先在
-> [dev 版本](https://github.com/Rafael-Ikaros/Component_Manager/releases)提供，正式版范围见[发布说明](docs/releases/0.7.8.md)。
+> 上方下载按钮提供正式版。下文也介绍 dev 功能，包含国内 EDA 查询、购买价格与材料成本、料盘识别和网页更新。正式版范围见[发布说明](docs/releases/0.7.8.md)，开发版见 [GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases)。
 
 ## 能做什么
 
@@ -58,7 +57,7 @@ Android 可在「添加元件」拍摄或选择料盘标签照片。应用在本
 
 Web 库存页在手机上使用紧凑导航和元件卡片。「多选」可批量删除当前页选中的元件，
 删除会同步到同账户设备并保留历史流水。「库存工具」下的[库存资料检查](docs/parameter-enrichment.md)
-可扫描当前账户、复核嘉立创差异并按字段补全，数量、库位、名称和用户备注保持原值。
+可扫描当前账户、复核目录差异并跨页全选可更新资料。应用前可以逐字段取消，厂商型号匹配须单独确认。数量、库位、名称和用户备注保持原值。
 
 ### 项目用料，确认后才扣库存
 

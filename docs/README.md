@@ -14,7 +14,7 @@
 | 在设备间同步元件照片 | [照片同步](photo-sync.md) |
 | 创建、停用、删除用户及分发密钥 | [账户管理](accounts.md) |
 | 用商城订单修正已有元件资料 | [从订单更新资料](order-metadata-update.md) |
-| 批量查询中文资料和补全参数 | [资料补全](parameter-enrichment.md) |
+| 扫描库存资料、跨页全选并应用更新 | [库存资料检查](parameter-enrichment.md) |
 | 编辑标签、模板和汉印 M1 打印 | [标签打印](m1-printing-feature-matrix.md) |
 | HM-A300E Android 实验适配与资料 | [HM-A300E](hm-a300e.md) |
 | 反馈错误和附加诊断 | [扫码诊断与反馈](feedback-and-scan-diagnostics.md) |
@@ -29,9 +29,7 @@
 | 配置网页更新及了解一次性配置要求 | [网页更新](server-web-update.md) |
 | 维护者向 Docker Hub 发布镜像、核对发布结果 | [镜像发布](dockerhub.md) |
 
-**仅把 0.7.8 的 API/Web 镜像换成 dev，不会自动启用网页更新。** 保留数据升级和安装更新组件是两件事；
-首次可在原项目中一起完成。之后管理员可在网页更新到支持该能力的正式版或 dev。
-具体限制见[升级说明](server-web-update.md#已有正式版先升级到-dev)。
+已有 Docker 部署请在原项目中升级，保留数据挂载。希望以后在网页切换版本的管理员，可在同一次升级中启用 updater，详见[网页更新教程](server-web-update.md)。
 
 ## 开发和技术参考
 
@@ -46,7 +44,6 @@
 这些文档不作为安装或操作步骤：
 
 - [验证记录](history/verification.md)：发布、实机与隔离数据测试的摘要和原始记录索引。
-- [M1 APK 协议分析](m1-apk-analysis.md)、[HCI 取证方法](m1-protocol-capture.md)：协议来源及历史调查。
-- [历史 UI 验证及截图](ui-consistency-implementation.md)：2026-09-16 的界面验证。
-- [平板布局提案](design/tablet-ui-proposal.md)：含尚未实施的布局原型。
+- [M1 协议与 HCI 分析](m1-apk-analysis.md)：协议来源、复测过程和采集方法。
+- [平板布局提案](design/tablet-ui-proposal.md)：交互原型与实现边界。
 - [历史发布说明](releases/)：对应版本的交付范围，不代表当前版本的菜单和能力。

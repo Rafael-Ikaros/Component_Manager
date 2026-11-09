@@ -1,44 +1,12 @@
 # Runbook
 
-## 可选网页更新
-
-群晖可直接使用完整的 `docker-compose.hub-web-update.yml`，无需手动合并多个文件；深度定制项目继续按需合并 `docker-compose.web-update.yml`。沿用原项目名、端口、数据来源和网络。当前共享管理镜像模板需要 dev.8 或更新兼容版本，旧部署迁移见[网页更新配置](server-web-update.md)。
-Docker Images 只构建 API 和管理镜像：开发标签 `dev / web-dev`，正式标签 `latest / web-latest`，另有固定版本标签。
-Web 与 updater 共用管理镜像，后者通过 `command: [updater]` 独立运行；不再新增 `updater-*` 标签。
-updater仅内部端口，socket不授予API/Web。
-该流程与Watchtower对同一服务互斥；CLI仍保留用于人工恢复。当前旧正式版不支持新入口，在线目标会被能力检查拒绝，
-不要为了让它可切换而跳过dev验收发布正式版。独立任务状态保存在updater卷；API无法恢复时从NAS界面查看日志。
-
-## 独立 Docker CI 与发布渠道
-
-Docker 构建检查由 `docker-ci.yml` 单独运行。`Docker Images` (`server-image.yml`) 可手动补发：填写已有 `release_tag`，开启 `push_image`；source_ref 留空使用该 tag，显式填写时必须对应同一提交。使用既有 DOCKERHUB_USERNAME / DOCKERHUB_IMAGE Variables 和 DOCKERHUB_TOKEN Secret。
-
-changelog 发布在 sync/tag 后并行生成原生附件和 Docker 镜像；两个 job 分别报告成功/失败。Docker 失败时修复后重跑独立流程，不需要重建 Android/Windows。dev 更新固定版本及 dev/web-dev，正式版才更新 latest/web-latest。核对两种镜像版本、revision 和 amd64/arm64 manifest，以及发布后真实更新门禁，不能只看 GitHub Release。当前旧正式0.7.8不支持网页更新及共享管理镜像的 updater 启动模式。
-
-部署切换使用 [渠道教程](docker-channels.md)，保留项目名及完整 `/data`。只选择或检测渠道不替换容器；启用updater后在Web确认才执行更新。Watchtower跟随已选镜像，不会跨渠道。dev.7发布CI已通过唯一临时Compose项目的真实更新，核对API/Web替换、updater持续运行及数据/挂载/端口保留；不是用户NAS实测。已有正式版可先升级dev后在Web管理应用配置，最少操作见[升级说明](server-web-update.md#已有正式版先升级到-dev)。
-
-## 0.7.8 正式版部署
-
-0.7.8 汇总前期 dev 的 BOM 预设同步、原图同步及订单资料更新。正式版配套发布 API `rafaelikaros/component_manager:0.7.8`（浮动标签 `latest`）和 Web `:web-0.7.8`（`web-latest`）。先核对发布流水线及 Docker Hub 对应标签，再升级原有项目；不要新建数据卷或清空配置。
-
-停写并备份整个 `/data`，包括各账户数据库、配置与 `.photos` 目录；客户端本地备份还需单独保留 BOM 预设 JSON。保持原 Compose 项目名和挂载，执行：
-
-```sh
-docker compose -f docker-compose.hub.yml --profile web pull
-docker compose -f docker-compose.hub.yml --profile web up -d
-docker compose -f docker-compose.hub.yml --profile web ps
-```
-
-仅使用 API 时省略 `--profile web`。旧 `.env` 若固定了镜像版本，应将 API、Web 成对改为新固定版本或 `latest` / `web-latest`。群晖与可选 Watchtower 操作见 [Docker Hub 指南](dockerhub.md)，新版 Web 的订单资料功能仍需启用 Web 库存操作。
-
 ## Docker Hub image deployment
 
-普通部署和升级见[快速部署](docker-quickstart.md)、[渠道切换](docker-channels.md)和
-[网页更新](server-web-update.md)。保留原项目名称、完整 `/data` 及应用配置；
-0.7.8 升级 dev 不会自动创建 updater。Web 更新首次需配置，之后由管理员确认作业。
+普通部署见[快速部署](docker-quickstart.md)，正式版与 dev 切换见[渠道指南](docker-channels.md)。启用网页更新时使用单文件模板，`.env` 填宿主机项目目录，dev 另填渠道。旧部署保留原项目名、端口、完整 `/data` 和生效的自定义 API 环境变量。[网页更新教程](server-web-update.md)
 
-维护者发布镜像见[Docker Hub 发布](dockerhub.md)。普通部署者不需要 Docker Hub 发布 Token。
-API/Web/updater 镜像身份、发布门禁和 ARM 运行边界应分别核对，不能仅凭 GitHub 附件判断容器发布完成。
+### 独立 Docker CI 与发布渠道
+
+`docker-ci.yml` 检查镜像构建；`server-image.yml` 发布 API 和管理镜像。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可使用独立工作流重跑同一 tag。dev 更新 `dev / web-dev`，正式版更新 `latest / web-latest`，两者均发布固定标签。镜像身份、平台和更新验收见[发布指南](dockerhub.md)。
 
 ### Optional Watchtower updates for the Hub deployment
 
@@ -263,103 +231,14 @@ The Android client is a Gradle/Compose app in `android-client/`.
 For an HM-A300E test build, pass the vendor SDK directory through `hprtCpclSdkDir`.
 See the [HM-A300E SDK build instructions](hm-a300e.md#构建-sdk-测试包).
 
-Known machine requirements:
-
-- Android SDK installed
-- `ANDROID_HOME` or `ANDROID_SDK_ROOT` configured
-- Access to Google Maven repositories
-
-Basic check:
+按 [Android 构建说明](../android-client/README.md#构建)安装 JDK、Android SDK 和构建工具。使用仓库的 Gradle wrapper；版本以构建文件与 CI 为准。仓库根目录可执行：
 
 ```powershell
 .\android-client\gradlew.bat -p android-client help --no-daemon
+.\android-client\gradlew.bat -p android-client assembleDebug --no-daemon
 ```
 
-Verified working configuration on this host (`2026-05-17`):
-
-- Android SDK: `C:\Users\gdblz\AppData\Local\Android\Sdk`
-- JDK: `D:\android_studio\jbr`
-- Gradle wrapper: `.\android-client\gradlew.bat` (`8.11.1`)
-- project-local Gradle cache: `D:\Project_Folder\Component_warehouse\.gradle-user-home`
-- project-local Android user home: `D:\Project_Folder\Component_warehouse\.android-user`
-- the repository does not hardcode `org.gradle.java.home`, so Gradle now uses
-  `JAVA_HOME` or the toolchain configured by the host/runner
-- current Android build baseline: AGP `8.10.1`, Kotlin `2.0.21`,
-  Lifecycle `2.9.2`, Android SDK Platform `35`, Build Tools `35.0.0`,
-  Java 21 in CI, and Java 17 bytecode target
-
-Create or confirm `android-client/local.properties`:
-
-```properties
-sdk.dir=C:\\Users\\gdblz\\AppData\\Local\\Android\\Sdk
-```
-
-Build verification:
-
-```powershell
-$env:GRADLE_USER_HOME='D:\Project_Folder\Component_warehouse\.gradle-user-home'
-$env:JAVA_HOME='D:\android_studio\jbr'
-$env:ANDROID_SDK_ROOT='C:\Users\gdblz\AppData\Local\Android\Sdk'
-$env:ANDROID_HOME='C:\Users\gdblz\AppData\Local\Android\Sdk'
-$env:ANDROID_USER_HOME='D:\Project_Folder\Component_warehouse\.android-user'
-& '.\android-client\gradlew.bat' -p android-client help --no-daemon
-& '.\android-client\gradlew.bat' -p android-client assembleDebug --no-daemon
-& '.\android-client\gradlew.bat' -p android-client testDebugUnitTest --no-daemon
-& '.\android-client\gradlew.bat' -p android-client assembleRelease --no-daemon
-```
-
-Simpler Windows helper:
-
-```powershell
-.\scripts\android-gradle.ps1 assembleDebug
-.\scripts\android-gradle.ps1 assembleRelease
-```
-
-That helper prefers Android Studio's embedded JBR and then calls the
-repository Gradle wrapper, so local Windows builds stay aligned with CI even
-when the machine has a newer system Java or another Gradle version on `PATH`.
-
-Verification result on this host:
-
-- `.\android-client\gradlew.bat -p android-client help --no-daemon` ->
-  success on `2026-05-17`
-- last full `assembleDebug` -> success on `2026-05-16`
-- last full `testDebugUnitTest` -> success on `2026-05-16`
-- last full `assembleRelease` -> success on `2026-05-16`
-- `compileDebugKotlin --no-daemon` after the adaptive-shell refactor ->
-  success on `2026-05-17`
-- current local `assembleDebug` / `assembleRelease` on this host ->
-  blocked on `2026-05-17` because AGP cannot install
-  `build-tools;35.0.0` into
-  `C:\Users\gdblz\AppData\Local\Android\Sdk`; the SDK directory is not
-  writable for the current user
-- Android metrics warnings and Kotlin daemon fallback messages may appear on
-  this host and do not, by themselves, indicate a Kotlin or Compose source
-  failure
-
-Android Studio note:
-
-- The official `Layout Editor` tutorial applies to View/XML layouts.
-- This project uses Jetpack Compose, so visual editing should use Compose
-  Preview, Interactive Preview, Run Preview, and Live Edit inside Android
-  Studio.
-
-Implemented client behaviors:
-
-- local SQLite persistence for components, stock movements, and sync queue
-- shared-preference sync settings
-- component create/edit/soft delete
-- movement entry and quantity recalculation
-- manual sync, connection test, and optional auto sync
-- JLC text/QR and direct C-number import with bundled offline recognition rules,
-  device-only learning and public product lookup; no recognition server is needed
-- BOM CSV/XLSX preview and transactional batch release, component-hub JSON
-  migration, and official product images; see [BOM and migration](bom-and-migration.md)
-- supplier packaging OCR import plus generated JLC-compatible or warehouse QR
-  labels
-- official adaptive Compose shell and Inventory flow built on
-  `NavigationSuiteScaffold`, `currentWindowAdaptiveInfo`,
-  `NavigableListDetailPaneScaffold`, and a `SearchBar`-first dense list layout
+Windows 也可用 `scripts/android-gradle.ps1 assembleDebug`。该脚本优先选择 Android Studio 的 JBR，并调用仓库的 Gradle wrapper。
 
 ### Windows
 
@@ -708,22 +587,16 @@ the release workflow injects the artifact's version at build time.
 
 Example: `0.7.4-dev.1` uses code `704001`, and stable `0.7.4` uses `704999`.
 Do not change signing keys between channels. See [update behavior](app-updates.md)
-and [current dev test notes](releases/0.7.4-dev.1.md).
+and the [verification history](history/verification.md).
 
 #### Client behavior
 
-Settings / About checks `Rafael-ban/Component_Manager` only after a user click.
-The persisted update channel defaults to Stable; choosing Dev also includes
-public prereleases. Switching channels never automatically downgrades or installs.
+Android 和 Windows 启动时按当前渠道检查一次，有可用更新时显示提示。设置的“关于”仍可手动检查。默认渠道为正式版，开发渠道也检查公开预发布版本。切换渠道不会自动降级或安装。
 The APK and portable ZIP filenames must match the
 release workflow. A missing package, HTTP 404, rate limit or network failure is
 shown in the UI; users can still open the fixed release page. Applications do
 not silently install or import signing certificates. See [application updates](app-updates.md)
 for installation and Debug/Release signing boundaries.
-
-## 旧库存参数补全
-
-包含工具的 API 与 Web 需一起升级。在 Web 库存页预览当前账户缺少参数的 LCSC 元件，再确认批量补全；写入需要管理员启用 Web 库存操作。先同步各客户端，完成后再次同步获取参数；数量、库位及流水不变。取消保留成功项，重启后重新预览剩余候选。开发版不推送 Docker 稳定标签；源码 Compose 与现有数据卷的部署说明、恢复步骤见[旧库存参数补全指南](parameter-enrichment.md)。
 
 ## Android 测试超时排查
 
@@ -742,11 +615,9 @@ Actions 的 `android-check` 先运行库存扫码与数量边界的直接测试�
 
 原生客户端先升级并在同账户下手动同步一次，可在“BOM 预设”核对结果。此页没有扣库存或生产预占操作。完整备份服务端数据库可保留已同步预设；客户端 Excel 库存备份不包含预设，尚未同步的预设需另外保留 `bom-presets.json`。
 
-## dev19 照片数据卷与升级
+## 照片数据卷与升级
 
-API/Web 同时升级，客户端 `/auth/ping` 应见 `photo_protocol:1`。本开发版不推进 Docker `latest` 正式标签；测试源码 Compose 构建可沿用本手册既有步骤。无新环境变量和端口，保留整个 `/data` 挂载及账户数据库。
-
-照片保存在 `<账户数据库路径>.photos/`，普通账户各自独立；备份/恢复必须同时包含 SQLite、配置和这些目录，建议停写后复制整个数据卷。只恢复数据库会缺少图片字节，客户端将提示在仍有原图的设备上同步。服务端清理超过24小时未引用文件，删除账户会同步清除其照片目录。客户端清理下载缓存只影响副本，不修改库存或服务器图片。详见[照片教程](photo-sync.md)。
+API 和 Web 应成对更新。启用照片同步前核对 `/auth/ping` 的 `photo_protocol: 1`，并保留完整 `/data` 挂载。各账户原图保存在对应的 `.db.photos/` 目录，应与数据库和配置一起备份。详见[照片同步与恢复](photo-sync.md)。
 
 ### Windows 订单与更新日志检查
 
@@ -763,9 +634,9 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/Relea
 订单更新操作见[订单资料指南](order-metadata-update.md)，历史验证边界见[验证记录](history/verification.md)。
 
 
-### 从订单更新已有资料（dev.21）
+### 从订单更新已有资料
 
-API 生产依赖新增 xlrd（BIFF `.xls`）与 python-multipart，源码部署需重新安装 `server/requirements.txt`；开发测试另外使用 xlwt 生成合成 BIFF。服务端与管理台同时升级，原 `/data` 映射保留，无新增环境变量和 schema 迁移。该功能从 dev.21 开始验证，并纳入 0.7.8 正式镜像；使用已发布的配套稳定镜像或按[订单资料更新教程](order-metadata-update.md)构建源码。
+自 0.7.8 起可使用配套 API 和 Web 镜像。源码部署使用 `server/requirements.txt` 安装依赖，包括读取 BIFF `.xls` 的 xlrd 和处理上传的 python-multipart。升级时沿用原 `/data` 挂载。
 
 Web“库存 → 从订单更新资料”支持只读差异预览和字段确认；应用沿用 Web 库存写入开关。故障时区分不支持格式/文件损坏、未匹配 SKU、同 SKU 资料冲突、设备并发版本冲突。成功项不会因其他项失败而回滚；网络结果不明可使用原请求重试，不自动刷新版本覆盖。
 
@@ -773,6 +644,6 @@ Web“库存 → 从订单更新资料”支持只读差异预览和字段确认
 
 API 与 Web 配套更新后，在「库存 → 库存工具 → 库存资料检查」扫描当前账户库存。
 分析不写入；应用沿用 `WEB_INVENTORY_ENABLED` 或已保存的 Web 库存操作开关。
-先同步各设备，逐页预览缺项或冲突，选择具体字段和参数，应用后再同步回设备。
+先同步各设备，再核对缺项或差异。可以逐条选择，也可在支持的版本中全选本次扫描的可更新资料。确认应用后再同步设备。
 任务预览只存在本次服务进程，重启后重新分析；网络失败可重试，版本冲突需重新预览。
 开发镜像使用 dev/web-dev，正式镜像使用 latest/web-latest。试用时成对更新并保留原项目和数据；需要源码构建时见[资料更新教程](parameter-enrichment.md)。
