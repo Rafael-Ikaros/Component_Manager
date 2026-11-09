@@ -76,6 +76,10 @@ export function defaultCatalogSelection(row: CatalogRow): string[] {
   return catalogOptions(row).filter(option => option.safe).map(option => option.id);
 }
 
+export function canSelectCatalogRow(row: CatalogRow, confirmedMatches: ReadonlySet<string>): boolean {
+  return row.status === "ready" && (row.match_source !== "mpn" || confirmedMatches.has(row.id));
+}
+
 export function buildCatalogSelections(
   rows: CatalogRow[],
   selected: Record<string, string[]>,
@@ -83,7 +87,7 @@ export function buildCatalogSelections(
   requestId: () => string,
 ): CatalogSelection[] {
   return rows.flatMap((row): CatalogSelection[] => {
-    if (row.status !== "ready" || (row.match_source === "mpn" && !confirmedMatches.has(row.id))) return [];
+    if (!canSelectCatalogRow(row, confirmedMatches)) return [];
     const choices = selected[row.id] ?? [];
     const options = catalogOptions(row).filter(option => choices.includes(option.id));
     if (!options.length) return [];

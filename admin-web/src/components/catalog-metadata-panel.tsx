@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, postJson, requestJson } from "@/lib/api";
 import {
-  buildCatalogSelections, catalogOptions, defaultCatalogSelection,
+  buildCatalogSelections, canSelectCatalogRow, catalogOptions, defaultCatalogSelection,
   type CatalogField, type CatalogJob, type CatalogRow, type CatalogSelection, type CatalogStatus, type ScanMode,
 } from "@/lib/catalog-review";
 import { displayParameterLabel } from "@/lib/component-parameters";
 import { useI18n } from "@/lib/i18n";
-import { pendingStorageKey } from "@/lib/pending-request";
+import { pendingStorageKey, shouldRetainPending } from "@/lib/pending-request";
 import { createRequestId } from "@/lib/request-id";
 
 interface Rows { page: number; total: number; page_size: number; items: CatalogRow[] }
@@ -19,6 +19,7 @@ interface ApplyResult {
   summary: Record<string, number>;
 }
 const root = "/admin-api/components/catalog-metadata/jobs";
+const applyBatchSize = 50;
 const filters = ["all", "ready", "unchanged", "skipped", "failed", "pending"] as const;
 
 function readJobId(key: string): string | null {
@@ -47,6 +48,7 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<"all" | CatalogStatus>("all");
   const [rows, setRows] = useState<Rows | null>(null);
+  const [bulkRows, setBulkRows] = useState<CatalogRow[] | null>(null);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [confirmedMatches, setConfirmedMatches] = useState<Set<string>>(new Set());
   const [resolved, setResolved] = useState<Set<string>>(new Set());
@@ -54,9 +56,16 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
   const [pending, setPending] = useState<CatalogSelection[] | null>(null);
   const [result, setResult] = useState<ApplyResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const storageKey = session && identity ? pendingStorageKey(session.apiBaseUrl, "catalog-preview", identity.account_id) : null;
   const running = job?.state === "running" || job?.state === "queued";
+  const scanMode = job?.scan_mode ?? (job?.mode === "missing" || job?.mode === "review" ? job.mode : undefined);
+  const fieldLevel = Boolean(scanMode || job?.language);
+  const canEdit = enabled && fieldLevel && !busy && !pending;
+  const selectionRows = (bulkRows ?? rows?.items ?? []).filter(row => !resolved.has(row.id));
+  const eligibleRows = selectionRows.filter(row => canSelectCatalogRow(row, confirmedMatches));
+  const selectedCount = eligibleRows.filter(row => selected[row.id]?.length).length;
   const names: Record<CatalogField, string> = {
     category: text("分类", "Category"), package_name: text("封装", "Package"),
     parameters: text("参数", "Parameters"), reference_price: text("商城参考价", "Catalog reference price"),
@@ -88,7 +97,8 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
   useEffect(() => {
     const generation = ++epoch.current;
     setJob(null); setJobId(null); setRows(null); setPending(null); setResult(null);
-    setResolved(new Set()); setPage(1); setFilter("all"); setBusy(false); setError(null);
+    setBulkRows(null); setSelected({}); setConfirmedMatches(new Set()); setResolved(new Set());
+    setPage(1); setFilter("all"); setBusy(false); setSelectingAll(false); setError(null);
     if (!openedOnce || !session || !storageKey) return;
     const saved = readJobId(storageKey);
     if (saved) setJobId(saved);
@@ -124,6 +134,7 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
         if (cause instanceof ApiError && cause.status === 404) {
           rememberJobId(storageKey!, null);
           setJobId(null); setJob(null);
+          setBulkRows(null); setSelected({}); setConfirmedMatches(new Set()); setResolved(new Set());
           setError(text("这次预览已失效，请重新扫描。", "This preview expired. Start a new scan."));
         } else {
           fail(cause);
@@ -140,7 +151,7 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
 
   const jobState = job?.state;
   useEffect(() => {
-    setRows(null); setSelected({}); setConfirmedMatches(new Set());
+    setRows(null);
     if (!session || !jobId || !jobState || jobState === "running" || jobState === "queued") return;
     let live = true;
     const query = new URLSearchParams({ page: String(page) });
@@ -148,7 +159,10 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
     void requestJson<Rows>(session, `${root}/${jobId}/rows?${query}`).then(next => {
       if (!live) return;
       setRows(next);
-      setSelected(Object.fromEntries(next.items.map(row => [row.id, defaultCatalogSelection(row)])));
+      setSelected(previous => ({
+        ...Object.fromEntries(next.items.map(row => [row.id, defaultCatalogSelection(row)])),
+        ...previous,
+      }));
     }).catch(cause => { if (live) fail(cause); });
     return () => { live = false; };
   }, [session, jobId, jobState, page, filter]);
@@ -163,12 +177,14 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
       const next = await postJson<CatalogJob>(session, path, body);
       if (generation !== epoch.current) return;
       if (kind === "clear") {
-        setJob(null); setJobId(null); setRows(null); setResult(null); setResolved(new Set());
+        setJob(null); setJobId(null); setRows(null); setResult(null);
+        setBulkRows(null); setSelected({}); setConfirmedMatches(new Set()); setResolved(new Set());
         if (storageKey) rememberJobId(storageKey, null);
       } else if (kind === "cancel") setJob(next);
       else {
         setPage(1); setFilter("all"); setRows(null); setJob(next); setJobId(next.id);
-        setPending(null); setResult(null); setResolved(new Set());
+        setPending(null); setResult(null); setBulkRows(null);
+        if (kind === "start") { setSelected({}); setConfirmedMatches(new Set()); setResolved(new Set()); }
         if (storageKey) rememberJobId(storageKey, next.id);
       }
     } catch (cause) {
@@ -180,10 +196,40 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
     } finally { if (generation === epoch.current) setBusy(false); }
   }
 
+  async function selectAll() {
+    if (!session || !jobId || !canEdit || !job?.ready) return;
+    const generation = epoch.current;
+    setBusy(true); setSelectingAll(true); setError(null);
+    try {
+      const readyRows = bulkRows ?? [];
+      if (!bulkRows) {
+        let currentPage = 1;
+        for (;;) {
+          const next = await requestJson<Rows>(session, `${root}/${jobId}/rows?status=ready&page=${currentPage}`);
+          if (generation !== epoch.current) return;
+          readyRows.push(...next.items);
+          if (currentPage * next.page_size >= next.total) break;
+          currentPage++;
+        }
+      }
+      const selectable = readyRows.filter(row => !resolved.has(row.id) && canSelectCatalogRow(row, confirmedMatches));
+      const allOptions = Object.fromEntries(selectable.map(row => [row.id, catalogOptions(row).map(option => option.id)]));
+      setBulkRows(readyRows);
+      setSelected(previous => ({ ...previous, ...allOptions }));
+    } catch (cause) {
+      if (generation === epoch.current) fail(cause);
+    } finally {
+      if (generation === epoch.current) { setBusy(false); setSelectingAll(false); }
+    }
+  }
+
+  function clearSelection() {
+    const cleared = Object.fromEntries(selectionRows.map(row => [row.id, []]));
+    setSelected(previous => ({ ...previous, ...cleared }));
+  }
+
   function requestApply() {
-    const items = pending ?? buildCatalogSelections(
-      (rows?.items ?? []).filter(row => !resolved.has(row.id)), selected, confirmedMatches, createRequestId,
-    );
+    const items = pending ?? buildCatalogSelections(selectionRows, selected, confirmedMatches, createRequestId);
     if (!items.length) return;
     setConfirmItems(items);
     dialog.current?.showModal();
@@ -194,20 +240,37 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
     const generation = epoch.current;
     dialog.current?.close();
     setBusy(true); setPending(items); setError(null);
+    const completed: ApplyResult["items"] = [];
+    const retry: CatalogSelection[] = [];
+    let index = 0;
     try {
-      const next = await postJson<ApplyResult>(session, `${root}/${jobId}/apply`, { items });
-      if (generation !== epoch.current) return;
-      setResult(next);
-      const failed = new Set(next.items.filter(item => item.status === "failed").map(item => item.component_id));
-      const retry = items.filter(item => failed.has(item.component_id));
-      setPending(retry.length ? retry : null);
-      setResolved(previous => new Set([...previous, ...next.items.filter(item => item.status !== "failed").map(item => item.component_id)]));
-      if (next.summary.updated > 0 || next.summary.unchanged > 0) onChanged();
+      for (; index < items.length; index += applyBatchSize) {
+        const batch = items.slice(index, index + applyBatchSize);
+        const next = await postJson<ApplyResult>(session, `${root}/${jobId}/apply`, { items: batch });
+        if (generation !== epoch.current) return;
+        completed.push(...next.items);
+        const failed = new Set(next.items.filter(item => item.status === "failed").map(item => item.component_id));
+        retry.push(...batch.filter(item => failed.has(item.component_id)));
+      }
     } catch (cause) {
       if (generation !== epoch.current) return;
       fail(cause);
-      if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500) setPending(null);
-    } finally { if (generation === epoch.current) setBusy(false); }
+      if (!(cause instanceof ApiError) || shouldRetainPending(cause.status)) retry.push(...items.slice(index));
+    } finally {
+      if (generation === epoch.current) {
+        setPending(retry.length ? retry : null);
+        setBusy(false);
+        if (completed.length) {
+          const results = new Map((pending ? result?.items ?? [] : []).map(item => [item.component_id, item]));
+          for (const item of completed) results.set(item.component_id, item);
+          const summary: ApplyResult["summary"] = { updated: 0, unchanged: 0, conflict: 0, failed: 0 };
+          for (const item of results.values()) summary[item.status] = (summary[item.status] ?? 0) + 1;
+          setResult({ items: [...results.values()], summary });
+          setResolved(previous => new Set([...previous, ...completed.filter(item => item.status !== "failed").map(item => item.component_id)]));
+          if (completed.some(item => item.status === "updated" || item.status === "unchanged")) onChanged();
+        }
+      }
+    }
   }
 
   function value(field: CatalogField, entry: unknown) {
@@ -220,12 +283,7 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
     return [`${quote.currency} ${quote.unit_price}`, minimum, queried && Number.isFinite(queried.getTime()) ? queried.toLocaleString(locale) : ""].filter(Boolean).join(" · ");
   }
 
-  const selectedCount = (rows?.items ?? []).filter(row =>
-    row.status === "ready" && !resolved.has(row.id) && selected[row.id]?.length && (row.match_source !== "mpn" || confirmedMatches.has(row.id)),
-  ).length;
   const pageCount = Math.max(1, Math.ceil((rows?.total ?? 0) / (rows?.page_size ?? 50)));
-  const scanMode = job?.scan_mode ?? (job?.mode === "missing" || job?.mode === "review" ? job.mode : undefined);
-  const fieldLevel = Boolean(scanMode || job?.language);
 
   return <Card className="min-w-0">
     <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
@@ -274,9 +332,20 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
       {result && <div role="status" className="space-y-1 break-words rounded-xl border p-3 text-sm">
         <p>{Object.entries(result.summary).map(([key, count]) => `${labels[key] ?? key} ${count}`).join(" · ")}</p>
         {result.items.filter(item => item.status === "failed" || item.status === "conflict").map(item =>
-          <p key={item.component_id}>{rows?.items.find(row => row.id === item.component_id)?.sku ?? item.component_id} · {labels[item.status]}{item.message ? ` · ${item.message}` : ""}</p>)}
+          <p key={item.component_id}>{(bulkRows ?? rows?.items)?.find(row => row.id === item.component_id)?.sku ?? item.component_id} · {labels[item.status]}{item.message ? ` · ${item.message}` : ""}</p>)}
       </div>}
       {rows && <>
+        {job && job.ready > 0 && fieldLevel && enabled && <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="min-h-11" disabled={!canEdit} onClick={() => void selectAll()}>
+              {selectingAll ? text("正在全选…", "Selecting all…") : text("全选可更新资料", "Select all available updates")}
+            </Button>
+            <Button variant="ghost" className="min-h-11" disabled={!canEdit || !selectedCount} onClick={clearSelection}>
+              {bulkRows ? text("清空选择", "Clear selection") : text("清空本页选择", "Clear this page's selection")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">{text("全选涵盖本次扫描的所有页面，包括有差异的已有资料。按厂商型号匹配的元件需先确认。", "Select all covers every page of this scan, including differences in existing data. Confirm manufacturer matches first.")}</p>
+        </div>}
         {rows.items.length === 0 && <p className="rounded-xl border border-dashed p-3 text-sm text-muted-foreground">
           {job?.total === 0 ? text("这个账户没有有效库存。请核对当前账户和客户端同步状态。", "There are no active items in this account. Check the account and device sync.") : text("此筛选下没有结果。", "No items match this filter.")}
         </p>}
@@ -330,10 +399,10 @@ export function CatalogMetadataPanel({ enabled, onChanged }: { enabled: boolean;
           </div>
         </div>
       </>}
-      {(rows || pending) && <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-background py-3">
-        <span className="text-sm text-muted-foreground">{text(`已选 ${pending?.length ?? selectedCount} 项`, `${pending?.length ?? selectedCount} selected`)}</span>
+      {(rows || bulkRows || pending) && <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t bg-background py-3">
+        <span className="text-sm text-muted-foreground" aria-live="polite">{text(`已选 ${pending?.length ?? selectedCount} 项`, `${pending?.length ?? selectedCount} selected`)}</span>
         <Button className="min-h-11 whitespace-normal" disabled={!enabled || !fieldLevel || busy || (!pending && !selectedCount)} onClick={requestApply}>
-          {pending ? text("重试原请求", "Retry original request") : text("应用本页所选", "Apply selected on this page")}
+          {pending ? (busy ? text("正在应用…", "Applying…") : text("重试未完成项", "Retry incomplete items")) : bulkRows ? text("应用所选", "Apply selected") : text("应用本页所选", "Apply selected on this page")}
         </Button>
       </div>}
       <dialog ref={dialog} aria-labelledby={`${id}-confirm`} onClose={() => setConfirmItems([])}
