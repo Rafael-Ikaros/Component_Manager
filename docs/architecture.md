@@ -318,7 +318,10 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   spaced label formats, and shows alternatives when a label has multiple codes.
   Only the selected model goes to the existing catalog search. Exact model
   matches can enrich the draft after selection, while a catalog miss leaves
-  the label details editable. Printed pack quantity is a hint and the actual
+  the label details editable. The reel review compares recognized brand,
+  package and passive specifications to catalog fields in equivalent units.
+  Differences require a separate confirmation. Missing or unparseable values
+  are shown as unverified. Printed pack quantity is a hint and the actual
   inbound quantity must be entered separately.
 - Package QR scanning runs through an in-app CameraX surface backed by the
   bundled ML Kit Barcode Scanning API, so first use does not depend on Google

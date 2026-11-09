@@ -50,10 +50,14 @@ import com.componentvault.android.data.ImportLookupRequestGate
 import com.componentvault.android.data.LcscDomesticProduct
 import com.componentvault.android.data.LcscPublicCatalog
 import com.componentvault.android.data.LcscDomesticCatalog
+import com.componentvault.android.data.ReelCatalogConflict
 import com.componentvault.android.data.ReelLabel
 import com.componentvault.android.data.ReelLabelParser
 import com.componentvault.android.data.ocr.OcrEngineFactory
 import com.componentvault.android.data.ocr.OcrResult
+import com.componentvault.android.data.reelCatalogParameters
+import com.componentvault.android.data.reelParameterKind
+import com.componentvault.android.data.reviewReelCatalog
 import com.componentvault.android.model.AppPreferences
 import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.ComponentImportCandidate
@@ -65,7 +69,6 @@ import com.componentvault.android.model.LocalComponentSku
 import com.componentvault.android.model.StorageLocationRecord
 import com.componentvault.android.model.SyncConfiguration
 import com.componentvault.android.model.isJlcSource
-import com.componentvault.android.model.officialParameterKind
 import com.componentvault.android.model.referenceDisplayName
 import com.componentvault.android.model.withOfficialMetadata
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +85,8 @@ private enum class ImportScannerMode {
     Qr,
     SupplierText,
 }
+
+private data class PendingReelCatalogChoice(val product: LcscDomesticProduct, val conflicts: List<ReelCatalogConflict>)
 
 @Composable
 internal fun JlcImportSurface(
@@ -113,6 +118,7 @@ internal fun JlcImportSurface(
     var domesticSearchIsError by remember { mutableStateOf(false) }
     var domesticSearchJob by remember { mutableStateOf<Job?>(null) }
     var reelLabel by remember { mutableStateOf<ReelLabel?>(null) }
+    var pendingReelCatalogChoice by remember { mutableStateOf<PendingReelCatalogChoice?>(null) }
     var photoOcrText by remember { mutableStateOf("") }
     var showPhotoText by remember { mutableStateOf(false) }
     var photoRecognitionInProgress by remember { mutableStateOf(false) }
@@ -238,6 +244,7 @@ internal fun JlcImportSurface(
         domesticSearchJob?.cancel()
         domesticSearchJob = null
         domesticResults = emptyList()
+        pendingReelCatalogChoice = null
         domesticSearchMessage = null
         domesticSearchInProgress = false
         domesticSearchIsError = false
@@ -272,10 +279,12 @@ internal fun JlcImportSurface(
         } else {
             photo.candidate(product.metadata.model, context.getString(R.string.import_reel_source))
         }
-        val metadata = product.metadata
-        val catalogParameterKinds = metadata.parameters.keys.mapNotNull(::officialParameterKind).toSet()
+        val metadata = if (photo == null) product.metadata else {
+            product.metadata.copy(parameters = reelCatalogParameters(product.metadata.parameters))
+        }
+        val catalogParameterKinds = metadata.parameters.keys.mapNotNull(::reelParameterKind).toSet()
         val catalogCandidate = if (photo == null) source.withOfficialMetadata(metadata) else {
-            val localNotes = photo.parameters.filterKeys { officialParameterKind(it) !in catalogParameterKinds }
+            val localNotes = photo.parameters.filterKeys { reelParameterKind(it) !in catalogParameterKinds }
                 .map { (key, value) -> "参数：$key：$value" }
             source.copy(
                 packageName = if (metadata.packageName.isNullOrBlank()) source.packageName else "",
@@ -735,10 +744,13 @@ internal fun JlcImportSurface(
                 }
                 domesticResults.forEach { product ->
                     val metadata = product.metadata
+                    val review = remember(reelLabel, metadata) { reelLabel?.let { reviewReelCatalog(it, metadata) } }
+                    val conflicts = review?.conflicts.orEmpty()
                     SectionPane(
                         title = listOfNotNull(metadata.sku, metadata.model).joinToString(" · "),
                         supporting = metadata.name.orEmpty(),
                     ) {
+                        review?.let { ReelCatalogReviewSummary(it) }
                         metadata.brand?.let { ValueBlock(strings.importer.vendorLabel, it) }
                         metadata.categoryPath?.let { ValueBlock(strings.common.fieldCategory, it) }
                         metadata.packageName?.let { ValueBlock(strings.common.fieldPackage, it) }
@@ -748,10 +760,16 @@ internal fun JlcImportSurface(
                         ) }
                         product.parameters.entries.take(8).forEach { (key, value) -> ValueBlock(key, value) }
                         FilledTonalButton(
-                            onClick = { applyDomesticProduct(product) },
+                            onClick = {
+                                if (conflicts.isEmpty()) applyDomesticProduct(product)
+                                else pendingReelCatalogChoice = PendingReelCatalogChoice(product, conflicts)
+                            },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.import_catalog_use_candidate))
+                            Text(stringResource(
+                                if (conflicts.isEmpty()) R.string.import_catalog_use_candidate
+                                else R.string.import_reel_review_conflicts,
+                            ))
                         }
                         metadata.officialUrl?.let { url ->
                             TextButton(onClick = { uriHandler.openUri(url) }) {
@@ -1058,6 +1076,18 @@ internal fun JlcImportSurface(
             } },
         )
     }
+    pendingReelCatalogChoice?.let { choice ->
+        ReelCatalogConflictDialog(
+            partNumber = listOfNotNull(choice.product.metadata.sku, choice.product.metadata.model).joinToString(" · "),
+            conflicts = choice.conflicts,
+            onDismiss = { pendingReelCatalogChoice = null },
+            onConfirm = {
+                pendingReelCatalogChoice = null
+                applyDomesticProduct(choice.product)
+            },
+        )
+    }
+
     if (creatingLocation) {
         AlertDialog(
             onDismissRequest = { if (!locationCreationBusy) creatingLocation = false },

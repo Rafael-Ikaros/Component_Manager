@@ -180,6 +180,7 @@ jobs:
           --tests 'com.componentvault.android.data.LcscDomesticCatalogTest'
           --tests 'com.componentvault.android.data.EasyEdaCatalogTest'
           --tests 'com.componentvault.android.data.ReelLabelParserTest'
+          --tests 'com.componentvault.android.data.ReelCatalogReviewTest'
           --tests 'com.componentvault.android.model.ReferencePriceNotesTest'
           --tests 'com.componentvault.android.data.BluetoothPrinterDiagnosticsTest'
           --tests 'com.componentvault.android.data.M1Spp*Test'
