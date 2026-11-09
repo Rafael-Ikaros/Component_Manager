@@ -159,7 +159,7 @@ Admin web is available at:
 ### Server
 
 - `API_TOKEN`: optional environment-provided administrator account key; ordinary accounts use their own keys
-- `DATABASE_PATH`: SQLite file path; Compose fixes it to `/data/component_vault.db`
+- `DATABASE_PATH`: SQLite file path; the API image defaults to `/data/component_vault.db`
 - `CONFIG_PATH`: optional override for `config.json`; defaults beside SQLite
 - `LOG_DIR`: optional application log directory; defaults to `logs` beside SQLite
 - `APP_HOST`, `APP_PORT`: host and port for direct local development; the
@@ -186,13 +186,14 @@ Admin web is available at:
   the authenticated Web page live in SQLite and override these defaults after
   the API restarts.
 
-`.env.example` groups setup-managed values before advanced LCSC, remote-rule and
-MQTT settings. Hub Compose exposes common deployment options; the optional
-updater template also sets `UPDATER_URL` / `UPDATE_TOKEN_FILE` and its fixed
-project directory. Runtime application configuration lives under `/data`, not
-in a temporary `.env` inside the container. Non-empty setup-managed environment
-values remain authoritative; preserve them on upgrade, and persist equivalent
-values before releasing an override. See [configuration priority](docker-quickstart.md#3-环境变量和网页配置的优先级).
+Hub Compose passes through the common application overrides shown in `.env.example`.
+For advanced MQTT or catalog settings, explicitly add the needed keys under
+`api.environment`, such as `IMPORT_RULES_REMOTE_URL: ${IMPORT_RULES_REMOTE_URL:-}`.
+Putting an advanced key in the host `.env` alone does not pass it to the API.
+When replacing an existing Compose file, keep any custom API environment entries
+and `/data` mounts. Use the setup page for application settings saved under `/data`.
+Non-empty setup-managed environment values remain authoritative until the override
+is removed. [Configuration priority](docker-quickstart.md#3-环境变量和网页配置的优先级)
 Persistent API state includes account SQLite files, `config.json`, each account's
 `<database-path>.photos/` directory and bounded `/data/logs/server.log` files.
 Uvicorn also writes stdout/stderr for Docker/NAS viewers. Photo files need no
@@ -666,10 +667,10 @@ See [lookup diagnostics](feedback-and-scan-diagnostics.md).
 
 MQTT is disabled by default. Configure the API environment variables
 `MQTT_ENABLED`, `MQTT_HOST`, `MQTT_PORT`, `MQTT_TLS`, `MQTT_USERNAME`,
-`MQTT_PASSWORD`, `MQTT_TOPIC_PREFIX`, and `MQTT_CLIENT_ID`; restart the API after
-changing them. Root Compose forwards these values from its environment/root
-`.env`; `server/.env` requires explicit `uvicorn --env-file .env` when running
-locally. The development script does not implicitly load that file.
+`MQTT_PASSWORD`, `MQTT_TOPIC_PREFIX`, and `MQTT_CLIENT_ID` if you need to set
+defaults by environment. For Docker, pass the keys explicitly to `api.environment`
+and recreate the API container after changes. For local source runs, use
+`uvicorn --env-file .env` to read `server/.env` explicitly.
 
 Alternatively, use the web Settings MQTT form and save. Saved SQLite settings
 override MQTT environment defaults on the next restart. The UI separates

@@ -21,6 +21,8 @@ COMPONENT_VAULT_DOCKER_CHANNEL=dev
 
 正式版普通部署可省略 `.env`。选择开发版会拉取 `dev / web-dev`。部署前可在 Docker Hub Tags 核对对应版本。需要固定版本时，在 `.env` 中用 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 指定配套的 API 和 Web 完整镜像名。首次网页配置从 `0.7.1` 开始提供。
 
+下载模板后可直接部署。SQLite、日志和配置文件使用镜像的默认路径，管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。只有启用网页更新时，才需在 `.env` 里额外填写宿主机项目目录。已有服务仅更新镜像时可继续使用原 Compose 文件。
+
 在部署目录中先启动 API：
 
 ```sh
@@ -122,7 +124,7 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 
 当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。正式使用 `latest / web-latest`，开发使用 `dev / web-dev`；新模板的 updater 与 Web 使用同一个管理镜像，通过 `command: [updater]` 启动。共享镜像需要 `0.7.9-dev.8` 或更新版本，旧正式镜像不包含此启动模式。实际发布以[Docker Hub 核对记录](dockerhub.md)和 `/health` 为准。
 
-嘉立创／立创目录查询使用公开目录，无需 OpenAPI 凭据。Android 和 Windows 直接查询，Web 库存的目录补全通过服务端查询。远程识别规则和 MQTT 等高级部署选项见 [`.env.example`](../.env.example)。
+嘉立创／立创目录查询使用公开目录，无需 OpenAPI 凭据。Android 和 Windows 直接查询，Web 库存的目录补全通过服务端查询。已有 Compose 若通过环境变量配置了 MQTT、远程识别规则或目录查询选项，采用新模板时需保留原 `api.environment` 中对应的行。[高级配置](runbook.md#environment-variables)
 
 `VITE_DEFAULT_API_BASE_URL` 只在从源码构建 Web 镜像时生效。Hub 预构建 Web 镜像不会因运行时 `.env` 中这个值改变而重新打包。
 

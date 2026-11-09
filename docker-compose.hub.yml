@@ -9,25 +9,13 @@ services:
     ports:
       - "8787:8787"
     environment:
+      # Optional overrides for existing deployments. Set up new installations in /setup.
       API_TOKEN: ${API_TOKEN:-}
-      DATABASE_PATH: /data/component_vault.db
       CONFIG_PATH: ${CONFIG_PATH:-}
       LOG_DIR: ${LOG_DIR:-}
       ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
       ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
       WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
-      MQTT_ENABLED: ${MQTT_ENABLED:-false}
-      MQTT_HOST: ${MQTT_HOST:-}
-      MQTT_PORT: ${MQTT_PORT:-1883}
-      MQTT_TLS: ${MQTT_TLS:-false}
-      MQTT_USERNAME: ${MQTT_USERNAME:-}
-      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
-      MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-component-vault}
-      MQTT_CLIENT_ID: ${MQTT_CLIENT_ID:-component-vault-server}
-      LCSC_LOOKUP_CACHE_TTL_SECONDS: ${LCSC_LOOKUP_CACHE_TTL_SECONDS:-43200}
-      IMPORT_RULES_REMOTE_URL: ${IMPORT_RULES_REMOTE_URL:-}
-      IMPORT_RULES_REFRESH_HOURS: ${IMPORT_RULES_REFRESH_HOURS:-24}
-      ENABLE_WEB_FALLBACK_RESOLVERS: ${ENABLE_WEB_FALLBACK_RESOLVERS:-false}
     volumes:
       - component_vault_data:/data
     restart: unless-stopped

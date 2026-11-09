@@ -13,6 +13,12 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILES = (ROOT / "docker-compose.yml", ROOT / "docker-compose.hub.yml")
 ENV_KEYS = ("API_TOKEN", "ADMIN_WEB_ORIGINS", "WEB_INVENTORY_ENABLED")
+API_DEFAULTS = (
+    "DATABASE_PATH", "APP_HOST", "APP_PORT", "MQTT_ENABLED", "MQTT_HOST", "MQTT_PORT",
+    "MQTT_TLS", "MQTT_USERNAME", "MQTT_PASSWORD", "MQTT_TOPIC_PREFIX", "MQTT_CLIENT_ID",
+    "LCSC_LOOKUP_CACHE_TTL_SECONDS", "IMPORT_RULES_REMOTE_URL", "IMPORT_RULES_REFRESH_HOURS",
+    "ENABLE_WEB_FALLBACK_RESOLVERS",
+)
 IMAGE_ENV_KEYS = (
     "COMPONENT_VAULT_DOCKER_CHANNEL", "COMPONENT_VAULT_IMAGE", "COMPONENT_VAULT_WEB_IMAGE",
     "COMPONENT_VAULT_UPDATER_IMAGE", "COMPONENT_VAULT_DEPLOY_DIR", "COMPOSE_PROJECT_NAME",
@@ -20,10 +26,12 @@ IMAGE_ENV_KEYS = (
 
 
 def render(compose_file: Path, env_file: str, overrides: dict[str, str] | None = None,
-           extra_files: tuple[Path, ...] = ()) -> dict:
+           extra_files: tuple[Path, ...] = (), project_name: str | None = None) -> dict:
     command = [
         "docker", "compose", "--profile", "*", "--env-file", env_file,
     ]
+    if project_name is not None:
+        command.extend(("--project-name", project_name))
     for path in (compose_file, *extra_files):
         command.extend(("-f", str(path)))
     command.extend(("config", "--format", "json"))
@@ -59,11 +67,14 @@ def main() -> None:
             api_override = overridden["services"]["api"]
             empty_environment = api_empty["environment"]
             override_environment = api_override["environment"]
-            for key in (*ENV_KEYS, "DATABASE_PATH"):
+            for key in ENV_KEYS:
                 assert key in empty_environment, (
                     f"{compose_file.name} api environment is missing {key}"
                 )
             assert all(empty_environment[key] in (None, "") for key in ENV_KEYS)
+            assert not (empty_environment.keys() & set(API_DEFAULTS)), (
+                f"{compose_file.name} should leave standard and advanced defaults to the image"
+            )
             assert override_environment["API_TOKEN"] == "compose-ci-token"
             assert override_environment["ADMIN_WEB_ORIGINS"] == "http://localhost:8081"
             assert override_environment["WEB_INVENTORY_ENABLED"] in (True, "true")
@@ -93,12 +104,12 @@ def main() -> None:
                 assert pinned["services"]["admin-web"]["image"] == "example/inventory:web-0.7.9"
                 managed = render(compose_file, os.devnull, {
                     "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
-                    "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, (ROOT / "docker-compose.watchtower.yml", ROOT / "docker-compose.web-update.yml"))
+                }, (ROOT / "docker-compose.watchtower.yml", ROOT / "docker-compose.web-update.yml"),
+                    project_name="component-vault-compose-ci")
                 services = managed["services"]
                 assert services["api"]["environment"]["UPDATER_URL"] == "http://updater:8790"
-                assert services["api"]["environment"]["UPDATE_TOKEN_FILE"] == "/data/.updater-token"
+                assert "UPDATE_TOKEN_FILE" not in services["api"]["environment"]
                 for service in ("api", "admin-web"):
                     assert services[service]["labels"]["com.centurylinklabs.watchtower.enable"] == "false"
                     assert not any(volume["target"] == "/var/run/docker.sock" for volume in services[service].get("volumes", []))
@@ -107,7 +118,7 @@ def main() -> None:
                 assert updater["image"] == services["admin-web"]["image"]
                 assert updater["command"] == ["updater"]
                 assert updater["environment"]["UPDATE_PROJECT_NAME"] == "component-vault-compose-ci"
-                assert updater["environment"]["UPDATE_TOKEN_FILE"] == "/data/.updater-token"
+                assert "UPDATE_TOKEN_FILE" not in updater["environment"]
                 assert any(volume["target"] == "/data" and volume.get("read_only") for volume in updater["volumes"])
                 assert any(volume["target"] == "/var/run/docker.sock" for volume in updater["volumes"])
                 assert any(volume["target"] == str(ROOT) and volume["source"] == str(ROOT) for volume in updater["volumes"])
@@ -116,14 +127,12 @@ def main() -> None:
                 # by default; the remaining services must render identically.
                 single = render(ROOT / "docker-compose.hub-web-update.yml", os.devnull, {
                     "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
-                    "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                })
+                }, project_name="component-vault-compose-ci")
                 combined = render(compose_file, os.devnull, {
                     "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
-                    "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, (ROOT / "docker-compose.web-update.yml",))
+                }, (ROOT / "docker-compose.web-update.yml",), project_name="component-vault-compose-ci")
                 combined["services"]["admin-web"].pop("profiles", None)
                 assert single == combined, "Single-file Web updater deployment drifted from the base and override."
                 # Explicit Web pins must also select the updater image, even if

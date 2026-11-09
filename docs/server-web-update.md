@@ -77,21 +77,20 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    如果要使用宿主目录保存数据，先建好其中的 `data/` 子目录。将完整模板放入项目目录，
    在 Container Manager 创建项目时选择同一目录并导入模板。**已有项目**应在原目录修改原项目，
    先备份整个 API `/data`，记录原项目名、端口、数据来源和原 Compose 文件。
-2. 在构建项目之前，把名为 `.env` 的实际文件放到所选项目目录，与 Compose 文件并列。
-   新建项目使用下面三行，替换示例项目名与绝对路径；已有项目在原 `.env` 中添加或修改这三项，保留其它配置：
+2. 在部署目录中放置 `.env`。新建 dev 项目填写目录和渠道，已有项目在原 `.env` 上修改：
 
    ```dotenv
-   COMPOSE_PROJECT_NAME=component-vault
    COMPONENT_VAULT_DEPLOY_DIR=/volume1/docker/component-vault
    COMPONENT_VAULT_DOCKER_CHANNEL=dev
    ```
 
-   `COMPOSE_PROJECT_NAME` 应与 Container Manager 项目名一致。兼容的正式版可省略渠道行，默认使用 `latest / web-latest`。
+   群晖使用 Container Manager 中的项目名，命令行使用 `docker compose -p 原项目名`。旧 `.env` 中已有相同的 `COMPOSE_PROJECT_NAME` 可以保留。
+   兼容的正式版可省略渠道行，默认使用 `latest / web-latest`。
    现有 `COMPONENT_VAULT_IMAGE`、`COMPONENT_VAULT_WEB_IMAGE` 非空时优先于渠道，应清空或指定配套的兼容版本。
    Web 和 updater 均使用 `web-dev`，固定版本时均由 `COMPONENT_VAULT_WEB_IMAGE` 指定。
    新模板不再读取 `COMPONENT_VAULT_UPDATER_IMAGE`，旧 `.env` 中此项可移除。
 3. 使用 [`docker-compose.hub-web-update.yml`](../docker-compose.hub-web-update.yml) 的配置。
-   已有项目沿用原文件名、端口、API 数据来源及其它自定义设置。
+   已有项目沿用原文件名、端口、API 数据来源及其它自定义设置。MQTT 或目录查询曾使用环境变量时，保留原 `api.environment` 中相应的条目。
    完整模板默认同时启动 Web，不用再开启 `web` profile，也不用手动合并三套服务。
    **现有部署的端口、数据卷或自定义网络与模板不一致时，不要直接覆盖这些部分。**
    对已经深度定制的项目，也可继续只合并 `docker-compose.web-update.yml` 中的更新服务配置。
@@ -107,8 +106,8 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 
    模板默认使用 named volume `component_vault_data`。若新建项目选择宿主 `data/`，
    或现有 API 已使用 `/volume1/docker/component-vault/data:/data`，updater 也应使用同一来源并加 `:ro`，
-   不能另挂一个空 named volume。API/updater 的 `UPDATE_TOKEN_FILE` 均为
-   `/data/.updater-token`，由 API 自动创建，**不需手动填写或复制密钥**。
+   不能另挂一个空 named volume。默认数据库布局下，API 自动创建 `/data/.updater-token`，updater 从同一数据卷读取。
+   已定制数据库或令牌路径的项目继续在 API 和 updater 保留同一个 `UPDATE_TOKEN_FILE`。无需手动填写或复制密钥。
 5. updater 必须加入 API 所在的同一网络；默认 Hub 的 default network 已满足。
    自定义网络的部署在 updater 也声明该网络，保留 `api` / `admin-web` 服务名。
    原部署目录以外若还有 Compose override、env/config 文件，需以相同绝对路径映射到 updater。
