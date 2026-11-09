@@ -26,8 +26,6 @@ def _client(tmp_path: Path, monkeypatch) -> TestClient:
     monkeypatch.setenv("LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("MQTT_ENABLED", "false")
     monkeypatch.setenv("WEB_INVENTORY_ENABLED", "true")
-    monkeypatch.setenv("LCSC_OPENAPI_KEY", "")
-    monkeypatch.setenv("LCSC_OPENAPI_SECRET", "")
     get_settings.cache_clear()
     return TestClient(create_app())
 

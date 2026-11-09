@@ -398,9 +398,8 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   also treats supplier `vendor` fields as a `brand` fallback and rejects
   model-like tokens when persisting learned names. User edits in the import
   confirmation form remain authoritative.
-- Android keeps a local cache for repeated public lookups. Server lookup routes
-  remain compatibility endpoints for older clients when credentials are available;
-  they are no longer part of the normal Android import flow.
+- Android keeps a local cache for repeated public lookups. It can also request
+  optional recognition assistance from the bound server via `/admin-api/part-lookup`.
 - Android build verification completed successfully on `2026-05-08` on the
   current host machine after local SDK and JDK configuration. The current
   Android build baseline is AGP `8.10.1`, Gradle wrapper `8.11.1`, Java 17
@@ -527,15 +526,15 @@ from server/MQTT payloads and inventory Excel exports. See
   MQTT configuration GET/POST at `/admin-api/mqtt/config`.
 - The server exposes `GET /admin-api/part-lookup` as a token-protected
   hybrid recognition endpoint that applies bundled or refreshed rule packs
-  first and then optionally merges official LCSC metadata when credentials are
-  configured or public LCSC product-page metadata when
+  first and then optionally merges public LCSC product-page metadata when
   `ENABLE_WEB_FALLBACK_RESOLVERS=true`.
 - The server also exposes `GET /admin-api/recognition-rules/meta` and
   `POST /admin-api/recognition-rules/refresh` so operators can inspect or
   refresh the active rule pack without changing the sync schema.
 - `GET /admin-api/lcsc/lookup` remains available as a token-protected direct
-  compatibility proxy to the LCSC OpenAPI, with short in-memory response
-  caching and configurable credentials through environment variables.
+  compatibility lookup against international LCSC public pages, with in-memory
+  response caching. This explicit request is independent of the automatic
+  recognition fallback switch and does not require supplier credentials.
 - SQLite is used for a single-user self-hosted deployment.
 - Legacy incoming entities and location metadata use last-write-wins on `updated_at`;
   managed inventory uses a checked `base_updated_at` and a complete allocation snapshot.
@@ -880,7 +879,7 @@ Android 和 Windows 将官方参数保存在既有元件 `description` 的参数
 
 ## 旧库存参数维护工具
 
-Web 库存页的 `SpecEnrichmentPanel` 使用 `/admin-api/components/spec-enrichment/*`，按已认证账户预览、启动、恢复、取消和重试参数补全。服务端 `EnrichmentJobs` 逐项查询明确的 LCSC SKU；优先配置的 API，否则查询公开详情，独立于自动识别 fallback 开关。仅保存官方明确参数及描述，不改名称、数量、库位或流水。
+Web 库存页的 `SpecEnrichmentPanel` 使用 `/admin-api/components/spec-enrichment/*`，按已认证账户预览、启动、恢复、取消和重试参数补全。服务端 `EnrichmentJobs` 逐项从国际 LCSC 公开商品详情精确匹配 SKU，独立于自动识别回退开关。仅保存官方明确参数及描述，不改名称、数量、库位或流水。
 
 查询不持有写事务；回写以 updated_at/SKU/删除状态复核，复用 `save_sync_payload_in_transaction` 和原有账户同步 revision，因此原生客户端可通过增量同步获取。任务进度为进程内状态，每账户只保留最近完成任务及活动任务，提供清除入口；重启不自动重跑，已完成资料持久化，其余由候选重新选择。完整行为和部署边界见[旧库存参数补全](parameter-enrichment.md)。
 

@@ -357,11 +357,10 @@ state rather than promising a stored response snapshot.
 
 Looks up hybrid recognition metadata for JLC/LCSC imports and other supplier
 payloads. The server first applies bundled or refreshed rule-pack matches using
-`sku`, `mpn`, `name`, `brand`, `package_hint`, and `source_type`. If LCSC
-credentials are configured and the request includes `sku`, `mpn`, or `name`,
-the server may then merge official supplier metadata on top of the local-rule
-match. When `ENABLE_WEB_FALLBACK_RESOLVERS=true`, the same endpoint can also
-fall back to public LCSC product pages if OpenAPI credentials are unavailable.
+`sku`, `mpn`, `name`, `brand`, `package_hint`, and `source_type`. When
+`ENABLE_WEB_FALLBACK_RESOLVERS=true` and the request includes `sku`, `mpn`,
+or `name`, the server may merge metadata from international LCSC public pages.
+If the public request fails, the rule result still applies.
 
 Canonical `name` should be treated as unresolved when blank. Clients should not
 silently replace it with `mpn` or `sku`; those remain reference fields until
@@ -403,11 +402,9 @@ Typical success response from bundled rules only:
 }
 ```
 
-If official supplier credentials are configured, the `source` field may become
-`lcsc_openapi+local_rules`. If public-web fallback is enabled instead, the
-`source` field may become `lcsc_public_web+local_rules`. In both cases the
-response can fill `name`, `brand`, or `category_path` while keeping local
-package or family inference.
+If public-web fallback is enabled and both sources match, the `source` field
+becomes `lcsc_public_web+local_rules`. The response can fill `name`, `brand`,
+or `category_path` while keeping local package or family inference.
 
 ### `GET /admin-api/recognition-rules/meta`
 
@@ -446,9 +443,10 @@ curl -X POST http://localhost:8787/admin-api/recognition-rules/refresh `
 
 ### `GET /admin-api/lcsc/lookup`
 
-Looks up official supplier metadata for JLC/LCSC parts directly. This endpoint
-is retained as a compatibility proxy when callers need the raw LCSC-focused
-result without the server's hybrid local-rule merge behavior.
+Queries international LCSC public pages directly for JLC/LCSC parts. This
+authenticated compatibility endpoint returns supplier metadata without
+merging local rules. It needs no supplier credentials and is independent of
+`ENABLE_WEB_FALLBACK_RESOLVERS`.
 
 Query parameters:
 
@@ -468,9 +466,9 @@ Typical success response:
 ```json
 {
   "found": true,
-  "source": "lcsc_openapi",
+  "source": "lcsc_public_web",
   "sku": "C30926",
-  "name": "Multilayer Ceramic Capacitors MLCC - SMD/SMT 100nF 50V 0603",
+  "name": "FH(Guangdong Fenghua Advanced Tech) 0603B104K500NT",
   "mpn": "0603B104K500NT",
   "package_name": "0603",
   "category": "Capacitor",
@@ -486,8 +484,8 @@ Typical success response:
 Failure behavior:
 
 - `422 Unprocessable Entity`: no query field was provided
-- `503 Service Unavailable`: LCSC credentials are not configured on the server
 - `502 Bad Gateway`: the upstream LCSC request failed
+- `200 OK` with `found: false`: the public lookup returned no match
 
 ## Payload Rules
 
@@ -509,8 +507,6 @@ Failure behavior:
 - `409 Conflict`: active `sku` uniqueness violation during push.
 - `422 Unprocessable Entity`: request body shape or field validation failed.
 - `502 Bad Gateway`: upstream supplier lookup or rule-refresh fetch failed.
-- `503 Service Unavailable`: LCSC credentials are not configured for the
-  compatibility lookup path.
 
 ## Native direct public lookup
 

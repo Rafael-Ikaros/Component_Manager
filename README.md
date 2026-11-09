@@ -93,6 +93,7 @@ MQTT 可把已同步的库存变化发布给 Home Assistant 或看板。
 ### 让手机、电脑和网页共用库存
 
 按照[Docker／群晖快速部署](docs/docker-quickstart.md)启动 API 与 Web。
+普通正式版部署可直接使用 Compose 默认值，开发版在 `.env` 中只需指定渠道。日常目录查询无需立创 OpenAPI 凭据。
 API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管理镜像、分别运行在两个容器中。
 首次访问 `http://服务器IP:8787/setup` 设置管理员密钥，再在管理台创建普通账户。
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。

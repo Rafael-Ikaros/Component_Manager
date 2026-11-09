@@ -9,20 +9,17 @@ API 与管理台保持前后端分离。从 `0.7.9-dev.8` 起，只构建两种�
 
 已有正式版希望升级到 dev 并在网页管理，请直接看[保留数据升级与网页配置](server-web-update.md#已有正式版先升级到-dev)。
 API/Web 可以先成对升级，应用设置随后在网页修改；要连镜像更新也放进网页，需一次启用 updater。
-新部署需要这项能力时，可直接使用[完整单文件模板](../docker-compose.hub-web-update.yml)，当前从 dev.7 或更高兼容版本开始，不必先部署基础模板再合并。
+新部署需要这项能力时，按[群晖一次性配置](server-web-update.md#群晖一次性配置)直接使用完整单文件模板。共享管理镜像需使用 `0.7.9-dev.8` 或更新兼容版本。
 
 ## 1. 准备并启动
 
-下载配套的 `docker-compose.hub.yml` 和 `.env.example`，放进固定部署目录。将 `.env.example` 复制为同目录的 `.env`。新安装保持下面的配置为空，让首次配置页面管理支持的项目：
+下载 [`docker-compose.hub.yml`](../docker-compose.hub.yml)，放进固定部署目录。正式版默认使用 `latest / web-latest`，可以直接启动。选择开发版时，在 Compose 同目录创建名为 `.env` 的文件，只需这一行：
 
 ```dotenv
-API_TOKEN=
-ADMIN_WEB_ORIGINS=
-ADMIN_WEB_URL=
-WEB_INVENTORY_ENABLED=
+COMPONENT_VAULT_DOCKER_CHANNEL=dev
 ```
 
-首次网页配置从 `0.7.1` 开始提供。Hub Compose 默认使用 API `latest` 和 Web `web-latest`；部署前在 Docker Hub Tags 核对它们当前对应的版本。需要固定版本时，在 `.env` 中将 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 分别设为已发布的同版本 API 标签与 `web-` 标签。`0.7.0` 没有首次配置页，不能用旧镜像测试这条流程。
+正式版普通部署可省略 `.env`。选择开发版会拉取 `dev / web-dev`。部署前可在 Docker Hub Tags 核对对应版本。需要固定版本时，在 `.env` 中用 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 指定配套的 API 和 Web 完整镜像名。首次网页配置从 `0.7.1` 开始提供。
 
 在部署目录中先启动 API：
 
@@ -78,7 +75,7 @@ API/Web 更新并非原子操作。更新后核对容器、`/health` 版本、�
 
 ## 2. 群晖 Container Manager 与文件映射
 
-在群晖 File Station 中建立共享目录，例如 `/volume1/docker/component-manager/`，把 Compose 和 `.env` 放在其中，再建立 `data/` 子目录。通过 Container Manager 的 **项目** 导入 Compose 时，可将 API 的 volume 改成宿主目录映射：
+在群晖 File Station 中准备项目目录，例如 `/volume1/docker/component-manager/`，将 Compose 放在其中。使用开发版时，先把上面的单行 `.env` 放进这个目录。若希望在 File Station 查看持久化文件，先创建 `data/` 子目录，再在 Container Manager 的 **项目** 中选择该目录并导入 Compose，将 API 的 volume 改成宿主目录映射：
 
 ```yaml
 services:
@@ -87,7 +84,7 @@ services:
       - /volume1/docker/component-manager/data:/data
 ```
 
-若通过 Container Manager 图形界面同时启用 Web，在项目的 Compose 编辑器中删除 `admin-web` 下的 `profiles:` 和紧随其后的 `- web` 两行，保留 `8081:80` 端口映射，然后重新部署项目。这样会启动独立的 Web 容器，API 与 Web 镜像仍分开，原有 `/data` 映射不变；只重启 API 容器不会创建 Web 服务。部署后用 `http://NAS地址:8081/` 打开管理台，以 `http://NAS地址:8787` 为 API 地址，使用同一 API Token 登录，并将 `http://NAS地址:8081` 加入 `ADMIN_WEB_ORIGINS`。
+若通过 Container Manager 图形界面同时启用 Web，在项目的 Compose 编辑器中删除 `admin-web` 下的 `profiles:` 和紧随其后的 `- web` 两行，保留 `8081:80` 端口映射，然后部署项目。先在 `http://NAS地址:8787/setup` 设置管理员密钥，将 `http://NAS地址:8081` 填入 Web 允许来源。再打开 `http://NAS地址:8081/`，以 `http://NAS地址:8787` 为 API 地址，使用刚设置的密钥登录。
 
 部署后可在 File Station 看到这些持久文件：
 
@@ -113,8 +110,8 @@ services:
 
 已有部署可继续在 `.env` 或群晖 **api 容器 → 环境变量** 中设置 `API_TOKEN`、`ADMIN_WEB_ORIGINS`、`ADMIN_WEB_URL` 和 `WEB_INVENTORY_ENABLED`。非空环境变量优先于 `/data/config.json`；被环境变量接管的值不能在网页中修改。若希望网页管理某一项，应清空对应环境变量并执行 `up -d` 重建容器，仅执行 `restart` 不会重新读取 `.env`。
 
-解除覆盖前，先备份并确认该项现值已写入持久化配置。`config.json` 使用 `api_token`、
-`admin_web_origins`、`admin_web_url`、`web_inventory_enabled` 字段；空配置下直接移除旧 Token
+解除覆盖前，先备份并确认该项现值已写入持久化配置。`config.json` 使用 `API_TOKEN`、
+`ADMIN_WEB_ORIGINS`、`ADMIN_WEB_URL`、`WEB_INVENTORY_ENABLED` 字段；空配置下直接移除旧 Token
 可能改变生效密钥，移除旧允许来源可能令浏览器无法登录。单纯升级镜像无需清空这些值。
 MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT 环境默认值，修改后按页面提示重启 API。
 
@@ -125,7 +122,7 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 
 当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。正式使用 `latest / web-latest`，开发使用 `dev / web-dev`；新模板的 updater 与 Web 使用同一个管理镜像，通过 `command: [updater]` 启动。共享镜像需要 `0.7.9-dev.8` 或更新版本，旧正式镜像不包含此启动模式。实际发布以[Docker Hub 核对记录](dockerhub.md)和 `/health` 为准。
 
-`.env.example` 后半部分列出全部可由 Compose 传入的 LCSC、远程识别规则和 MQTT 高级选项。普通部署无需填写。Web 设置页保存的 MQTT 配置也位于 SQLite，并在 API 下次启动时优先于 MQTT 环境变量默认值。
+嘉立创／立创目录查询使用公开目录，无需 OpenAPI 凭据。Android 和 Windows 直接查询，Web 库存的目录补全通过服务端查询。远程识别规则和 MQTT 等高级部署选项见 [`.env.example`](../.env.example)。
 
 `VITE_DEFAULT_API_BASE_URL` 只在从源码构建 Web 镜像时生效。Hub 预构建 Web 镜像不会因运行时 `.env` 中这个值改变而重新打包。
 
@@ -141,12 +138,7 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 
 管理台的登录页和设置页可选择“跟随系统 / 简体中文 / English”；`/setup` 页眉也提供语言选择。选择只保存在当前浏览器的网站存储中，两个端口的网页需要分别设置，不影响其他用户或库存内容。
 
-按以下顺序检查：
-
-1. 已登录的 `http://服务器IP:8787/setup` 配置页；
-2. 部署目录 `.env`；
-3. 群晖 Container Manager 的 **api 容器 → 环境变量 → API_TOKEN**；
-4. bind mount 中的 `/data/config.json`。该文件包含秘密值，不要发到 Issue、聊天或日志中。
+在 `/setup` 保存的密钥位于容器的 `/data/config.json`，字段名是 `API_TOKEN`。如果 `/data` 映射到项目的 `data/` 子目录，可以在 File Station 打开 `data/config.json` 查看。使用 named volume 时可通过下方容器命令查看。若部署时显式设置了非空的 `API_TOKEN` 环境变量，则以该值为准，可在部署目录 `.env` 或 Container Manager 的 **api 容器 → 环境变量** 查找。请妥善保管密钥和配置文件。
 
 已经运行的 Hub Compose 部署也可在部署目录执行：
 
@@ -154,9 +146,9 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 docker compose -f docker-compose.hub.yml exec api printenv API_TOKEN
 ```
 
-源码 Compose 使用 `docker compose exec api printenv API_TOKEN`。命令只会显示环境变量来源的值；若输出为空，Token 可能由 `/data/config.json` 管理，应登录配置页查看。命令会在终端显示秘密值，注意终端历史、录屏和旁观者。粘贴到客户端时只复制值，不包含 `API_TOKEN=`。
+源码 Compose 使用 `docker compose exec api printenv API_TOKEN`。这条命令只显示环境变量来源的值。粘贴到客户端时只复制值。
 
-如果忘记网页配置的 Token，可直接在 File Station 打开映射目录的 `config.json`，查看 `api_token` 字段；无需先登录网页或重置数据库。若同时有非空 `API_TOKEN` 环境变量，则以环境变量为准。高级用户也可在容器终端仅输出当前生效值：
+在容器终端查看当前生效的管理员密钥：
 
 ```sh
 docker compose -f docker-compose.hub.yml exec api python -c 'from app.config import get_settings; print(get_settings().api_token)'

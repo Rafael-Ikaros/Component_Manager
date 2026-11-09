@@ -12,11 +12,12 @@ from ..auth import require_token, require_admin
 from ..config import Settings, get_settings
 from ..build_info import BUILD_REVISION, BUILD_VERSION
 from ..database import get_db
-from ..lcsc import LookupConfigurationError, LookupRequestError, lookup_lcsc_product
 from ..part_lookup import (
+    LookupRequestError,
     RecognitionRulesRefreshError,
     get_recognition_rules_meta,
     lookup_part_metadata,
+    lookup_public_lcsc_product,
     refresh_recognition_rules,
 )
 from ..schemas import (
@@ -525,14 +526,6 @@ def get_settings_overview(
                 ),
             ),
             AdminKeyValueItem(
-                label="LCSC lookup status",
-                value=(
-                    "Configured"
-                    if settings.lcsc_openapi_key and settings.lcsc_openapi_secret
-                    else "Not configured"
-                ),
-            ),
-            AdminKeyValueItem(
                 label="Recognition rules remote URL",
                 value=settings.import_rules_remote_url or "Not configured",
             ),
@@ -641,17 +634,12 @@ def get_lcsc_lookup(
         )
 
     try:
-        return lookup_lcsc_product(
+        return lookup_public_lcsc_product(
             settings=settings,
             sku=sku,
             mpn=mpn,
             name=name,
         )
-    except LookupConfigurationError as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(error),
-        ) from error
     except LookupRequestError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

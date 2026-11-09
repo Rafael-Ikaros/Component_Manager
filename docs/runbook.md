@@ -169,21 +169,15 @@ Admin web is available at:
 - `ADMIN_WEB_URL`: optional absolute HTTP(S) URL of the deployed Web console,
   including its path. Non-empty values override the setup page setting; an empty
   value leaves it editable in `/setup` and Web console Settings.
-- `LCSC_OPENAPI_KEY`: optional LCSC OpenAPI key used by
-  `/admin-api/lcsc/lookup`
-- `LCSC_OPENAPI_SECRET`: optional LCSC OpenAPI secret used by
-  `/admin-api/lcsc/lookup`
-- `LCSC_OPENAPI_BASE_URL`: optional LCSC OpenAPI base URL, default
-  `https://ips.lcsc.com`
-- `LCSC_LOOKUP_CACHE_TTL_SECONDS`: server-side in-memory cache TTL for official
-  lookup responses, default `43200`
+- `LCSC_LOOKUP_CACHE_TTL_SECONDS`: server-side in-memory cache TTL for public
+  LCSC lookup responses, default `43200`
 - `IMPORT_RULES_REMOTE_URL`: optional JSON URL used to refresh the server-side
   recognition rule pack consumed by `/admin-api/part-lookup`
 - `IMPORT_RULES_REFRESH_HOURS`: refresh age threshold for the cached rule pack,
   default `24`
 - `ENABLE_WEB_FALLBACK_RESOLVERS`: enables public LCSC product-page fallback
-  for `/admin-api/part-lookup` when OpenAPI credentials are unavailable,
-  default `false`
+  for `/admin-api/part-lookup`, default `false`. Explicit compatibility
+  queries and inventory specification enrichment do not depend on this switch.
 - `WEB_INVENTORY_ENABLED`: enables authenticated Web inventory writes, default
   `false`
 - `MQTT_ENABLED`, `MQTT_HOST`, `MQTT_PORT`, `MQTT_TLS`, `MQTT_USERNAME`,
@@ -665,7 +659,7 @@ international sources. There is no automatic cross-region fallback or Cookie
 requirement. Exact-SKU queries must match the returned C code; a site/network
 failure is different from QR decode or payload parsing failure. Retry, inspect
 the optional redacted diagnostics, or edit the form manually. Native lookup is
-independent of the sync token and optional legacy backend OpenAPI credentials.
+independent of the sync token and needs no supplier credentials.
 See [lookup diagnostics](feedback-and-scan-diagnostics.md).
 
 ### MQTT inventory subscriptions

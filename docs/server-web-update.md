@@ -73,30 +73,30 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 无法通过普通网页请求给自己补上挂载。无需开放群晖 SSH，也不需填写 Docker Hub 密钥。
 新部署可直接采用完整模板，从一开始就启用；已有部署需在原项目保存并重新部署一次。
 
-1. 备份整个 API `/data`，记录原项目名、端口、数据来源和原 Compose 文件。保留各账户数据库、
-   配置、照片及日志。不要新建同名仓库的数据卷，也不要删除旧卷。
-2. 从对应版本源码包取得 `docker-compose.hub-web-update.yml`。
-   在 File Station 打开**原项目目录**，保留原 `.env`；没有 `.env` 时创建它。
-3. `.env` 加入下面设置，目录与项目名替换为自己的值；其它值保留：
+1. **新建项目**时，在 File Station 准备固定项目目录，例如 `/volume1/docker/component-vault`。
+   如果要使用宿主目录保存数据，先建好其中的 `data/` 子目录。将完整模板放入项目目录，
+   在 Container Manager 创建项目时选择同一目录并导入模板。**已有项目**应在原目录修改原项目，
+   先备份整个 API `/data`，记录原项目名、端口、数据来源和原 Compose 文件。
+2. 在构建项目之前，把名为 `.env` 的实际文件放到所选项目目录，与 Compose 文件并列。
+   新建项目使用下面三行，替换示例项目名与绝对路径；已有项目在原 `.env` 中添加或修改这三项，保留其它配置：
 
    ```dotenv
-   COMPOSE_PROJECT_NAME=原项目名
+   COMPOSE_PROJECT_NAME=component-vault
    COMPONENT_VAULT_DEPLOY_DIR=/volume1/docker/component-vault
    COMPONENT_VAULT_DOCKER_CHANNEL=dev
-   COMPONENT_VAULT_IMAGE=
-   COMPONENT_VAULT_WEB_IMAGE=
    ```
 
-   原完整镜像覆盖非空时优先于渠道键，应清空或指定配套的支持版本。
+   `COMPOSE_PROJECT_NAME` 应与 Container Manager 项目名一致。兼容的正式版可省略渠道行，默认使用 `latest / web-latest`。
+   现有 `COMPONENT_VAULT_IMAGE`、`COMPONENT_VAULT_WEB_IMAGE` 非空时优先于渠道，应清空或指定配套的兼容版本。
    Web 和 updater 均使用 `web-dev`，固定版本时均由 `COMPONENT_VAULT_WEB_IMAGE` 指定。
    新模板不再读取 `COMPONENT_VAULT_UPDATER_IMAGE`，旧 `.env` 中此项可移除。
-4. 在 Container Manager 的**原项目**中编辑 Compose，使用完整的 `docker-compose.hub-web-update.yml` 内容，
-   按原配置保留端口、API 数据来源及其它自定义设置，再保存为该项目原本使用的文件名。
+3. 使用 [`docker-compose.hub-web-update.yml`](../docker-compose.hub-web-update.yml) 的配置。
+   已有项目沿用原文件名、端口、API 数据来源及其它自定义设置。
    完整模板默认同时启动 Web，不用再开启 `web` profile，也不用手动合并三套服务。
    **现有部署的端口、数据卷或自定义网络与模板不一致时，不要直接覆盖这些部分。**
    对已经深度定制的项目，也可继续只合并 `docker-compose.web-update.yml` 中的更新服务配置。
    API/Web 的 `image` 应保留 Hub 模板的变量形式；写死旧镜像会令在线更新停止并提示修正。
-5. 核对四个必要映射：
+4. 核对四个必要映射：
 
    | updater 中的路径 | 来源 | 用途 |
    | --- | --- | --- |
@@ -105,20 +105,22 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    | `/state` | 独立持久卷 | 保存更新任务，API 重启不丢失进度 |
    | 原部署目录的相同绝对路径 | 例如 `/volume1/docker/component-vault` → 同路径 | 读取原 Compose 并保存渠道配置 |
 
-   示例默认 API 使用 named volume `component_vault_data`。现有 API 如果使用
-   `/volume1/docker/component-vault/data:/data`，updater 也应改为同一来源且只读，
+   模板默认使用 named volume `component_vault_data`。若新建项目选择宿主 `data/`，
+   或现有 API 已使用 `/volume1/docker/component-vault/data:/data`，updater 也应使用同一来源并加 `:ro`，
    不能另挂一个空 named volume。API/updater 的 `UPDATE_TOKEN_FILE` 均为
    `/data/.updater-token`，由 API 自动创建，**不需手动填写或复制密钥**。
-6. updater 必须加入 API 所在的同一网络；默认 Hub 的 default network 已满足。
+5. updater 必须加入 API 所在的同一网络；默认 Hub 的 default network 已满足。
    自定义网络的部署在 updater 也声明该网络，保留 `api` / `admin-web` 服务名。
    原部署目录以外若还有 Compose override、env/config 文件，需以相同绝对路径映射到 updater。
-7. 若使用 Watchtower，API/Web 的 `com.centurylinklabs.watchtower.enable` 设为 `false`，
+6. 若使用 Watchtower，API/Web 的 `com.centurylinklabs.watchtower.enable` 设为 `false`，
    避免两个更新服务同时重建；其它应用仍可沿用 Watchtower。
-8. 在 GUI 中保存、拉取新的配套镜像并重新部署原项目一次，不删除数据卷。登录 Web 管理台，管理员在关于区看到可用的
+7. 在 GUI 中保存项目，拉取配套镜像并部署。新安装先在 `http://NAS地址:8787/setup` 设置管理员密钥和 Web 允许来源，
+   应用设置写入 `/data/config.json`。登录 Web 管理台，管理员在关于区看到可用的
    “服务端更新”后，日常升级只需网页操作。
 
 Docker socket 具有主机 Docker 管理能力，仅挂载到 updater；API、Web 不挂载 socket，
 updater 不映射主机端口。实际更新接口仅管理员可调用，普通账户没有更新入口。
+updater 在后续切换时读取原 Compose 文件，并在同一目录备份和更新 `.env` 中的镜像设置。
 
 ## 从独立 Updater 镜像迁移
 

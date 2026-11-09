@@ -6,9 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.build_info import BUILD_REVISION, BUILD_VERSION
 from app.config import get_settings
-from app.lcsc import LookupConfigurationError
 from app.main import create_app
-from app.schemas import LcscLookupResponse
 
 
 def test_health_endpoint() -> None:
@@ -140,29 +138,20 @@ def test_lcsc_lookup_requires_query(tmp_path: Path, monkeypatch) -> None:
 def test_lcsc_lookup_returns_proxy_result(tmp_path: Path, monkeypatch) -> None:
     _configure_env(tmp_path, monkeypatch)
 
-    def fake_lookup_lcsc_product(**_: object) -> LcscLookupResponse:
-        return LcscLookupResponse(
-            found=True,
-            sku="C30926",
-            name="100nF Ceramic Capacitor",
-            mpn="0603B104K500NT",
-            package_name="0603",
-            category="Ceramic Capacitors",
-            category_path="Passives / Capacitors / Ceramic Capacitors",
-            brand="TDK",
-            description="100nF ±10% 50V",
-            parameters={"Capacitance": "100nF", "Voltage Rating": "50V"},
-            official_url="https://www.lcsc.com/product-detail/C30926.html",
-            matched_by="sku",
-            confidence="exact",
-        )
+    def fetch(request, timeout):
+        assert request.full_url == "https://www.lcsc.com/product-detail/C30926.html"
+        return _HtmlResponse('''
+          <script type="application/ld+json">
+            {"@type":"Product","sku":"C30926","mpn":"0603B104K500NT",
+             "packageName":"0603","description":"100nF ±10% 50V",
+             "additionalProperty":[{"name":"Voltage Rating","value":"50V"}]}
+          </script>
+        ''')
 
-    monkeypatch.setattr(
-        "app.admin.api.lookup_lcsc_product",
-        fake_lookup_lcsc_product,
-    )
-
+    monkeypatch.setattr("app.part_lookup.urlopen", fetch)
     with TestClient(create_app()) as client:
+        denied = client.get("/admin-api/lcsc/lookup", params={"sku": "C30926"})
+        assert denied.status_code == 401
         response = client.get(
             "/admin-api/lcsc/lookup",
             headers={"Authorization": "Bearer test-token"},
@@ -172,31 +161,47 @@ def test_lcsc_lookup_returns_proxy_result(tmp_path: Path, monkeypatch) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["found"] is True
+    assert body["source"] == "lcsc_public_web"
     assert body["package_name"] == "0603"
     assert body["matched_by"] == "sku"
     assert body["description"] == "100nF ±10% 50V"
     assert body["parameters"]["Voltage Rating"] == "50V"
 
 
-def test_lcsc_lookup_returns_configuration_error(tmp_path: Path, monkeypatch) -> None:
+def test_lcsc_lookup_reports_timeout(tmp_path: Path, monkeypatch) -> None:
     _configure_env(tmp_path, monkeypatch)
 
-    def fake_lookup_lcsc_product(**_: object) -> LcscLookupResponse:
-        raise LookupConfigurationError("LCSC lookup is not configured on this server.")
+    def fetch(request, timeout):
+        raise TimeoutError("upstream timed out")
 
-    monkeypatch.setattr(
-        "app.admin.api.lookup_lcsc_product",
-        fake_lookup_lcsc_product,
-    )
-
+    monkeypatch.setattr("app.part_lookup.urlopen", fetch)
     with TestClient(create_app()) as client:
         response = client.get(
             "/admin-api/lcsc/lookup",
             headers={"Authorization": "Bearer test-token"},
-            params={"sku": "C30926"},
+            params={"sku": "C1234"},
         )
 
-    assert response.status_code == 503
+    assert response.status_code == 502
+
+
+def test_lcsc_lookup_rejects_a_different_product(tmp_path: Path, monkeypatch) -> None:
+    _configure_env(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "app.part_lookup.urlopen",
+        lambda request, timeout: _HtmlResponse(
+            '<script type="application/ld+json">{"@type":"Product","sku":"C999","mpn":"Wrong"}</script>'
+        ),
+    )
+    with TestClient(create_app()) as client:
+        response = client.get(
+            "/admin-api/lcsc/lookup",
+            headers={"Authorization": "Bearer test-token"},
+            params={"sku": "C1234"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["found"] is False
 
 
 def test_part_lookup_requires_query(tmp_path: Path, monkeypatch) -> None:
@@ -211,7 +216,7 @@ def test_part_lookup_requires_query(tmp_path: Path, monkeypatch) -> None:
     assert response.status_code == 422
 
 
-def test_part_lookup_returns_local_rule_result_without_lcsc_credentials(
+def test_part_lookup_uses_local_rules_with_public_fallback_disabled(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -232,48 +237,6 @@ def test_part_lookup_returns_local_rule_result_without_lcsc_credentials(
     assert body["category"] == "Capacitor / MLCC"
     assert body["model_family"] == "MLCC"
     assert body["rule_version"] == "2026.05.10.2"
-
-
-def test_part_lookup_merges_lcsc_with_local_rules(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    _configure_env(tmp_path, monkeypatch)
-
-    def fake_lookup_lcsc_product(**_: object) -> LcscLookupResponse:
-        return LcscLookupResponse(
-            found=True,
-            sku="C30926",
-            name="100nF Ceramic Capacitor",
-            mpn="0603B104K500NT",
-            category="Capacitor",
-            category_path="Capacitors / Ceramic Capacitors",
-            brand="FH",
-            matched_by="sku",
-            confidence="exact",
-            cache_hit=True,
-        )
-
-    monkeypatch.setattr(
-        "app.part_lookup.lookup_lcsc_product",
-        fake_lookup_lcsc_product,
-    )
-
-    with TestClient(create_app()) as client:
-        response = client.get(
-            "/admin-api/part-lookup",
-            headers={"Authorization": "Bearer test-token"},
-            params={"sku": "C30926", "mpn": "0603B104K500NT"},
-        )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["found"] is True
-    assert body["source"] == "lcsc_openapi+local_rules"
-    assert body["package_name"] == "0603"
-    assert body["model_family"] == "MLCC"
-    assert body["confidence"] == "exact"
-    assert body["cache_hit"] is True
 
 
 def test_part_lookup_uses_public_web_fallback_when_enabled(
@@ -480,8 +443,7 @@ def _configure_env(
         "ADMIN_WEB_ORIGINS",
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8081",
     )
-    monkeypatch.setenv("LCSC_OPENAPI_KEY", "")
-    monkeypatch.setenv("LCSC_OPENAPI_SECRET", "")
+    monkeypatch.setenv("LCSC_LOOKUP_CACHE_TTL_SECONDS", "0")
     monkeypatch.setenv("IMPORT_RULES_REMOTE_URL", "")
     monkeypatch.setenv("IMPORT_RULES_REFRESH_HOURS", "24")
     monkeypatch.setenv(

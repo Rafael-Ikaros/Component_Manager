@@ -475,7 +475,7 @@ class MqttConfigurationResponse(BaseModel):
 
 class LcscLookupResponse(BaseModel):
     found: bool
-    source: str = "lcsc_openapi"
+    source: str = "lcsc_public_web"
     sku: str | None = None
     name: str | None = None
     mpn: str | None = None

@@ -8,15 +8,16 @@ import re
 from threading import Lock
 import time
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from .config import Settings
-from .lcsc import (
-    LookupConfigurationError, LookupRequestError, extract_product_parameters,
-    lookup_lcsc_product,
-)
 from .schemas import LcscLookupResponse, PartLookupResponse, RecognitionRulesMetaResponse
+
+
+class LookupRequestError(RuntimeError):
+    pass
 
 
 class RecognitionRulesRefreshError(RuntimeError):
@@ -174,32 +175,16 @@ def lookup_part_metadata(
     )
     local_result = _lookup_local_rules(rules=rules, values=values)
 
-    lcsc_result: LcscLookupResponse | None = None
-    if any((values.sku, values.mpn, values.name)):
+    if settings.enable_web_fallback_resolvers and any((values.sku, values.mpn, values.name)):
         try:
-            lcsc_result = lookup_lcsc_product(
+            web_result = lookup_public_lcsc_product(
                 settings=settings,
                 sku=values.sku,
                 mpn=values.mpn,
                 name=values.name,
             )
-        except (LookupConfigurationError, LookupRequestError):
-            lcsc_result = None
-
-    if lcsc_result is not None and lcsc_result.found:
-        return _merge_lcsc_and_local(
-            values=values,
-            lcsc_result=lcsc_result,
-            local_result=local_result,
-        )
-
-    if settings.enable_web_fallback_resolvers and any((values.sku, values.mpn, values.name)):
-        web_result = _lookup_public_web_product(
-            settings=settings,
-            sku=values.sku,
-            mpn=values.mpn,
-            name=values.name,
-        )
+        except LookupRequestError:
+            web_result = None
         if web_result is not None and web_result.found:
             return _merge_lcsc_and_local(
                 values=values,
@@ -230,21 +215,7 @@ def lookup_explicit_sku_metadata(
     normalized = _normalize_text(sku)
     if normalized is None or _build_lcsc_product_url(normalized) is None:
         raise ValueError("A valid LCSC SKU is required.")
-    try:
-        official = lookup_lcsc_product(settings=settings, sku=normalized)
-    except (LookupConfigurationError, LookupRequestError):
-        official = None
-    if official is not None and official.found and official.sku and (
-        official.sku.casefold() == normalized.casefold()
-    ) and (official.parameters or official.description):
-        return official
-    try:
-        public = _lookup_public_web_detail(normalized, "sku")
-    except Exception as error:
-        raise LookupRequestError(
-            f"Public LCSC SKU lookup failed ({type(error).__name__})."
-        ) from error
-    return public or LcscLookupResponse(found=False, source="lcsc_public_web")
+    return lookup_public_lcsc_product(settings, sku=normalized)
 
 
 def get_recognition_rules_meta(
@@ -501,17 +472,18 @@ def _merge_lcsc_and_local(
     )
 
 
-def _lookup_public_web_product(
+def lookup_public_lcsc_product(
     settings: Settings,
-    sku: str | None,
-    mpn: str | None,
-    name: str | None,
-) -> LcscLookupResponse | None:
+    sku: str | None = None,
+    mpn: str | None = None,
+    name: str | None = None,
+) -> LcscLookupResponse:
     normalized_queries = (
         ("sku", _normalize_text(sku)),
         ("mpn", _normalize_text(mpn)),
         ("name", _normalize_text(name)),
     )
+    request_error: Exception | None = None
     for matched_by, query in normalized_queries:
         if not query:
             continue
@@ -525,20 +497,21 @@ def _lookup_public_web_product(
                 response = _lookup_public_web_detail(query, matched_by)
             else:
                 response = _lookup_public_web_search(query, matched_by)
-        except Exception:
-            response = None
+        except (OSError, ValueError) as error:
+            request_error = error
+            continue
 
         if response is None or not response.found:
             continue
 
         _write_public_web_cache(settings, cache_key, response)
-        if response.sku:
-            _write_public_web_cache(settings, f"sku:{response.sku.casefold()}", response)
-        if response.mpn:
-            _write_public_web_cache(settings, f"mpn:{response.mpn.casefold()}", response)
         return response
 
-    return None
+    if request_error is not None:
+        raise LookupRequestError(
+            f"Public LCSC lookup failed ({type(request_error).__name__})."
+        ) from request_error
+    return LcscLookupResponse(found=False)
 
 
 def _lookup_public_web_detail(
@@ -548,7 +521,12 @@ def _lookup_public_web_detail(
     url = _build_lcsc_product_url(sku)
     if url is None:
         return None
-    html = _fetch_public_web_text(url)
+    try:
+        html = _fetch_public_web_text(url)
+    except HTTPError as error:
+        if error.code == 404:
+            return None
+        raise
     return _parse_public_web_lookup(
         html=html,
         source_url=url,
@@ -602,10 +580,12 @@ def _parse_public_web_lookup(
         for record in _iter_json_objects(payload)
         if _looks_like_public_product_record(record)
     ]
-    record = _select_public_product_record(records, matched_by, query)
+    record = _select_public_product_record(records, "sku" if fallback_sku else matched_by, query)
     category_path = _extract_breadcrumb_path(payloads)
 
-    sku = _lookup_record_text(record, _SKU_KEYS) or fallback_sku
+    sku = _lookup_record_text(record, _SKU_KEYS)
+    if record is None or (fallback_sku and (not sku or sku.casefold() != fallback_sku.casefold())):
+        return None
     mpn = _lookup_record_text(record, _MPN_KEYS)
     name = _lookup_record_text(record, _NAME_KEYS)
     package_name = _lookup_record_text(record, _PACKAGE_KEYS)
@@ -641,12 +621,35 @@ def _parse_public_web_lookup(
         category_path=category_path,
         brand=brand,
         description=_lookup_record_text(record, ("description", "lightProductName")) or name,
-        parameters=extract_product_parameters(record),
+        parameters=_extract_product_parameters(record),
         official_url=_build_lcsc_product_url(sku) or source_url,
         matched_by=matched_by,
         confidence=confidence,
         cache_hit=False,
     )
+
+
+def _extract_product_parameters(record: dict[str, Any]) -> dict[str, str]:
+    """Retain explicit upstream values without inferring specifications from an MPN."""
+    parameters: dict[str, str] = {}
+    for field in ("paramLinkedMap", "parameters"):
+        raw = record.get(field)
+        if isinstance(raw, dict):
+            for key, value in raw.items():
+                if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                    text = str(value).strip()
+                    if str(key).strip() and text:
+                        parameters[str(key).strip()] = text
+    properties = record.get("additionalProperty", [])
+    if isinstance(properties, list):
+        for prop in properties:
+            if not isinstance(prop, dict):
+                continue
+            key, value = prop.get("name"), prop.get("value")
+            if isinstance(key, str) and isinstance(value, (str, int, float)):
+                if key.strip() and str(value).strip():
+                    parameters.setdefault(key.strip(), str(value).strip())
+    return parameters
 
 
 def _read_public_web_cache(

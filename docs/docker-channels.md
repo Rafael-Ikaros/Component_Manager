@@ -25,7 +25,8 @@
 1. 备份整个 `/data`，包括各账户数据库、`config.json`、照片和日志。`.env` 备份不能代替数据备份；
    切回正式渠道不会撤销开发版的数据修改，也不保证旧版本可读取未来的数据库格式。
 2. 从对应版本源码包取得 `tools/deployment/switch-channel.sh`，放到部署主机。
-   原 Compose 文件及 `.env` 仍须位于原位置。群晖可通过 SSH 使用有 Docker 操作权限的账户执行。
+   原 Compose 文件及 `.env` 仍须位于原位置。普通正式版原先可省略 `.env`，首次使用切换助手前，
+   在原 Compose 项目目录创建空的 `.env` 即可。群晖可通过 SSH 使用有 Docker 操作权限的账户执行。
 3. 运行 `docker compose ls`，记下原项目名。以下以 `component-warehouse` 为例，先预览：
 
    ```sh
@@ -56,15 +57,15 @@
 ## 群晖不使用 SSH
 
 在 Container Manager 打开原项目，备份数据并记录原项目名、端口和目录。
-使用新版 `docker-compose.hub.yml`，保留 `.env` 其它配置，将下面的渠道键设为 `dev` 或 `latest`：
+使用采用渠道变量的 `docker-compose.hub.yml`。在原项目目录创建或修改 `.env`，
+保留既有应用配置，将渠道键设为 `dev` 或 `latest`：
 
 ```dotenv
 COMPONENT_VAULT_DOCKER_CHANNEL=dev
-COMPONENT_VAULT_IMAGE=
-COMPONENT_VAULT_WEB_IMAGE=
 ```
 
-完整镜像覆盖必须为空，否则它会优先于渠道键。重新下载镜像并重新构建**原项目**，沿用原挂载。
+已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，应清空，以便按渠道取镜像。
+重新下载镜像并重新构建**原项目**，沿用原挂载。
 不要新建空项目或删除数据卷。只使用单独容器而非项目时，仍需在 GUI 中为 API、Web 选择配套镜像。
 
 ## Watchtower 与版本确认

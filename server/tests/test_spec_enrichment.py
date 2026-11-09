@@ -25,8 +25,6 @@ def _client(tmp_path: Path, monkeypatch, *, enabled: bool = True) -> TestClient:
     monkeypatch.setenv("LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("MQTT_ENABLED", "false")
     monkeypatch.setenv("WEB_INVENTORY_ENABLED", str(enabled).lower())
-    monkeypatch.setenv("LCSC_OPENAPI_KEY", "")
-    monkeypatch.setenv("LCSC_OPENAPI_SECRET", "")
     monkeypatch.setenv("ENABLE_WEB_FALLBACK_RESOLVERS", "false")
     get_settings.cache_clear()
     return TestClient(create_app())
@@ -211,8 +209,6 @@ def test_enrichment_uses_public_sku_detail_with_default_lookup_settings(
     with _client(tmp_path, monkeypatch) as client:
         component = _component(client, "C888", "TAJB476K010RNJ", "old note")
         settings = get_settings()
-        assert not settings.lcsc_openapi_key
-        assert not settings.lcsc_openapi_secret
         assert not settings.enable_web_fallback_resolvers
         calls: list[str] = []
 
@@ -247,7 +243,7 @@ def test_enrichment_public_network_failure_is_retryable_failed_item(
         started = client.post(f"{BASE}/jobs", headers=HEADERS, json={})
         job = _done(client, started.json()["id"])
         assert (job["updated"], job["skipped"], job["failed"]) == (0, 0, 1)
-        assert "Public LCSC SKU lookup failed" in job["items"][0]["reason"]
+        assert "Public LCSC lookup failed" in job["items"][0]["reason"]
 
 
 def test_enrichment_gate_and_account_isolation(tmp_path: Path, monkeypatch) -> None:
