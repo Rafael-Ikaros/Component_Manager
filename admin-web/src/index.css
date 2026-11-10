@@ -22,6 +22,7 @@
     --input: 214 32% 91%;
     --ring: 198 93% 60%;
     --radius: 1rem;
+    --mobile-nav-height: calc(3.5rem + env(safe-area-inset-bottom));
   }
 
   * {
@@ -31,9 +32,18 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: "Segoe UI", Inter, "Noto Sans SC", sans-serif;
-    background-image:
-      radial-gradient(circle at top, rgba(14, 165, 233, 0.12), transparent 28%),
-      linear-gradient(180deg, #f8fbff 0%, #eef5f7 100%);
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      --mobile-nav-height: 0px;
+    }
+
+    body {
+      background-image:
+        radial-gradient(circle at top, rgba(14, 165, 233, 0.12), transparent 28%),
+        linear-gradient(180deg, #f8fbff 0%, #eef5f7 100%);
+    }
   }
 }
 

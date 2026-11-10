@@ -41,9 +41,9 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+    <div className="flex min-h-dvh items-start justify-center px-4 py-4 lg:items-center lg:py-10">
       <div className="grid w-full max-w-5xl gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-        <Card className="border-white/70 bg-white/85 backdrop-blur">
+        <Card className="hidden border-white/70 bg-white/85 backdrop-blur lg:block">
           <CardHeader>
             <div className="mb-2 flex justify-end"><LanguageSelect compact /></div>
             <div className="flex items-center gap-3">
@@ -73,14 +73,19 @@ export function LoginPage() {
 
         <Card className="border-white/70 bg-white/92">
           <CardHeader>
-            <CardTitle>{t("连接 API")}</CardTitle>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 lg:hidden">
+              <img src="/component-vault-logo.png" alt="" width={36} height={36} className="h-9 w-9 object-contain" />
+              <LanguageSelect compact />
+            </div>
+            <h1 className="text-xl font-semibold tracking-tight lg:hidden">{t("Component Vault 管理台")}</h1>
+            <h2 className="text-lg font-semibold tracking-tight">{t("连接 API")}</h2>
             <CardDescription>
               {t("验证账户密钥后，加载此账户的库存。")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form
-              className="space-y-5"
+              className="space-y-4 lg:space-y-5"
               onSubmit={async (event) => {
                 event.preventDefault();
                 setIsSubmitting(true);
@@ -112,6 +117,7 @@ export function LoginPage() {
                 </span>
                 <Input
                   autoComplete="url"
+                  inputMode="url"
                   value={apiBaseUrl}
                   onChange={(event) => setApiBaseUrl(event.target.value)}
                   placeholder="http://localhost:8787"
@@ -131,7 +137,7 @@ export function LoginPage() {
                   placeholder={t("粘贴部署时设置的 API_TOKEN")}
                 />
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => setShowToken((value) => !value)}>
+                  <Button type="button" size="sm" variant="outline" className="min-h-11 lg:min-h-0" onClick={() => setShowToken((value) => !value)}>
                     {showToken ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
                     {showToken ? t("隐藏令牌") : t("显示令牌")}
                   </Button>
@@ -139,6 +145,7 @@ export function LoginPage() {
                     type="button"
                     size="sm"
                     variant="outline"
+                    className="min-h-11 lg:min-h-0"
                     disabled={!token.trim()}
                     onClick={async () => {
                       const copied = await copyText(token);
@@ -153,8 +160,6 @@ export function LoginPage() {
                 <p className="text-xs text-muted-foreground">{t("管理员可在账户管理中创建用户并获取其密钥。")}</p>
               </label>
 
-              {serverSetupUrl(apiBaseUrl) ? <a className="block text-sm font-medium text-teal-700 underline" href={serverSetupUrl(apiBaseUrl)} target="_blank" rel="noopener noreferrer">{t("首次部署？打开服务端配置与日志")}</a> : null}
-
               {error ? (
                 <Alert variant="destructive">
                   <AlertTitle>{t("连接失败")}</AlertTitle>
@@ -162,9 +167,10 @@ export function LoginPage() {
                 </Alert>
               ) : null}
 
-              <Button className="w-full" disabled={isSubmitting} type="submit">
+              <Button className="min-h-11 w-full lg:min-h-0" disabled={isSubmitting} type="submit">
                 {isSubmitting ? t("正在验证令牌…") : t("进入管理台")}
               </Button>
+              {serverSetupUrl(apiBaseUrl) ? <a className="flex min-h-11 items-center text-sm font-medium text-teal-700 underline lg:min-h-0" href={serverSetupUrl(apiBaseUrl)} target="_blank" rel="noopener noreferrer">{t("首次部署？打开服务端配置与日志")}</a> : null}
             </form>
           </CardContent>
         </Card>

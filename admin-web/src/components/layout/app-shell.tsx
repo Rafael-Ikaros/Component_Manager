@@ -1,7 +1,7 @@
 import { useI18n } from "@/lib/i18n";
-import { ClipboardList, DatabaseZap, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck } from "lucide-react";
-import { useRef } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { ClipboardList, DatabaseZap, LayoutDashboard, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,13 @@ const navigationItems = [
 export function AppShell() {
   const { t, locale } = useI18n();
   const { identity, logout, session, logoutError } = useAuth();
-  const mobileMenu = useRef<HTMLDialogElement>(null);
+  const { pathname } = useLocation();
+  const accountDialog = useRef<HTMLDialogElement>(null);
+  const accountLabel = locale === "zh-CN" ? "当前账户" : "Current account";
+
+  useEffect(() => {
+    if (!window.matchMedia("(min-width: 1024px)").matches) window.scrollTo(0, 0);
+  }, [pathname]);
 
   return (
     <div className="min-h-screen">
@@ -62,30 +68,25 @@ export function AppShell() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 flex min-h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur lg:hidden">
-            <Button variant="ghost" className="h-11 w-11 shrink-0 p-0" aria-label={locale === "zh-CN" ? "打开导航" : "Open navigation"} onClick={() => mobileMenu.current?.showModal()}>
-              <Menu aria-hidden="true" className="h-5 w-5" />
-            </Button>
-            <span className="min-w-0 font-semibold">Component Vault</span>
-          </header>
-          <dialog ref={mobileMenu} aria-label={locale === "zh-CN" ? "导航" : "Navigation"} className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(20rem,calc(100%-2rem))] max-w-none overflow-y-auto border-r bg-background p-4 text-foreground backdrop:bg-slate-950/40">
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <span className="font-semibold">Component Vault</span>
-              <Button variant="ghost" className="min-h-11" onClick={() => mobileMenu.current?.close()}>{locale === "zh-CN" ? "关闭" : "Close"}</Button>
+          <header className="flex min-h-12 items-center justify-between border-b bg-card px-3 lg:hidden">
+            <div className="flex min-w-0 items-center gap-2">
+              <img src="/component-vault-logo.png" alt="" width={26} height={26} className="h-[26px] w-[26px] shrink-0 object-contain" />
+              <span className="truncate text-sm font-semibold">Component Vault</span>
             </div>
-            <nav className="grid gap-1">
-              {navigationItems.map(({ icon: Icon, label, to }) => (
-                <NavLink key={to} to={to} onClick={() => mobileMenu.current?.close()} className={({ isActive }) =>
-                  cn("flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium", isActive && "bg-primary text-primary-foreground")}>
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{t(label)}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="mt-5 space-y-2 border-t pt-4 text-sm">
+            <Button variant="ghost" className="h-11 w-11 shrink-0 p-0" aria-label={accountLabel} onClick={() => accountDialog.current?.showModal()}>
+              <UserRound aria-hidden="true" className="h-5 w-5" />
+            </Button>
+          </header>
+          <dialog ref={accountDialog} aria-label={accountLabel} className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-2xl border bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-foreground backdrop:bg-slate-950/40">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">{accountLabel}</h2>
+              <Button variant="ghost" className="min-h-11" onClick={() => accountDialog.current?.close()}>{locale === "zh-CN" ? "关闭" : "Close"}</Button>
+            </div>
+            <div className="mt-2 space-y-2 border-t pt-4 text-sm">
               <p className="font-medium">{t("已连接 API")}</p>
               <p className="break-all text-muted-foreground">{session?.apiBaseUrl}</p>
               {identity ? <p className="break-words">{identity.name} · {identity.role === "admin" ? t("管理员") : t("普通用户")}</p> : null}
-              <Button variant="outline" className="min-h-11" onClick={() => { mobileMenu.current?.close(); void logout(); }}>{t("退出登录")}</Button>
+              <Button variant="outline" className="min-h-11" onClick={() => { accountDialog.current?.close(); void logout(); }}>{t("退出登录")}</Button>
             </div>
           </dialog>
           <header className="sticky top-0 z-20 hidden border-b border-white/70 bg-background/75 px-6 py-4 backdrop-blur lg:block">
@@ -105,10 +106,24 @@ export function AppShell() {
             </div>
           </header>
 
-          <main className="px-4 py-5 md:px-6 md:py-6">
+          <main className="px-3 pt-4 pb-[calc(var(--mobile-nav-height)+1rem)] sm:px-5 lg:p-6">
             {logoutError ? <p role="alert" className="mb-4 text-red-700">{t("退出失败，请重试。")}{logoutError}</p> : null}
             <Outlet />
           </main>
+          <nav aria-label={locale === "zh-CN" ? "主导航" : "Main navigation"} className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+            {navigationItems.map(({ icon: Icon, label, to }) => (
+              <NavLink key={to} to={to} aria-label={t(label)} className={({ isActive }) =>
+                cn("flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[11px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring",
+                  isActive ? "text-primary" : "text-muted-foreground")}>
+                {({ isActive }) => <>
+                  <span className={cn("flex h-6 w-10 items-center justify-center rounded-lg", isActive && "bg-primary text-primary-foreground")}>
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span>{to === "/bom-presets" ? "BOM" : t(label)}</span>
+                </>}
+              </NavLink>
+            ))}
+          </nav>
         </div>
       </div>
     </div>

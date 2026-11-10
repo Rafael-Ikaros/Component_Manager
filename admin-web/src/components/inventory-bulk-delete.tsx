@@ -90,7 +90,7 @@ export function InventoryBulkDelete({ selecting, onFinishSelection, selected, di
     }
   }
 
-  return <div className={selecting || pending ? "sticky bottom-0 z-10 mt-4 space-y-2 bg-background pb-[env(safe-area-inset-bottom)]" : "mt-4 space-y-2"}>
+  return <div className={selecting || pending ? "sticky bottom-[var(--mobile-nav-height)] z-10 mt-4 space-y-2 bg-background" : "mt-4 space-y-2"}>
     {selecting || pending ? <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-slate-50 p-2.5">
       <div className="space-y-1 text-sm">
         <p aria-live="polite">{t("本页已选：")}{formatCount(selected.length, locale)}</p>

@@ -29,10 +29,10 @@ export function SyncPage() {
   );
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-2">
-        <h2 className="text-3xl font-semibold tracking-tight">{t("Sync")}</h2>
-        <p className="max-w-3xl text-sm text-slate-600">
+    <section className="space-y-4 lg:space-y-6">
+      <header className="space-y-1 lg:space-y-2">
+        <h2 className="text-2xl font-semibold tracking-tight lg:text-3xl">{t("Sync")}</h2>
+        <p className="hidden max-w-3xl text-sm text-slate-600 lg:block">
           {t("Recent stock movement activity and read-only sync posture.")}
         </p>
       </header>
@@ -41,8 +41,8 @@ export function SyncPage() {
       {error ? (
         <Alert variant="destructive">
           <AlertTitle>{t("Sync view unavailable")}</AlertTitle>
-          <AlertDescription className="flex items-center justify-between gap-4">
-            <span>{error}</span>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span className="min-w-0 [overflow-wrap:anywhere]">{error}</span>
             <Button onClick={() => void reload()} size="sm" variant="outline">
               {t("Retry")}
             </Button>
@@ -52,7 +52,7 @@ export function SyncPage() {
 
       {data ? (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
             <StatCard
               title={t("Movements")}
               value={data.metrics.movement_count}
@@ -75,11 +75,11 @@ export function SyncPage() {
             />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.45fr,0.9fr]">
+          <div className="grid gap-4 lg:gap-6 xl:grid-cols-[1.45fr,0.9fr]">
             <Card className="bg-white/90">
               <CardHeader>
                 <CardTitle>{t("Recent stock movements")}</CardTitle>
-                <CardDescription>
+                <CardDescription className="hidden lg:block">
                   {t("Latest movement activity received by the sync API.")}
                 </CardDescription>
               </CardHeader>
@@ -89,35 +89,52 @@ export function SyncPage() {
                     {t("No stock movement activity is available yet.")}
                   </p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("SKU")}</TableHead>
-                        <TableHead>{t("Component")}</TableHead>
-                        <TableHead>{t("Type")}</TableHead>
-                        <TableHead>{t("Qty")}</TableHead>
-                        <TableHead>{t("Reason")}</TableHead>
-                        <TableHead>{t("Happened")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    <ul className="divide-y lg:hidden">
                       {data.recent_movements.map((movement) => (
-                        <TableRow key={movement.id}>
-                          <TableCell className="font-medium">{movement.sku}</TableCell>
-                          <TableCell>{movement.component_name}</TableCell>
-                          <TableCell>{formatMovementType(movement.movement_type, locale)}</TableCell>
-                          <TableCell>{new Intl.NumberFormat(locale).format(movement.quantity)}</TableCell>
-                          <TableCell>{movement.reason}</TableCell>
-                          <TableCell>{formatDateTime(movement.happened_at, locale)}</TableCell>
-                        </TableRow>
+                        <li key={movement.id} className="space-y-1 py-3 text-sm first:pt-0 last:pb-0 [overflow-wrap:anywhere]">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="min-w-0 font-medium">{movement.component_name}</p>
+                            <p className="max-w-[45%] shrink-0 text-right font-medium tabular-nums">{new Intl.NumberFormat(locale).format(movement.quantity)}</p>
+                          </div>
+                          <p className="text-muted-foreground">{movement.sku} · {formatMovementType(movement.movement_type, locale)}</p>
+                          {movement.reason ? <p>{movement.reason}</p> : null}
+                          <p className="text-xs text-muted-foreground">{formatDateTime(movement.happened_at, locale)}</p>
+                        </li>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </ul>
+                    <div className="hidden lg:block">
+                      <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>{t("SKU")}</TableHead>
+                              <TableHead>{t("Component")}</TableHead>
+                              <TableHead>{t("Type")}</TableHead>
+                              <TableHead>{t("Qty")}</TableHead>
+                              <TableHead>{t("Reason")}</TableHead>
+                              <TableHead>{t("Happened")}</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {data.recent_movements.map((movement) => (
+                              <TableRow key={movement.id}>
+                                <TableCell className="font-medium">{movement.sku}</TableCell>
+                                <TableCell>{movement.component_name}</TableCell>
+                                <TableCell>{formatMovementType(movement.movement_type, locale)}</TableCell>
+                                <TableCell>{new Intl.NumberFormat(locale).format(movement.quantity)}</TableCell>
+                                <TableCell>{movement.reason}</TableCell>
+                                <TableCell>{formatDateTime(movement.happened_at, locale)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
 
-            <div className="space-y-6">
+            <div className="space-y-4 lg:space-y-6">
               <Card className="bg-white/90">
                 <CardHeader>
                   <CardTitle>{t("Sync posture")}</CardTitle>
@@ -129,7 +146,7 @@ export function SyncPage() {
                   {data.sync_assumptions.map((item) => (
                     <div
                       key={item.label}
-                      className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
+                      className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 [overflow-wrap:anywhere] lg:rounded-2xl lg:p-4"
                     >
                       <p className="text-sm font-medium text-slate-600">{translateServerText(item.label, locale)}</p>
                       <p className="mt-1 text-sm text-slate-900">{translateServerText(item.value, locale)}</p>
@@ -148,7 +165,7 @@ export function SyncPage() {
                 <CardContent>
                   <ul className="space-y-3 text-sm text-slate-700">
                     {data.attention_items.map((item) => (
-                      <li key={item} className="rounded-2xl border border-amber-100 bg-amber-50/90 p-4">
+                      <li key={item} className="rounded-xl border border-amber-100 bg-amber-50/90 p-3 [overflow-wrap:anywhere] lg:rounded-2xl lg:p-4">
                         {translateServerText(item, locale)}
                       </li>
                     ))}

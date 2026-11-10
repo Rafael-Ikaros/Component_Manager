@@ -1,4 +1,5 @@
 import { formatCount, useI18n } from "@/lib/i18n";
+import { ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -37,6 +38,7 @@ import type {
 
 export function InventoryPage() {
   const { t, locale } = useI18n();
+  const mobile = useMobileInventoryLayout();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const requestedFilter = searchParams.get("stock") ?? "all";
@@ -51,6 +53,10 @@ export function InventoryPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const searchInputId = useId();
   const stockFilterId = useId();
+  const toolsTitleId = useId();
+  const searchInput = useRef<HTMLInputElement>(null);
+  const toolsDialog = useRef<HTMLDialogElement>(null);
+  const resultsHeading = useRef<HTMLHeadingElement>(null);
   const detailHeading = useRef<HTMLHeadingElement>(null);
   const detailTrigger = useRef<HTMLButtonElement | null>(null);
   const path = useMemo(() => {
@@ -73,7 +79,7 @@ export function InventoryPage() {
   const inventoryEnabled = settings.data?.web_inventory_enabled === true;
   const locationLabel = (id: string) => {
     const location = locations.data?.find((item) => item.id === id);
-    return location ? `${location.name}（${location.id}）` : id;
+    return location?.name ?? id;
   };
 
   useEffect(() => setInput(query), [query]);
@@ -98,11 +104,11 @@ export function InventoryPage() {
   }
   useEffect(() => {
     if (!detail.data) return;
-    if (!window.matchMedia?.("(max-width: 767px)").matches) {
+    if (!mobile) {
       detailHeading.current?.scrollIntoView({ block: "start" });
     }
     detailHeading.current?.focus({ preventScroll: true });
-  }, [detail.data]);
+  }, [detail.data, mobile]);
 
   function selectComponent(event: MouseEvent<HTMLButtonElement>, id: string) {
     detailTrigger.current = event.currentTarget;
@@ -116,15 +122,47 @@ export function InventoryPage() {
 
   function submitSearch(event: FormEvent) {
     event.preventDefault();
+    if (mobile) searchInput.current?.blur();
     setSelectedId(null);
     setSearchParams(buildPageParams(input.trim(), stockFilter, 1));
   }
 
+  function changePage(nextPage: number) {
+    setSearchParams(buildPageParams(query, stockFilter, nextPage));
+    setSelectedId(null);
+    if (mobile) resultsHeading.current?.scrollIntoView({ block: "start" });
+  }
+
+  const toolsLabel = locale === "zh-CN" ? "库存工具" : "Inventory tools";
+  const tools = <>
+    <InventoryActions
+      scope="create"
+      enabled={inventoryEnabled}
+      component={null}
+      locations={locations.data ?? []}
+      onLocationsChanged={() => void locations.reload()}
+      onChanged={(value) => {
+        if (value) {
+          toolsDialog.current?.close();
+          setSelectedId(value.id);
+        }
+        void reload();
+        void detail.reload();
+      }}
+    />
+    <OrderMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
+    <CatalogMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
+    <SpecEnrichmentPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
+  </>;
+
   return (
-    <section className="space-y-6" aria-busy={loading}>
+    <section className="space-y-3 lg:space-y-6" aria-busy={loading}>
       <header className="space-y-2">
-        <h2 className="text-3xl font-semibold tracking-tight">{t("库存核对")}</h2>
-        <p className="max-w-3xl text-sm text-slate-600">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-2xl font-semibold tracking-tight lg:text-3xl">{t("库存")}</h2>
+          {settings.data?.web_inventory_enabled === false && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground lg:hidden">{locale === "zh-CN" ? "只读" : "Read only"}</span>}
+        </div>
+        <p className="hidden max-w-3xl text-sm text-slate-600 lg:block">
           {settings.data?.web_inventory_enabled === false
             ? (locale === "zh-CN" ? "当前为只读模式。需要编辑或删除时，请管理员在部署设置中启用 Web 库存操作。" : "Inventory is read-only. Ask an administrator to enable Web inventory writes in deployment settings.")
             : (locale === "zh-CN" ? "搜索当前账户的元器件，查看库存或处理出入库。" : "Search this account’s components and manage stock.")}
@@ -134,18 +172,22 @@ export function InventoryPage() {
       {settings.error ? <Alert variant="destructive"><AlertTitle>{t("无法确认库存操作开关")}</AlertTitle><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{settings.error}</span><Button variant="outline" size="sm" onClick={() => void settings.reload()}>{t("重试")}</Button></AlertDescription></Alert> : null}
       {inventoryEnabled && locations.error ? <Alert variant="destructive"><AlertTitle>{t("无法读取库位")}</AlertTitle><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{locations.error}</span><Button variant="outline" size="sm" onClick={() => void locations.reload()}>{t("重试")}</Button></AlertDescription></Alert> : null}
 
-      <Card className="bg-white/90">
-        <CardContent className="pt-6">
-          <form className="grid gap-3 md:grid-cols-[minmax(0,1fr),180px,auto]" onSubmit={submitSearch}>
-            <div className="space-y-2">
-              <label htmlFor={searchInputId} className="block text-sm font-medium">{t("料号、名称、品牌、参数或库位")}</label>
-              <Input id={searchInputId} className="min-h-11 text-base md:text-sm" value={input} onChange={(event) => setInput(event.target.value)} placeholder={t("例如 C30926、连接器或 A-01")} />
+      <div className="lg:rounded-2xl lg:border lg:bg-white/90 lg:p-5">
+        <form className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-end lg:gap-3" onSubmit={submitSearch}>
+          <div className="flex gap-2 lg:contents">
+            <div className="relative min-w-0 flex-1 lg:col-start-1 lg:row-start-1">
+              <label htmlFor={searchInputId} className="sr-only text-sm font-medium lg:not-sr-only lg:mb-2 lg:block">{t("料号、名称、品牌、参数或库位")}</label>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground lg:hidden" aria-hidden="true" />
+              <Input ref={searchInput} id={searchInputId} type="search" className="pl-9 lg:pl-3" value={input} onChange={(event) => setInput(event.target.value)} placeholder={mobile ? (locale === "zh-CN" ? "料号、名称或参数" : "SKU, name, or spec") : t("例如 C30926、连接器或 A-01")} />
             </div>
-            <div className="space-y-2">
-              <label htmlFor={stockFilterId} className="block text-sm font-medium">{t("库存状态")}</label>
+            <Button className="min-h-11 shrink-0 lg:col-start-3 lg:row-start-1" type="submit">{t("搜索")}</Button>
+          </div>
+          <div className="flex gap-2 lg:contents">
+            <div className="min-w-0 flex-1 lg:col-start-2 lg:row-start-1">
+              <label htmlFor={stockFilterId} className="sr-only text-sm font-medium lg:not-sr-only lg:mb-2 lg:block">{t("库存状态")}</label>
               <select
                 id={stockFilterId}
-                className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
+                className="min-h-11 w-full rounded-xl border border-input bg-card px-3 text-base lg:bg-background lg:text-sm"
                 value={stockFilter}
                 onChange={(event) => {
                   setSelectedId(null);
@@ -157,35 +199,24 @@ export function InventoryPage() {
                 <option value="healthy">{t("库存充足")}</option>
               </select>
             </div>
-            <Button className="min-h-11 self-end" type="submit">{t("搜索")}</Button>
-          </form>
-        </CardContent>
-      </Card>
+            <Button type="button" variant="outline" className="min-h-11 shrink-0 gap-1.5 lg:hidden" onClick={() => toolsDialog.current?.showModal()}>
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />{toolsLabel}
+            </Button>
+          </div>
+        </form>
+      </div>
 
-      <details className="rounded-xl border bg-white/90 px-4">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">
-          {locale === "zh-CN" ? "库存工具" : "Inventory tools"}
-        </summary>
-        <div className="space-y-3 pb-4">
-          <InventoryActions
-            scope="create"
-            enabled={inventoryEnabled}
-            component={null}
-            locations={locations.data ?? []}
-            onLocationsChanged={() => void locations.reload()}
-            onChanged={(value) => {
-              if (value) setSelectedId(value.id);
-              void reload();
-              void detail.reload();
-            }}
-          />
-
-          <OrderMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
-
-          <CatalogMetadataPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
-          <SpecEnrichmentPanel enabled={inventoryEnabled} onChanged={() => { void reload(); void detail.reload(); }} />
-        </div>
-      </details>
+      {mobile ? <dialog ref={toolsDialog} aria-labelledby={toolsTitleId}
+        className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto overscroll-contain bg-background text-foreground backdrop:bg-background">
+        <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b bg-card px-3 py-1">
+          <h2 id={toolsTitleId} className="font-semibold">{toolsLabel}</h2>
+          <Button variant="ghost" className="min-h-11" onClick={() => toolsDialog.current?.close()}>{locale === "zh-CN" ? "返回库存" : "Back to inventory"}</Button>
+        </header>
+        <div className="space-y-3 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{tools}</div>
+      </dialog> : <details className="rounded-xl border bg-white/90 px-4">
+        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{toolsLabel}</summary>
+        <div className="space-y-3 pb-4">{tools}</div>
+      </details>}
 
       {error ? (
         <Alert variant="destructive">
@@ -197,33 +228,47 @@ export function InventoryPage() {
         </Alert>
       ) : null}
 
-      <Card className="bg-white/90">
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center justify-between gap-2">
-            <span>{t("元器件列表")}</span>
-            {inventoryEnabled && !selecting ? <Button variant="outline" size="sm" className="min-h-11" onClick={() => setSelecting(true)}>{locale === "zh-CN" ? "多选" : "Select multiple"}</Button> : null}
-            <span className="text-sm font-normal text-muted-foreground" aria-live="polite">
+      <Card className="border-0 bg-transparent shadow-none lg:border lg:bg-white/90">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0 p-0 pb-2">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <CardTitle ref={resultsHeading} className="text-base lg:text-lg">{t("元器件列表")}</CardTitle>
+            <span className="text-xs text-muted-foreground lg:text-sm" aria-live="polite">
               {loading ? t("正在加载…") : `${t("共")}${formatCount(data?.total ?? 0, locale)}${t(" 项")}`}
             </span>
-          </CardTitle>
+          </div>
+          {inventoryEnabled && !selecting ? <Button variant="outline" size="sm" className="min-h-11" onClick={() => setSelecting(true)}>{locale === "zh-CN" ? "多选" : "Select multiple"}</Button> : null}
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-0 pb-0">
           {!loading && data?.items.length === 0 ? (
             <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
               {t("没有符合条件的元器件。请调整搜索词或库存状态。")}
             </div>
           ) : data ? (<>
-            <div className="grid gap-3 md:hidden" aria-label={t("库存结果")}>
-              {data.items.map((item) => <article key={item.id} className="rounded-2xl border bg-white p-4 shadow-sm">
-                {inventoryEnabled && selecting ? <label className="mb-2 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 shrink-0 accent-red-600" disabled={loading} checked={selectedIds.has(item.id)} onChange={() => toggleSelection(item.id)} /><span className="min-w-0 break-all">{t("选择元器件")} {item.sku}</span></label> : null}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 break-words"><button className="min-h-11 break-all text-left font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={(event) => selectComponent(event, item.id)}>{item.sku}</button><p className="text-sm text-slate-700">{item.name}</p><ComponentPhoto photoKey={item.photo_key} name={item.name} compact /></div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${item.low_stock ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{item.low_stock ? t("低库存") : t("库存充足")}</span>
-                </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><Detail label={t("分类")} value={locale === "zh-CN" ? displayCategory(item.category) : item.category} /><Detail label={t("库位")} value={locationLabel(item.location)} /><Detail label={t("库存 / 最低")} value={`${formatCount(item.quantity, locale)} / ${formatCount(item.min_stock, locale)}`} /><Detail label={t("更新时间")} value={formatDateTime(item.updated_at, locale)} /></dl>
-              </article>)}
-            </div>
-            <div className="hidden overflow-x-auto md:block" tabIndex={0} aria-label={t("库存结果")}>
+            {mobile ? <ul className="divide-y rounded-xl border bg-card" aria-label={t("库存结果")}>
+              {data.items.map((item) => {
+                const rowClass = "flex min-h-[4.5rem] w-full items-center gap-3 px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring";
+                const content = <>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold" title={item.name}>{item.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground" title={item.sku}>{item.sku}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{[locationLabel(item.location), locale === "zh-CN" ? displayCategory(item.category) : item.category].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <span className="max-w-[33%] shrink-0 text-right">
+                    <span className="block break-all text-lg font-semibold leading-6 tabular-nums">{formatCount(item.quantity, locale)}</span>
+                    {item.low_stock ? <span className="block text-xs font-medium text-amber-800">{t("低库存")}</span> : null}
+                  </span>
+                </>;
+                return <li key={item.id}>
+                  {inventoryEnabled && selecting ? <label className={rowClass}>
+                    <input type="checkbox" className="h-5 w-5 shrink-0 accent-primary" aria-label={`${t("选择元器件")} ${item.sku}`} disabled={loading} checked={selectedIds.has(item.id)} onChange={() => toggleSelection(item.id)} />
+                    {content}
+                  </label> : <button type="button" className={rowClass} aria-label={`${t("元器件详情")} · ${item.name} · ${item.sku} · ${t("库存")} ${formatCount(item.quantity, locale)}`} onClick={(event) => selectComponent(event, item.id)}>
+                    {content}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </button>}
+                </li>;
+              })}
+            </ul> : <div className="overflow-x-auto" tabIndex={0} aria-label={t("库存结果")}>
               <Table>
                 <TableHeader><TableRow>
                   {inventoryEnabled && selecting ? <TableHead className="w-12"><span className="sr-only">{t("选择元器件")}</span></TableHead> : null}
@@ -247,15 +292,15 @@ export function InventoryPage() {
                   </TableRow>
                 ))}</TableBody>
               </Table>
-            </div>
+            </div>}
           </>) : <div className="h-48 animate-pulse rounded-xl bg-slate-100" aria-label={t("正在加载库存")} />}
 
           {data && data.page_count > 0 ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted-foreground">{t("第")}{formatCount(data.page, locale)} / {formatCount(data.page_count, locale)}{t(" 页")}</p>
               <div className="flex gap-2">
-                <Button variant="outline" disabled={loading || data.page <= 1} onClick={() => { setSearchParams(buildPageParams(query, stockFilter, page - 1)); setSelectedId(null); }}>{t("上一页")}</Button>
-                <Button variant="outline" disabled={loading || data.page >= data.page_count} onClick={() => { setSearchParams(buildPageParams(query, stockFilter, page + 1)); setSelectedId(null); }}>{t("下一页")}</Button>
+                <Button variant="outline" className="min-h-11" disabled={loading || data.page <= 1} onClick={() => changePage(page - 1)}>{t("上一页")}</Button>
+                <Button variant="outline" className="min-h-11" disabled={loading || data.page >= data.page_count} onClick={() => changePage(page + 1)}>{t("下一页")}</Button>
               </div>
             </div>
           ) : null}
@@ -280,15 +325,15 @@ export function InventoryPage() {
       </Card>
 
       {selectedId ? (
-        <ResponsiveInventoryDetail onClose={closeDetail} title={t("元器件详情")}>
-          <Card className="scroll-mt-20 bg-white/90" aria-busy={detail.loading}>
-            <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <ResponsiveInventoryDetail mobile={mobile} onClose={closeDetail} title={t("元器件详情")}>
+          <Card className="scroll-mt-20 rounded-none border-0 bg-card shadow-none lg:border lg:bg-white/90" aria-busy={detail.loading}>
+            <CardHeader className="sticky top-0 z-10 flex-row items-center justify-between gap-3 space-y-0 border-b bg-card px-3 py-1 lg:static lg:border-0 lg:bg-transparent">
               <CardTitle ref={detailHeading} tabIndex={-1} className="scroll-mt-20 focus:outline-none">
                 {t("元器件详情")}
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={closeDetail}>{t("关闭详情")}</Button>
+              <Button variant="outline" size="sm" className="min-h-11" onClick={closeDetail}>{t("关闭详情")}</Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-3 lg:pt-0">
               {detail.error ? <Alert variant="destructive"><AlertTitle>{t("无法读取详情")}</AlertTitle><AlertDescription>{detail.error}</AlertDescription></Alert> : null}
               {detail.data ? (
                 <><dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -339,18 +384,21 @@ export function InventoryPage() {
   );
 }
 
-function ResponsiveInventoryDetail({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  const query = "(max-width: 767px)";
-  const [mobile, setMobile] = useState(() => window.matchMedia?.(query).matches ?? false);
-  const dialog = useRef<HTMLDialogElement>(null);
+function useMobileInventoryLayout() {
+  const desktopQuery = "(min-width: 1024px)";
+  const [mobile, setMobile] = useState(() => !window.matchMedia(desktopQuery).matches);
 
   useEffect(() => {
-    const media = window.matchMedia?.(query);
-    if (!media) return;
-    const onChange = () => setMobile(media.matches);
+    const media = window.matchMedia(desktopQuery);
+    const onChange = () => setMobile(!media.matches);
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, []);
+  return mobile;
+}
+
+function ResponsiveInventoryDetail({ mobile, title, onClose, children }: { mobile: boolean; title: string; onClose: () => void; children: ReactNode }) {
+  const dialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const element = dialog.current;
@@ -363,7 +411,7 @@ function ResponsiveInventoryDetail({ title, onClose, children }: { title: string
   return <dialog
     ref={dialog}
     aria-label={title}
-    className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto overscroll-contain bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-foreground backdrop:bg-background"
+    className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto overscroll-contain bg-card pb-[env(safe-area-inset-bottom)] text-foreground backdrop:bg-background"
     onCancel={(event) => { event.preventDefault(); onClose(); }}
   >{children}</dialog>;
 }
