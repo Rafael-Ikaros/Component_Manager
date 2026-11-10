@@ -22,8 +22,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - component_vault_data:/data:ro
       - component_vault_updater_state:/state
-      - ${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:rw
+      # Compose resolves the original project files at this same absolute path.
+      - type: bind
+        source: &deployment-directory ${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}
+        target: *deployment-directory
+        bind:
+          create_host_path: true
     restart: unless-stopped
 
 volumes:
-  component_vault_updater_state:
+  component_vault_updater_state: {}

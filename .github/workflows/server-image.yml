@@ -15,6 +15,10 @@ on:
         required: false
         default: false
         type: boolean
+      promote_channel:
+        required: false
+        default: false
+        type: boolean
     secrets:
       DOCKERHUB_TOKEN:
         required: false
@@ -26,12 +30,17 @@ on:
         default: ''
         type: string
       release_tag:
-        description: Release tag to publish (v0.7.9-dev.5 updates dev; v0.7.9 updates latest).
+        description: Git release tag to publish, e.g. v0.7.9-dev.16 or v0.7.9.
         required: false
         type: string
       push_image:
         description: Publish to the configured Docker Hub repository after startup checks.
         required: true
+        default: false
+        type: boolean
+      promote_channel:
+        description: Also update the dev or stable channel after verifying the fixed pair. Leave off for historical backfills.
+        required: false
         default: false
         type: boolean
   push:
@@ -47,8 +56,12 @@ env:
 jobs:
   server-image:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ (inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')) && 'component-vault-dockerhub-publish' || format('component-vault-docker-ci-{0}', github.run_id) }}
+      queue: max
     env:
       RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+      PROMOTE_CHANNEL: ${{ (inputs.push_image && inputs.promote_channel) || (github.event_name == 'push' && github.ref_type == 'tag') }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -264,40 +277,30 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Resolve API image tags
+      - name: Resolve version and channel image tags
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
-        id: api_tags
+        id: image_tags
         env:
           IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
         run: |
           version="${RELEASE_TAG#v}"
           channel=latest
-          if [[ "$version" == *-dev.* ]]; then channel=dev; fi
+          update_channel=stable
+          if [[ "$version" == *-dev.* ]]; then
+            channel=dev
+            update_channel=dev
+          fi
           {
-            echo 'tags<<EOF'
-            echo "$IMAGE:$version"
-            echo "$IMAGE:$channel"
-            echo 'EOF'
+            echo "api_version=$IMAGE:$version"
+            echo "web_version=$IMAGE:web-$version"
+            echo "api_channel=$IMAGE:$channel"
+            echo "web_channel=$IMAGE:web-$channel"
+            echo "update_channel=$update_channel"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Resolve web image tags
+      - name: Publish fixed multi-platform API image
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
-        id: web_tags
-        env:
-          IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
-        run: |
-          version="${RELEASE_TAG#v}"
-          channel=latest
-          if [[ "$version" == *-dev.* ]]; then channel=dev; fi
-          {
-            echo 'tags<<EOF'
-            echo "$IMAGE:web-$version"
-            echo "$IMAGE:web-$channel"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Publish multi-platform API image
-        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        id: published_api
         uses: docker/build-push-action@v7
         with:
           context: ./server
@@ -306,7 +309,7 @@ jobs:
             APP_REVISION=${{ steps.build_identity.outputs.revision }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.api_tags.outputs.tags }}
+          tags: ${{ steps.image_tags.outputs.api_version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ env.RELEASE_TAG }}
@@ -314,15 +317,16 @@ jobs:
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,mode=max,scope=server-image
 
-      - name: Publish multi-platform management image
+      - name: Publish fixed multi-platform management image
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        id: published_web
         uses: docker/build-push-action@v7
         with:
           context: .
           file: admin-web/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.web_tags.outputs.tags }}
+          tags: ${{ steps.image_tags.outputs.web_version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ env.RELEASE_TAG }}
@@ -330,10 +334,86 @@ jobs:
           cache-from: type=gha,scope=web-image
           cache-to: type=gha,mode=max,scope=web-image
 
-      - name: Verify real Web-triggered Compose update and data preservation
+      - name: Verify fixed images on Docker Hub
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        shell: bash
+        env:
+          API_VERSION: ${{ steps.image_tags.outputs.api_version }}
+          WEB_VERSION: ${{ steps.image_tags.outputs.web_version }}
+          API_DIGEST: ${{ steps.published_api.outputs.digest }}
+          WEB_DIGEST: ${{ steps.published_web.outputs.digest }}
+          EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
+        run: |
+          verify_image() {
+            local image=$1 digest=$2
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            test "$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')" = "$digest"
+            docker buildx imagetools inspect --raw "$image" | jq -e '
+              [.manifests[] | select(.platform.os == "linux") | .platform.architecture]
+              | unique == ["amd64", "arm64"]
+            ' >/dev/null
+            docker pull --platform linux/amd64 "$image"
+            test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "$RELEASE_TAG"
+            test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$EXPECTED_REVISION"
+          }
+          verify_image "$API_VERSION" "$API_DIGEST"
+          verify_image "$WEB_VERSION" "$WEB_DIGEST"
+
+      - name: Check out release workflow tools
+        if: env.PROMOTE_CHANNEL == 'true' && steps.build_identity.outputs.revision != github.workflow_sha
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+
+      - name: Verify real Web-triggered Compose update using fixed images
+        if: env.PROMOTE_CHANNEL == 'true'
         timeout-minutes: 12
         env:
-          UPDATE_CHANNEL: ${{ contains(env.RELEASE_TAG, '-dev.') && 'dev' || 'stable' }}
+          UPDATE_CHANNEL: ${{ steps.image_tags.outputs.update_channel }}
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
           EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
-        run: bash tools/deployment/verify-web-update.sh
+        run: |
+          script=tools/deployment/verify-web-update.sh
+          if [[ -f ".release-tools/$script" ]]; then script=".release-tools/$script"; fi
+          bash "$script"
+
+      - name: Promote the verified image pair to the channel
+        if: env.PROMOTE_CHANNEL == 'true'
+        env:
+          IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+          API_CHANNEL: ${{ steps.image_tags.outputs.api_channel }}
+          WEB_CHANNEL: ${{ steps.image_tags.outputs.web_channel }}
+          API_DIGEST: ${{ steps.published_api.outputs.digest }}
+          WEB_DIGEST: ${{ steps.published_web.outputs.digest }}
+        run: |
+          digest_of() {
+            docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'
+          }
+          promote() {
+            local tag=$1 digest=$2 attempt
+            for attempt in 1 2 3; do
+              if docker buildx imagetools create --tag "$tag" "$IMAGE@$digest" &&
+                test "$(digest_of "$tag")" = "$digest"; then
+                return 0
+              fi
+              if (( attempt < 3 )); then sleep 5; fi
+            done
+            return 1
+          }
+          previous_api=$(digest_of "$API_CHANNEL" || true)
+          previous_web=$(digest_of "$WEB_CHANNEL" || true)
+          if ! promote "$API_CHANNEL" "$API_DIGEST" || ! promote "$WEB_CHANNEL" "$WEB_DIGEST"; then
+            echo '::error::Channel promotion did not complete. The fixed images are still published.'
+            if [[ "$previous_api" =~ ^sha256:[0-9a-f]{64}$ && "$previous_web" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              restored=true
+              promote "$API_CHANNEL" "$previous_api" || restored=false
+              promote "$WEB_CHANNEL" "$previous_web" || restored=false
+              if [[ "$restored" == true ]]; then
+                echo 'Restored the previous channel pair.'
+              else
+                echo '::error::Could not restore the previous channel pair. Check both aliases before retrying.'
+              fi
+            fi
+            exit 1
+          fi

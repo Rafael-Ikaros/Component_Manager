@@ -26,17 +26,18 @@ IMAGE_ENV_KEYS = (
 
 
 def render(compose_file: Path, env_file: str, overrides: dict[str, str] | None = None,
-           extra_files: tuple[Path, ...] = (), project_name: str | None = None) -> dict:
-    command = [
-        "docker", "compose", "--profile", "*", "--env-file", env_file,
-    ]
+           extra_files: tuple[Path, ...] = (), project_name: str | None = None,
+           profile: str | None = None) -> dict:
+    command = ["docker", "compose", "--env-file", env_file]
+    if profile is not None:
+        command.extend(("--profile", profile))
     if project_name is not None:
         command.extend(("--project-name", project_name))
     for path in (compose_file, *extra_files):
         command.extend(("-f", str(path)))
     command.extend(("config", "--format", "json"))
     environment = os.environ.copy()
-    for key in (*ENV_KEYS, *IMAGE_ENV_KEYS):
+    for key in (*ENV_KEYS, *IMAGE_ENV_KEYS, "COMPOSE_PROFILES"):
         environment.pop(key, None)
     environment.update(overrides or {})
     result = subprocess.run(
@@ -61,7 +62,11 @@ def main() -> None:
             encoding="utf-8",
         )
         for compose_file in COMPOSE_FILES:
-            empty = render(compose_file, os.devnull)
+            profile = None
+            if compose_file.name == "docker-compose.hub.yml":
+                assert set(render(compose_file, os.devnull)["services"]) == {"api"}
+                profile = "web"
+            empty = render(compose_file, os.devnull, profile=profile)
             overridden = render(compose_file, str(fake_env))
             api_empty = empty["services"]["api"]
             api_override = overridden["services"]["api"]
@@ -82,10 +87,17 @@ def main() -> None:
             if compose_file.name == "docker-compose.hub.yml":
                 web = empty["services"]["admin-web"]
                 assert web.get("image") and "web" in web.get("profiles", [])
+                assert set(empty["services"]) == {"api", "admin-web"}
+                watchtower_file = ROOT / "docker-compose.watchtower.yml"
+                watchtower = render(compose_file, os.devnull,
+                                    extra_files=(watchtower_file,), profile="web")["services"]
+                assert set(watchtower) == {"api", "admin-web", "watchtower"}
+                for service in ("api", "admin-web"):
+                    assert watchtower[service]["labels"]["com.centurylinklabs.watchtower.enable"] == "true"
                 for channel in ("latest", "dev"):
                     selected = render(compose_file, os.devnull, {
                         "COMPONENT_VAULT_DOCKER_CHANNEL": channel,
-                    })
+                    }, profile="web")
                     assert selected["services"]["api"]["image"] == (
                         f"rafaelikaros/component_manager:{channel}"
                     )
@@ -99,14 +111,14 @@ def main() -> None:
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
                     "COMPONENT_VAULT_IMAGE": "example/inventory:0.7.9",
                     "COMPONENT_VAULT_WEB_IMAGE": "example/inventory:web-0.7.9",
-                })
+                }, profile="web")
                 assert pinned["services"]["api"]["image"] == "example/inventory:0.7.9"
                 assert pinned["services"]["admin-web"]["image"] == "example/inventory:web-0.7.9"
                 managed = render(compose_file, os.devnull, {
                     "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, (ROOT / "docker-compose.watchtower.yml", ROOT / "docker-compose.web-update.yml"),
-                    project_name="component-vault-compose-ci")
+                }, (watchtower_file, ROOT / "docker-compose.web-update.yml"),
+                    project_name="component-vault-compose-ci", profile="web")
                 services = managed["services"]
                 assert services["api"]["environment"]["UPDATER_URL"] == "http://updater:8790"
                 assert "UPDATE_TOKEN_FILE" not in services["api"]["environment"]
@@ -121,7 +133,9 @@ def main() -> None:
                 assert "UPDATE_TOKEN_FILE" not in updater["environment"]
                 assert any(volume["target"] == "/data" and volume.get("read_only") for volume in updater["volumes"])
                 assert any(volume["target"] == "/var/run/docker.sock" for volume in updater["volumes"])
-                assert any(volume["target"] == str(ROOT) and volume["source"] == str(ROOT) for volume in updater["volumes"])
+                assert any(volume["type"] == "bind" and volume["target"] == str(ROOT)
+                           and volume["source"] == str(ROOT) and not volume.get("read_only")
+                           for volume in updater["volumes"])
                 # Synology's GUI can use one complete file without manually
                 # merging the Hub template and updater override. It starts Web
                 # by default; the remaining services must render identically.
@@ -132,7 +146,8 @@ def main() -> None:
                 combined = render(compose_file, os.devnull, {
                     "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, (ROOT / "docker-compose.web-update.yml",), project_name="component-vault-compose-ci")
+                }, (ROOT / "docker-compose.web-update.yml",), project_name="component-vault-compose-ci",
+                    profile="web")
                 combined["services"]["admin-web"].pop("profiles", None)
                 assert single == combined, "Single-file Web updater deployment drifted from the base and override."
                 # Explicit Web pins must also select the updater image, even if

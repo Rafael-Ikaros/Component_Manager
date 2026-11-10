@@ -54,6 +54,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - 库存页通过显式多选模式进入当前页批量操作。窄屏使用底部导航、紧凑结果列表，以及独立的库存工具和详情对话框。详情关闭后回到原列表位置。概览、同步和 BOM 预设在窄屏展示列表，设置按功能分组。
 - `POST /admin-api/about/check-update?channel=stable|dev` 默认 stable。stable 只接受正式版；dev 按语义版本比较有效正式/开发发布（不含草稿）。浏览器按 API 地址保存检测偏好，接口不拉镜像或操作宿主机。
 - `docker-ci.yml` 按相关路径独立检查 API/Web 镜像；`server-image.yml` 独立发布多架构镜像，接受 dev 和正式 tag。`release-from-changelog.yml` 在 sync/tag 后并行调用 Docker 与原生附件流程，不依赖机器人创建 tag 再触发工作流。Docker 凭据/失败不再阻断原生附件 job。
+- Docker 发布按队列串行执行。先推送固定标签，核对两份镜像的摘要、架构和发布身份。启用渠道发布时，隔离 Compose 项目先从固定标签验证 Web 触发的更新及数据保留，再把对应的浮动标签指向已验证的镜像摘要。手动补发默认只推固定标签。
 - Hub Compose 默认 latest/web-latest，`COMPONENT_VAULT_DOCKER_CHANNEL=dev` 改用 dev/web-dev；完整镜像覆盖仍优先。部署助手复用原项目和 Compose 文件，拉取配套镜像后更新 `.env` 和重建，不引入 Docker socket 到 API/Web。详见 [渠道教程](docker-channels.md)。
 
 应用品牌母版位于 `docs/design/branding/component-vault-logo-ikaros.png`。`tools/branding/generate_icons.py` 使用 Pillow 生成现有路径的派生资源；Android 使用应用自有 mipmap 与自适应前景/白色背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。

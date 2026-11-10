@@ -11,13 +11,13 @@ services:
       - "8787:8787"
     environment:
       # Optional overrides for existing deployments. Set up new installations in /setup.
+      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
       API_TOKEN: ${API_TOKEN:-}
       CONFIG_PATH: ${CONFIG_PATH:-}
       LOG_DIR: ${LOG_DIR:-}
-      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
-      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
-      WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
       UPDATER_URL: http://updater:8790
+      WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
     labels:
       com.centurylinklabs.watchtower.enable: "false"
     volumes:
@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
 
   admin-web:
-    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    image: &management-image ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
     depends_on:
       - api
     ports:
@@ -36,7 +36,7 @@ services:
 
   updater:
     # Same management image as admin-web; a separate process and container.
-    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    image: *management-image
     command: [updater]
     environment:
       UPDATE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:?Choose the original Compose project name}
@@ -44,9 +44,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - component_vault_data:/data:ro
       - component_vault_updater_state:/state
-      - ${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}:rw
+      # Compose resolves the original project files at this same absolute path.
+      - type: bind
+        source: &deployment-directory ${COMPONENT_VAULT_DEPLOY_DIR:?Set the absolute original Compose deployment directory}
+        target: *deployment-directory
+        bind:
+          create_host_path: true
     restart: unless-stopped
 
 volumes:
-  component_vault_data:
-  component_vault_updater_state:
+  component_vault_data: {}
+  component_vault_updater_state: {}

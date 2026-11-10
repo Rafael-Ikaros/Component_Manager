@@ -183,3 +183,4 @@ jobs:
       source_ref: ${{ needs.sync-and-tag.outputs.source_ref }}
       release_tag: ${{ needs.sync-and-tag.outputs.tag }}
       push_image: true
+      promote_channel: true

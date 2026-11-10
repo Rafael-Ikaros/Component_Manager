@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post-publication acceptance test. Uses only its unique temporary CI project.
+# Pre-promotion acceptance test. Uses only its temporary CI project and fixed image tags.
 set -euo pipefail
 
 : "${RUNNER_TEMP:?Run this check on the isolated GitHub Actions runner}"
@@ -7,11 +7,35 @@ set -euo pipefail
 : "${EXPECTED_REVISION:?Set the just-published commit SHA}"
 UPDATE_CHANNEL=${UPDATE_CHANNEL:-dev}
 case "$UPDATE_CHANNEL" in stable|dev) ;; *) echo 'Invalid UPDATE_CHANNEL' >&2; exit 1;; esac
-repository=rafaelikaros/component_manager
+repository=${DOCKERHUB_IMAGE:-rafaelikaros/component_manager}
 project="cv-web-update-${GITHUB_RUN_ID:-local}-$$"
 deployment=$(mktemp -d "$RUNNER_TEMP/component-vault-web-update.XXXXXX")
 export UPDATE_CHANNEL EXPECTED_REVISION RELEASE_TAG
 export SMOKE_PROJECT=$project SMOKE_DEPLOY_DIR=$deployment
+export SMOKE_API_TARGET="$repository:${RELEASE_TAG#v}"
+export SMOKE_WEB_TARGET="$repository:web-${RELEASE_TAG#v}"
+
+# Exercise the release's own updater helper against the fixed tags before the
+# public channel moves. Only redirect the image references in this CI copy.
+python - "$repository" <<'PY'
+import os
+from pathlib import Path
+import shlex
+import sys
+
+source = Path('tools/deployment/switch-channel.sh').read_text(encoding='utf-8').splitlines()
+replacements = {
+    'official_repository=rafaelikaros/component_manager': 'official_repository=' + shlex.quote(sys.argv[1]),
+    'api_image=$official_repository:$image_channel': 'api_image=' + shlex.quote(os.environ['SMOKE_API_TARGET']),
+    'web_image=$official_repository:web-$image_channel': 'web_image=' + shlex.quote(os.environ['SMOKE_WEB_TARGET']),
+}
+for line in replacements:
+    if source.count(line) != 1:
+        raise SystemExit(f'Expected exactly one updater helper line: {line}')
+target = Path(os.environ['SMOKE_DEPLOY_DIR']) / 'switch-channel.sh'
+target.write_text(''.join(replacements.get(line, line) + '\n' for line in source), encoding='utf-8')
+PY
+
 read -r api_port web_port < <(python - <<'PY'
 import socket
 with socket.socket() as api, socket.socket() as web:
@@ -57,11 +81,13 @@ services:
     environment:
       UPDATE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}
       UPDATE_TOKEN_FILE: /data/.updater-token
+      UPDATE_HELPER_PATH: /ci/switch-channel.sh
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - component_vault_data:/data:ro
       - component_vault_updater_state:/state
       - ${SMOKE_DEPLOY_DIR}:${SMOKE_DEPLOY_DIR}:rw
+      - ${SMOKE_DEPLOY_DIR}/switch-channel.sh:/ci/switch-channel.sh:ro
 volumes:
   component_vault_data:
   component_vault_updater_state:
@@ -190,7 +216,7 @@ wait_for(web_ready, 'Updated Web startup')
 channel = 'dev' if os.environ['UPDATE_CHANNEL'] == 'dev' else 'latest'
 environment = (directory / '.env').read_text().splitlines()
 assert f'COMPONENT_VAULT_DOCKER_CHANNEL={channel}' in environment
-assert f'COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:{channel}' in environment
-assert f'COMPONENT_VAULT_WEB_IMAGE=rafaelikaros/component_manager:web-{channel}' in environment
+assert f'COMPONENT_VAULT_IMAGE={os.environ["SMOKE_API_TARGET"]}' in environment
+assert f'COMPONENT_VAULT_WEB_IMAGE={os.environ["SMOKE_WEB_TARGET"]}' in environment
 print('Real Web update: API/Web replaced, updater retained, selected release healthy, fixture and /data preserved.')
 PY

@@ -1,3 +1,4 @@
+# Build the API and Web console from the local checkout.
 services:
   api:
     build:
@@ -6,11 +7,11 @@ services:
       - "8787:8787"
     environment:
       # Optional overrides for existing deployments. Set up new installations in /setup.
+      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
       API_TOKEN: ${API_TOKEN:-}
       CONFIG_PATH: ${CONFIG_PATH:-}
       LOG_DIR: ${LOG_DIR:-}
-      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
-      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
       WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
     volumes:
       - component_vault_data:/data
@@ -27,4 +28,4 @@ services:
       - "8081:80"
 
 volumes:
-  component_vault_data:
+  component_vault_data: {}

@@ -6,7 +6,7 @@
 
 从 `0.7.9-dev.8` 起，工作流只构建 API 和共享管理镜像。管理镜像默认运行 Web，
 以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
-构建、双角色启动及发布后的真实更新均须通过 CI；下方 dev.7 摘要记录的是旧三镜像结构。
+CI 先验证镜像构建和三个容器角色的启动，再用固定版本验证网页更新，最后推进渠道。下方 dev.7 摘要记录的是旧三镜像结构。
 
 ## 先分清账号、仓库和两种 Token
 
@@ -101,16 +101,14 @@ GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs
 2. **Use workflow from** 选择 `master`。
 3. `source_ref` 留空，默认检出下方 tag；也可显式填相同提交或 tag。
 4. `release_tag` 填已经存在且通过验证的目标 tag，例如 `v0.7.9-dev.14`。
-5. `push_image` 选择 `true`，运行并等待独立任务结束。
+5. `push_image` 选择 `true`。只有需要推进当前渠道时才勾选 `promote_channel`，例如重跑新版本的 Docker 发布。补发历史版本时保持默认值 `false`。
+6. 运行并等待 Docker 任务结束。
 
 `source_ref` 决定源码，`release_tag` 决定版本与渠道；发布前会检查二者指向同一提交。
 独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
 手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
-以 dev.14 为例会推送 API `0.7.9-dev.14 / dev`、管理镜像 `web-0.7.9-dev.14 / web-dev`。
-正式版本使用相同固定前缀，但浮动渠道为 `latest / web-latest`。
-旧 dev.7 的 `updater-*` 标签保留历史用途，不再随新版本更新。补发历史版本会移动**该渠道**的浮动标签，操作前应确认目标，
-不要为了补旧版本附件而无意回退当前渠道。
+以 dev.14 为例，固定标签是 `0.7.9-dev.14` 和 `web-0.7.9-dev.14`，对应渠道为 `dev` 和 `web-dev`。正式版渠道为 `latest` 和 `web-latest`。旧版 `updater-*` 标签保留作历史记录。
 
 普通 Docker CI 或 `push_image=false` 只构建检查。请求发布但用户名、镜像名或 Token 缺失时，
 Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job，一方成功不能代表另一方成功，
@@ -118,19 +116,18 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 
 ## 六、确认发布确实成功
 
-先在本次 Actions run 中确认发布配置、API/管理镜像构建、三个角色的启动及健康检查、登录、两种多平台镜像推送均成功。
-发布末尾的 **Verify real Web-triggered Compose update and data preservation** 也须成功；
-该项在唯一临时项目中执行真实更新，不操作用户 NAS。
+1. 确认 **Verify fixed images on Docker Hub** 成功，API 与管理镜像均已推送固定标签，并核对了摘要、架构和发布身份。
+2. 如启用了 `promote_channel`，确认 **Verify real Web-triggered Compose update using fixed images** 成功。该步骤通过管理员 API 在隔离项目触发更新，检查 API/Web 容器替换、Updater 持续运行，以及测试库存、挂载和端口是否保留。
+3. 推进渠道时，确认 **Promote the verified image pair to the channel** 成功。工作流按摘要更新两个浮动标签并回读验证。如果推进失败，工作流会尝试恢复已记录的上一组摘要。
 
 再到 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 确认：
 
-- 存在对应 API、管理镜像的固定版本与该渠道浮动标签。
-- 同一镜像的固定/浮动标签摘要一致，两种镜像 OCI `version / revision` 对应同一发布源。
+- 存在对应 API、管理镜像的固定版本，两份镜像的 OCI `version` 和 `revision` 对应同一发布源。
+- 推进渠道后，同一镜像的固定标签与浮动标签摘要一致。
 - 清单包含 `linux/amd64` 和 `linux/arm64`。
 
 工作流在 `linux/amd64` 实际启动 API、Web、updater，验证健康、认证、任务持久化和 Web 资源。
-发布后通过管理员 API 发起真实更新，检查 API/Web 被替换、updater 持续运行，以及数据、挂载、端口保留。
-`linux/arm64` 参与构建与发布，当前 workflow 不在 ARM 机器上启动；这也不等于所有群晖机型实测。
+`linux/arm64` 参与构建与发布，容器启动和更新验证在 `linux/amd64` 运行器执行。
 
 本地有 Docker 时可额外检查；维护者通过 Actions 发布并不要求本机安装 Docker：
 

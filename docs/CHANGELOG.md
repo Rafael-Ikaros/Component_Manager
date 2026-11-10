@@ -17,6 +17,11 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+### Docker 发布与部署
+
+- Docker CI 先发布和核对 API 与管理镜像的固定版本，通过隔离 Compose 更新验证后再更新对应渠道。手动补发默认只推送固定版本。
+- 统一 Compose 模板中的环境变量和挂载声明，补充对默认服务、Watchtower、网页更新和群晖部署配置的校验。
+
 ## [0.7.9-dev.16] - 2026-11-10
 
 ### Web 管理台

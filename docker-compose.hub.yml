@@ -1,4 +1,4 @@
-# Pull the published API image instead of building from source.
+# Deploy published Docker Hub images. Enable the web profile to start the Web console.
 # Defaults to the floating latest/web-latest API and Web tags.
 # Set COMPONENT_VAULT_DOCKER_CHANNEL=dev for dev/web-dev; latest restores stable.
 # Full image overrides take precedence over the channel.
@@ -10,11 +10,11 @@ services:
       - "8787:8787"
     environment:
       # Optional overrides for existing deployments. Set up new installations in /setup.
+      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
       API_TOKEN: ${API_TOKEN:-}
       CONFIG_PATH: ${CONFIG_PATH:-}
       LOG_DIR: ${LOG_DIR:-}
-      ADMIN_WEB_ORIGINS: ${ADMIN_WEB_ORIGINS:-}
-      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-}
       WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
     volumes:
       - component_vault_data:/data
@@ -31,4 +31,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  component_vault_data:
+  component_vault_data: {}
