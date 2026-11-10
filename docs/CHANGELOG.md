@@ -17,11 +17,14 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.17] - 2026-11-11
+
 ### Docker 发布与部署
 
-- Docker CI 复用已核验的固定版本，只推送缺失的 API 或管理镜像。通过隔离 Compose 更新验证后再更新对应渠道。手动补发默认只补固定标签。
-- 统一 Compose 模板中的环境变量和挂载声明，补充对默认服务、Watchtower、网页更新和群晖部署配置的校验。
-- 移除重复的网页更新覆盖模板，统一使用完整单文件模板，并补充旧项目迁移说明。
+- Docker CI 核对已有固定标签的摘要、版本、提交和 `linux/amd64`、`linux/arm64` 两种架构，只构建并推送缺失的 API 或 Web 镜像。查询失败或镜像身份不符时停止发布。
+- 隔离 Compose 项目验证网页更新、库存数据、挂载和端口后，才推进 `dev / web-dev`。从 `master` 手动补发同版本时默认只补固定标签，已有镜像直接复用。[镜像发布指南](dockerhub.md)
+- 统一 Compose 模板的环境变量和挂载声明，补充对默认服务、Watchtower 和群晖部署配置的校验。
+- 网页更新统一使用 `docker-compose.hub-web-update.yml`。旧项目若引用已移除的覆盖文件，请保留原部署目录中的文件，迁移并重新部署后再移除。[旧项目迁移步骤](server-web-update.md#群晖一次性配置)
 
 ## [0.7.9-dev.16] - 2026-11-10
 
