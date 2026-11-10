@@ -99,7 +99,7 @@ API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管
 
 > [!IMPORTANT]
 > **0.7.8 可以保留数据升级 dev，但只换 API/Web 镜像不会自动启用网页更新。**
-> 需要网页切换更新渠道时，导入带 updater 的单文件模板，并在 `.env` 指定项目目录。群晖项目名由 Container Manager 传给 Compose。
+> 需要网页切换更新渠道时，使用[网页更新单文件模板](docker-compose.hub-web-update.yml)，并在 `.env` 指定项目目录。群晖项目名由 Container Manager 传给 Compose。
 > 第一次升级与启用组件可以一起完成，见[服务端更新教程](docs/server-web-update.md)。
 
 普通部署默认不会自动安装新镜像。网页 updater 由管理员确认后执行；

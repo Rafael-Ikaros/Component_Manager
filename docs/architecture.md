@@ -40,7 +40,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 
 网页更新是可选部署能力。首次启用时，将独立 updater 加入原 Compose 项目并共享原数据卷。完整模板从 Compose 取得项目名，管理员通过 `COMPONENT_VAULT_DEPLOY_DIR` 指定原项目目录。启用后由管理员选择渠道、确认并提交更新作业，版本检测仍是独立的只读操作。
 
-`docker-compose.hub-web-update.yml` 提供适合群晖项目的完整单文件声明，与 Hub 基础配置加 updater override 的差别是 Web 默认启动。CI 核对两者渲染结果。既有自定义端口、数据来源及网络仍由原部署声明保留。SQLite 路径由 API 镜像提供，MQTT 与目录的高级环境覆盖仅在需要时由部署显式传入。
+`docker-compose.hub-web-update.yml` 是网页更新的完整部署模板，默认启动 Web。CI 直接检查它与普通 Hub 部署使用相同的默认 API/Web 端口和数据卷，并核对 updater 的独立任务卷和同路径目录挂载。已有项目迁移时沿用自定义端口、数据来源和网络。SQLite 路径由 API 镜像提供，MQTT 与目录的高级环境覆盖仅在需要时由部署显式传入。
 
 - `server/app/admin/update_agent.py` 只为管理员代理固定 `UPDATER_URL` 的内部作业接口，沿用会话/CSRF；读取3秒、写入5秒超时。内部令牌自动原子创建，使用显式 `UPDATE_TOKEN_FILE` 或原数据库父目录，绝不返回浏览器，不修改账户密钥。
 - 独立 `updater/app.py` 以单 worker 和 SQLite 持久化任务，按项目串行执行现有 Compose helper。API 重建不终止更新任务；updater 重启后将未完成作业重新排队。只保留最近100条终态记录，支持幂等请求和失败重试。

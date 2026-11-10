@@ -90,7 +90,7 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    已有项目沿用原文件名、端口、API 数据来源及其它自定义设置。MQTT 或目录查询曾使用环境变量时，保留原 `api.environment` 中相应的条目。
    完整模板默认同时启动 Web，不用再开启 `web` profile，也不用手动合并三套服务。
    **现有部署的端口、数据卷或自定义网络与模板不一致时，不要直接覆盖这些部分。**
-   对已经深度定制的项目，也可继续只合并 `docker-compose.web-update.yml` 中的更新服务配置。
+   已有自定义 Compose 可以从完整模板合入 `updater` 服务和对应的顶层 `component_vault_updater_state` 卷声明，并复制 `api.environment.UPDATER_URL` 与 API/Web 的 Watchtower 排除标签。
    API/Web 的 `image` 应保留 Hub 模板的变量形式；写死旧镜像会令在线更新停止并提示修正。
 4. 核对四个必要映射：
 
@@ -113,6 +113,8 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 7. 在 Container Manager 的「映像」中更新项目使用的 API 和管理镜像标签；尚未下载的标签从「注册表」下载。dev 使用 `dev` 和 `web-dev`，其中 `web-dev` 同时供 Web 和 updater 使用。[群晖映像管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_image?version=7)
 8. 在「项目 → 原项目 → YAML 配置」保存并部署。对照原设置核对 API/Web 端口、`/data` 和 updater 的 `/state`；只点「重新启动」会继续运行已有容器。更新已有项目时，先确认没有进行中的网页更新任务；换用新模板或更新 updater 自身需要重新部署 updater。避免使用「清除」或「删除」项目。[群晖项目管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_project?version=7)
 9. 在原 API 地址打开 `/health` 核对版本，再登录管理台检查库存与「设置 → 关于服务端」的更新状态。新安装应先在 `/setup` 保存管理员密钥和 Web 地址，应用设置会写入 `/data/config.json`。
+
+旧项目若使用 `docker-compose.web-update.yml` 作为第二份配置，请在原项目中改用完整模板并重新部署。命令行部署将原来两个 `-f` 合为 `-f docker-compose.hub-web-update.yml`，继续使用原项目名；有自定义配置时按第 3 步合并。Updater 读取容器记录的 Compose 文件路径，重新部署前应在原路径保留旧文件。部署目录直接使用仓库检出时，请在拉取前准备好迁移配置。
 
 Docker socket 具有主机 Docker 管理能力，仅挂载到 updater；API、Web 不挂载 socket，
 updater 不映射主机端口。实际更新接口仅管理员可调用，普通账户没有更新入口。

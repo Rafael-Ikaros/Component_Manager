@@ -12,6 +12,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILES = (ROOT / "docker-compose.yml", ROOT / "docker-compose.hub.yml")
+WEB_UPDATE_FILE = ROOT / "docker-compose.hub-web-update.yml"
 ENV_KEYS = ("API_TOKEN", "ADMIN_WEB_ORIGINS", "WEB_INVENTORY_ENABLED")
 API_DEFAULTS = (
     "DATABASE_PATH", "APP_HOST", "APP_PORT", "MQTT_ENABLED", "MQTT_HOST", "MQTT_PORT",
@@ -114,12 +115,17 @@ def main() -> None:
                 }, profile="web")
                 assert pinned["services"]["api"]["image"] == "example/inventory:0.7.9"
                 assert pinned["services"]["admin-web"]["image"] == "example/inventory:web-0.7.9"
-                managed = render(compose_file, os.devnull, {
+                managed = render(WEB_UPDATE_FILE, os.devnull, {
                     "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, (watchtower_file, ROOT / "docker-compose.web-update.yml"),
-                    project_name="component-vault-compose-ci", profile="web")
+                }, project_name="component-vault-compose-ci")
                 services = managed["services"]
+                assert set(services) == {"api", "admin-web", "updater"}
+                assert services["api"]["image"] == "rafaelikaros/component_manager:dev"
+                assert services["admin-web"]["image"] == "rafaelikaros/component_manager:web-dev"
+                assert services["api"]["volumes"] == api_empty["volumes"]
+                assert services["api"]["ports"] == api_empty["ports"]
+                assert services["admin-web"]["ports"] == web["ports"]
                 assert services["api"]["environment"]["UPDATER_URL"] == "http://updater:8790"
                 assert "UPDATE_TOKEN_FILE" not in services["api"]["environment"]
                 for service in ("api", "admin-web"):
@@ -131,29 +137,20 @@ def main() -> None:
                 assert updater["command"] == ["updater"]
                 assert updater["environment"]["UPDATE_PROJECT_NAME"] == "component-vault-compose-ci"
                 assert "UPDATE_TOKEN_FILE" not in updater["environment"]
-                assert any(volume["target"] == "/data" and volume.get("read_only") for volume in updater["volumes"])
+                api_data = next(volume for volume in api_empty["volumes"] if volume["target"] == "/data")
+                assert any(volume["target"] == "/data" and volume["source"] == api_data["source"]
+                           and volume.get("read_only") for volume in updater["volumes"])
+                assert any(volume["target"] == "/state" and volume["type"] == "volume"
+                           and volume["source"] == "component_vault_updater_state"
+                           for volume in updater["volumes"])
                 assert any(volume["target"] == "/var/run/docker.sock" for volume in updater["volumes"])
                 assert any(volume["type"] == "bind" and volume["target"] == str(ROOT)
                            and volume["source"] == str(ROOT) and not volume.get("read_only")
                            for volume in updater["volumes"])
-                # Synology's GUI can use one complete file without manually
-                # merging the Hub template and updater override. It starts Web
-                # by default; the remaining services must render identically.
-                single = render(ROOT / "docker-compose.hub-web-update.yml", os.devnull, {
-                    "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
-                    "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, project_name="component-vault-compose-ci")
-                combined = render(compose_file, os.devnull, {
-                    "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
-                    "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
-                }, (ROOT / "docker-compose.web-update.yml",), project_name="component-vault-compose-ci",
-                    profile="web")
-                combined["services"]["admin-web"].pop("profiles", None)
-                assert single == combined, "Single-file Web updater deployment drifted from the base and override."
-                # Explicit Web pins must also select the updater image, even if
-                # an old deployment still has the retired updater override.
+                # Explicit Web pins also select the updater image, even when
+                # an existing .env still defines the retired updater image variable.
                 for channel in ("latest", "dev"):
-                    shared = render(ROOT / "docker-compose.hub-web-update.yml", os.devnull, {
+                    shared = render(WEB_UPDATE_FILE, os.devnull, {
                         "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
                         "COMPOSE_PROJECT_NAME": "component-vault-compose-ci",
                         "COMPONENT_VAULT_DOCKER_CHANNEL": channel,

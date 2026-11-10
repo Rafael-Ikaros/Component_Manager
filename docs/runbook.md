@@ -2,7 +2,7 @@
 
 ## Docker Hub image deployment
 
-普通部署见[快速部署](docker-quickstart.md)，正式版与 dev 切换见[渠道指南](docker-channels.md)。启用网页更新时使用单文件模板，`.env` 填宿主机项目目录，dev 另填渠道。旧部署保留原项目名、端口、完整 `/data` 和生效的自定义 API 环境变量。[网页更新教程](server-web-update.md)
+普通部署见[快速部署](docker-quickstart.md)，正式版与 dev 切换见[渠道指南](docker-channels.md)。启用网页更新时使用 `docker-compose.hub-web-update.yml`，`.env` 填宿主机项目目录，dev 另填渠道。旧部署保留原项目名、端口、完整 `/data` 和生效的自定义 API 环境变量。[网页更新与旧配置迁移](server-web-update.md#群晖一次性配置)
 
 ### 独立 Docker CI 与发布渠道
 
