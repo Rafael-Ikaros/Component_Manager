@@ -108,7 +108,11 @@ GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs
 独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
 手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
-以 dev.14 为例，固定标签是 `0.7.9-dev.14` 和 `web-0.7.9-dev.14`，对应渠道为 `dev` 和 `web-dev`。正式版渠道为 `latest` 和 `web-latest`。旧版 `updater-*` 标签保留作历史记录。
+以 dev.14 为例，固定标签是 `0.7.9-dev.14` 和 `web-0.7.9-dev.14`，对应渠道为 `dev` 和 `web-dev`。正式版渠道为 `latest` 和 `web-latest`。旧版 `updater-*` 标签在仍有部署可能依赖时保留，迁移方式见[网页更新指南](server-web-update.md#从独立-updater-镜像迁移)。
+
+补发时，CI 先核对已有固定标签的版本、提交和两种架构，复用符合预期的摘要，只推送缺失的镜像。标签存在但身份不匹配，或 Docker Hub 查询失败时，任务会停止。需要发布修订后的镜像时使用新的版本号。
+
+若需同时约束 CI 之外的推送，可在 Docker Hub 启用「Specific tags are immutable」，例如用 `^(web-)?[0-9]+\.[0-9]+\.[0-9]+(-dev\.[0-9]+)?$` 锁定版本标签，四个渠道标签仍可推进。[Docker Hub 不可变标签](https://docs.docker.com/docker-hub/repos/manage/hub-images/immutable-tags/)
 
 普通 Docker CI 或 `push_image=false` 只构建检查。请求发布但用户名、镜像名或 Token 缺失时，
 Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job，一方成功不能代表另一方成功，
@@ -116,7 +120,7 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 
 ## 六、确认发布确实成功
 
-1. 确认 **Verify fixed images on Docker Hub** 成功，API 与管理镜像均已推送固定标签，并核对了摘要、架构和发布身份。
+1. 确认 **Verify fixed images on Docker Hub** 成功。API 与管理镜像的固定标签都已核对摘要、架构和发布身份，发布步骤中已有镜像的构建应显示跳过。
 2. 如启用了 `promote_channel`，确认 **Verify real Web-triggered Compose update using fixed images** 成功。该步骤通过管理员 API 在隔离项目触发更新，检查 API/Web 容器替换、Updater 持续运行，以及测试库存、挂载和端口是否保留。
 3. 推进渠道时，确认 **Promote the verified image pair to the channel** 成功。工作流按摘要更新两个浮动标签并回读验证。如果推进失败，工作流会尝试恢复已记录的上一组摘要。
 

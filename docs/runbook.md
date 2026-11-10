@@ -6,7 +6,7 @@
 
 ### 独立 Docker CI 与发布渠道
 
-`docker-ci.yml` 检查镜像构建和 Compose 配置。`server-image.yml` 先发布并核对 API 和管理镜像的固定标签，再通过隔离项目验证更新，然后推进对应的 `dev / web-dev` 或 `latest / web-latest`。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可使用独立工作流重跑同一 tag。手动重跑默认只补固定标签，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
+`docker-ci.yml` 检查镜像构建和 Compose 配置。`server-image.yml` 核对并复用已发布的固定标签，只构建缺失的 API 或管理镜像。隔离项目验证更新后，才推进对应的 `dev / web-dev` 或 `latest / web-latest`。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可用 `master` 上的独立工作流补发同一 tag，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
 
 ### Optional Watchtower updates for the Hub deployment
 

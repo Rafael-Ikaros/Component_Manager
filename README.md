@@ -128,7 +128,7 @@ API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管
 
 [架构说明](docs/architecture.md) · [接口契约](docs/integration-guide.md) · [构建与发布](docs/runbook.md) · [验证记录](docs/history/verification.md)
 
-Docker 发布先推送和核对固定版本的 API 与管理镜像，通过 Compose 更新验证后再推进对应渠道。[镜像发布指南](docs/dockerhub.md)
+Docker 发布复用已验证的固定版本，只补发缺失的 API 或管理镜像。通过 Compose 更新验证后再推进对应渠道。[镜像发布指南](docs/dockerhub.md)
 
 反馈问题请提供应用／容器版本、复现步骤和实际报错。应用内反馈可选择附加诊断摘要；
 不要提交账户密钥或完整私人数据库。开发中的功能先发布 dev，验证后再决定正式发布。

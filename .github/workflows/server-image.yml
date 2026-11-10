@@ -270,6 +270,20 @@ jobs:
               --output /dev/null "http://127.0.0.1:18081$asset"
           done
 
+      - name: Check out release workflow tools
+        if: steps.build_identity.outputs.revision != github.workflow_sha
+        id: release_checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+          sparse-checkout: tools/deployment
+
+      - name: Verify fixed tag resolution and identity checks
+        env:
+          RELEASE_TOOLS: ${{ steps.release_checkout.outcome == 'success' && '.release-tools/tools/deployment' || 'tools/deployment' }}
+        run: python -m unittest discover -s "$RELEASE_TOOLS" -p test_fixed_docker_tags.py -v
+
       - name: Login to Docker Hub
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
         uses: docker/login-action@v4
@@ -277,29 +291,19 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Resolve version and channel image tags
+      - name: Check existing fixed images on Docker Hub
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
         id: image_tags
         env:
-          IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
-        run: |
-          version="${RELEASE_TAG#v}"
-          channel=latest
-          update_channel=stable
-          if [[ "$version" == *-dev.* ]]; then
-            channel=dev
-            update_channel=dev
-          fi
-          {
-            echo "api_version=$IMAGE:$version"
-            echo "web_version=$IMAGE:web-$version"
-            echo "api_channel=$IMAGE:$channel"
-            echo "web_channel=$IMAGE:web-$channel"
-            echo "update_channel=$update_channel"
-          } >> "$GITHUB_OUTPUT"
+          RELEASE_TOOLS: ${{ steps.release_checkout.outcome == 'success' && '.release-tools/tools/deployment' || 'tools/deployment' }}
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
+        run: python "$RELEASE_TOOLS/fixed_docker_tags.py"
 
       - name: Publish fixed multi-platform API image
-        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        if: steps.image_tags.outputs.api_missing == 'true'
         id: published_api
         uses: docker/build-push-action@v7
         with:
@@ -318,7 +322,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=server-image
 
       - name: Publish fixed multi-platform management image
-        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
+        if: steps.image_tags.outputs.web_missing == 'true'
         id: published_web
         uses: docker/build-push-action@v7
         with:
@@ -335,39 +339,20 @@ jobs:
           cache-to: type=gha,mode=max,scope=web-image
 
       - name: Verify fixed images on Docker Hub
-        if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
-        shell: bash
+        if: steps.image_tags.outcome == 'success'
+        id: verified_images
         env:
-          API_VERSION: ${{ steps.image_tags.outputs.api_version }}
-          WEB_VERSION: ${{ steps.image_tags.outputs.web_version }}
-          API_DIGEST: ${{ steps.published_api.outputs.digest }}
-          WEB_DIGEST: ${{ steps.published_web.outputs.digest }}
+          RELEASE_TOOLS: ${{ steps.release_checkout.outcome == 'success' && '.release-tools/tools/deployment' || 'tools/deployment' }}
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          API_DIGEST: ${{ steps.image_tags.outputs.api_digest || steps.published_api.outputs.digest }}
+          WEB_DIGEST: ${{ steps.image_tags.outputs.web_digest || steps.published_web.outputs.digest }}
           EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
-        run: |
-          verify_image() {
-            local image=$1 digest=$2
-            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-            test "$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')" = "$digest"
-            docker buildx imagetools inspect --raw "$image" | jq -e '
-              [.manifests[] | select(.platform.os == "linux") | .platform.architecture]
-              | unique == ["amd64", "arm64"]
-            ' >/dev/null
-            docker pull --platform linux/amd64 "$image"
-            test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "$RELEASE_TAG"
-            test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$EXPECTED_REVISION"
-          }
-          verify_image "$API_VERSION" "$API_DIGEST"
-          verify_image "$WEB_VERSION" "$WEB_DIGEST"
-
-      - name: Check out release workflow tools
-        if: env.PROMOTE_CHANNEL == 'true' && steps.build_identity.outputs.revision != github.workflow_sha
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          path: .release-tools
+        run: python "$RELEASE_TOOLS/fixed_docker_tags.py" --expect-digests "$API_DIGEST" "$WEB_DIGEST"
 
       - name: Verify real Web-triggered Compose update using fixed images
-        if: env.PROMOTE_CHANNEL == 'true'
+        if: env.PROMOTE_CHANNEL == 'true' && steps.verified_images.outcome == 'success'
         timeout-minutes: 12
         env:
           UPDATE_CHANNEL: ${{ steps.image_tags.outputs.update_channel }}
@@ -379,13 +364,13 @@ jobs:
           bash "$script"
 
       - name: Promote the verified image pair to the channel
-        if: env.PROMOTE_CHANNEL == 'true'
+        if: env.PROMOTE_CHANNEL == 'true' && steps.verified_images.outcome == 'success'
         env:
           IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
           API_CHANNEL: ${{ steps.image_tags.outputs.api_channel }}
           WEB_CHANNEL: ${{ steps.image_tags.outputs.web_channel }}
-          API_DIGEST: ${{ steps.published_api.outputs.digest }}
-          WEB_DIGEST: ${{ steps.published_web.outputs.digest }}
+          API_DIGEST: ${{ steps.verified_images.outputs.api_digest }}
+          WEB_DIGEST: ${{ steps.verified_images.outputs.web_digest }}
         run: |
           digest_of() {
             docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'
