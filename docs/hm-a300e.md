@@ -57,7 +57,7 @@ Windows CPCL 包的头文件中 `CPCL_GetStatus` 被注释，未核实到等价�
 & '.\android-client\gradlew.bat' -p android-client '-PhprtCpclSdkDir=D:/HPRT/Android_CPCL_V1.22.05/app/libs' assembleDebug
 ```
 
-SDK 二进制由构建者从汉印取得。当前在本地测试构建启用，SDK 的再分发条款待确认。默认构建选择 HM-A300E 时显示所需的 SDK 构建提示。
+2026-11-12 核对了[汉印型号下载页](https://www.hprt.com/Product/Mobile-Receipt-Printer-HM-A300E.html)、Android CPCL V1.22.05 随附手册、JAR 和同型号下载目录中的 UxPrint Android 包。官方手册提供集成步骤。当前资料中未找到允许把 SDK 二进制随第三方公开 APK 分发的条款。公开构建采用默认配置，选择 HM-A300E 时在创建队列按钮上方显示缺少 SDK 的原因。开发者可以按上面的步骤从汉印取得 SDK，构建测试包。
 
 ## 尺寸与命令
 

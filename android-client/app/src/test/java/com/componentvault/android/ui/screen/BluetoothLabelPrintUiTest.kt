@@ -36,7 +36,9 @@ import com.componentvault.android.data.LabelElementType
 import com.componentvault.android.data.M1TestPaperProfile
 import com.componentvault.android.data.LabelPrintQueue
 import com.componentvault.android.data.LabelPrintQueueStore
+import com.componentvault.android.data.createHprtCpclPort
 import com.componentvault.android.model.ComponentLabelSeed
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +70,32 @@ class BluetoothLabelPrintUiTest {
             ).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText(context.getString(R.string.label_ui_edit)).performClick()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun hmA300eWithoutSdkShowsTheReasonByTheDisabledQueueButton() {
+        assumeTrue(createHprtCpclPort(context) == null)
+        LabelPrintQueueStore(context).clear()
+        val seed = ComponentLabelSeed("C393939", "TYPE-C16PIN", "Connector", "SMD", "A", 10, 1)
+        setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("label_print_open") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("label_print_open").performClick()
+        val createLabel = context.getString(R.string.bluetooth_label_print_create)
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(createLabel) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("HM-A300E CPCL").performScrollTo().performClick()
+        compose.onNodeWithText(createLabel).assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.label_hm_sdk_missing)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.label_ui_print_blocked)).assertDoesNotExist()
+        compose.onNodeWithText("M1").performScrollTo().performClick()
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(createLabel) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.label_hm_sdk_missing)).assertDoesNotExist()
     }
 
     @Test

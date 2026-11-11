@@ -17,6 +17,18 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.18] - 2026-11-12
+
+### 修复
+
+- Android 在 HM-A300E 的打印准备页直接说明当前安装包缺少汉印 CPCL SDK，提示紧邻「创建打印队列」按钮。机型受支持时，页面会显示实际的预览错误。[#28](https://github.com/Rafael-Ikaros/Component_Manager/issues/28) · [HM-A300E 适配指南](hm-a300e.md)
+- Android 和 Windows 的元件库存分别显示「当前库存」和「累计出库」。库存数量使用现有结余，历史出库单独展示。[#30](https://github.com/Rafael-Ikaros/Component_Manager/issues/30)
+
+### 验证
+
+- 小米 9 上录入 100 件测试元件后出库 30 件，列表与详情均显示当前库存 70、累计出库 30。用该元件的有效预览选择 HM-A300E 可看到缺少 SDK 的提示，切回 M1 后队列按钮恢复可用。
+- Windows Release 构建和库存统计定向测试通过。
+
 ## [0.7.9-dev.17] - 2026-11-11
 
 ### Docker 发布与部署

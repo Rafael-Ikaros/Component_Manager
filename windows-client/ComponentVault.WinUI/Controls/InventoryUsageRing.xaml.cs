@@ -1,3 +1,4 @@
+using ComponentVault.WinUI.Localization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -25,7 +26,7 @@ public sealed partial class InventoryUsageRing : UserControl
         var total = checked(Math.Max(0, CurrentQuantity) + Math.Max(0, OutboundQuantity));
         var ratio = total == 0 ? 0 : Math.Clamp((double)Math.Max(0, OutboundQuantity) / total, 0, 1);
         PercentageText.Text = $"{ratio:P0}";
-        SummaryText.Text = $"已出库 {Compact(OutboundQuantity)} / 总量 {Compact(total)}";
+        SummaryText.Text = AppStrings.Format("InventoryUsageRing_TotalIssued", Compact(OutboundQuantity));
         FullUsedRing.Visibility = ratio >= 0.999999 ? Visibility.Visible : Visibility.Collapsed;
         UsedArc.Visibility = ratio > 0 && ratio < 0.999999 ? Visibility.Visible : Visibility.Collapsed;
         if (UsedArc.Visibility == Visibility.Visible)
@@ -46,7 +47,7 @@ public sealed partial class InventoryUsageRing : UserControl
                 },
             };
         }
-        var label = $"现存 {CurrentQuantity}，已出库 {OutboundQuantity}，统计总量 {total}";
+        var label = AppStrings.Format("InventoryUsageRing_Summary", CurrentQuantity, OutboundQuantity);
         ToolTipService.SetToolTip(this, label);
         AutomationProperties.SetName(this, label);
     }

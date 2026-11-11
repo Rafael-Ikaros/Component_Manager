@@ -275,13 +275,15 @@
 							Style="{StaticResource CaptionTextStyle}"
 							Text="仓位" />
 						<TextBlock
+							x:Uid="ComponentsViewCurrentStockColumn"
 							Grid.Column="3"
 							Style="{StaticResource CaptionTextStyle}"
-							Text="库存" />
+							Text="当前库存" />
 						<TextBlock
+							x:Uid="ComponentsViewTotalIssuedColumn"
 							Grid.Column="4"
 							Style="{StaticResource CaptionTextStyle}"
-							Text="使用 / 总量" />
+							Text="累计出库" />
 					</Grid>
 					<ListView
 						x:Name="ComponentsListView"
@@ -346,20 +348,11 @@
 										VerticalAlignment="Center"
 										FontWeight="SemiBold"
 										Text="{Binding Quantity}" />
-									<StackPanel
+									<controls:InventoryUsageRing
 										Grid.Column="4"
 										HorizontalAlignment="Center"
-										Spacing="0">
-										<controls:InventoryUsageRing CurrentQuantity="{Binding Quantity}" OutboundQuantity="{Binding CumulativeOutboundQuantity}" />
-										<StackPanel
-											Margin="0,-8,0,0"
-											HorizontalAlignment="Center"
-											Orientation="Horizontal"
-											Spacing="3">
-											<TextBlock Style="{StaticResource CaptionTextStyle}" Text="总量" />
-											<TextBlock Style="{StaticResource CaptionTextStyle}" Text="{Binding StatisticalTotal}" />
-										</StackPanel>
-									</StackPanel>
+										CurrentQuantity="{Binding Quantity}"
+										OutboundQuantity="{Binding CumulativeOutboundQuantity}" />
 								</Grid>
 							</DataTemplate>
 						</ListView.ItemTemplate>
@@ -431,7 +424,7 @@
 									<RowDefinition Height="Auto" />
 									<RowDefinition Height="Auto" />
 								</Grid.RowDefinitions>
-								<TextBlock Style="{StaticResource CaptionTextStyle}" Text="现存" />
+								<TextBlock x:Uid="ComponentsViewCurrentStockDetail" Style="{StaticResource CaptionTextStyle}" Text="当前库存" />
 								<TextBlock
 									Grid.Column="1"
 									FontWeight="SemiBold"

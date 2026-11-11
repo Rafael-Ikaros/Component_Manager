@@ -386,39 +386,50 @@ internal fun BluetoothLabelPrintScreen(
         title = stringResource(if (showPrintView) R.string.label_ui_print_ready else R.string.bluetooth_label_print_title),
         onBack = ::requestBack,
         bottomBar = {
-            Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!showPrintView) {
-                    Button(onClick = { showPrintView = true }, enabled = controller.loaded && !controller.working,
-                        modifier = Modifier.weight(1f).testTag("label_print_open")) {
-                        Text(stringResource(R.string.label_ui_print))
-                    }
-                } else if (!hasQueue) {
-                    OutlinedButton(onClick = { showPrintView = false }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.label_ui_edit))
-                    }
-                    Button(onClick = { paper?.let { sheet ->
-                        if (draftFreeLabel != null && activeDesign != null)
-                            controller.createFree(draftFreeLabel, freeCopies.toInt(), sheet, activeDesign)
-                        else controller.create(draftSelections, templateId, textTemplateId, sheet, printDesigns)
-                    } }, enabled = canCreate, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.bluetooth_label_print_create))
-                    }
-                } else if (controller.running) {
-                    OutlinedButton(onClick = controller::pause, enabled = !controller.pauseRequested,
-                        modifier = Modifier.weight(1f)) { Text(stringResource(R.string.bluetooth_label_print_pause)) }
-                    Button(onClick = { leaveAfterStop = false; confirmStop = true }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.bluetooth_label_print_stop))
-                    }
-                } else {
-                    Button(onClick = { selectedCandidate?.let(controller::start) },
-                        enabled = printerAvailable && !controller.working && selectedCandidate != null &&
-                            queue.items.any { it.state == LabelPrintItemState.Pending } &&
-                            queue.items.none { it.state in listOf(LabelPrintItemState.Uncertain,
-                                LabelPrintItemState.Failed, LabelPrintItemState.Sending) },
-                        modifier = Modifier.weight(1f).testTag("print_queue_start")) {
-                        Text(stringResource(R.string.bluetooth_label_print_start))
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (showPrintView && !hasQueue && !printerAvailable) {
+                    Text(
+                        stringResource(R.string.label_hm_sdk_missing),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!showPrintView) {
+                        Button(onClick = { showPrintView = true }, enabled = controller.loaded && !controller.working,
+                            modifier = Modifier.weight(1f).testTag("label_print_open")) {
+                            Text(stringResource(R.string.label_ui_print))
+                        }
+                    } else if (!hasQueue) {
+                        OutlinedButton(onClick = { showPrintView = false }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.label_ui_edit))
+                        }
+                        Button(onClick = { paper?.let { sheet ->
+                            if (draftFreeLabel != null && activeDesign != null)
+                                controller.createFree(draftFreeLabel, freeCopies.toInt(), sheet, activeDesign)
+                            else controller.create(draftSelections, templateId, textTemplateId, sheet, printDesigns)
+                        } }, enabled = canCreate, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.bluetooth_label_print_create))
+                        }
+                    } else if (controller.running) {
+                        OutlinedButton(onClick = controller::pause, enabled = !controller.pauseRequested,
+                            modifier = Modifier.weight(1f)) { Text(stringResource(R.string.bluetooth_label_print_pause)) }
+                        Button(onClick = { leaveAfterStop = false; confirmStop = true }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.bluetooth_label_print_stop))
+                        }
+                    } else {
+                        Button(onClick = { selectedCandidate?.let(controller::start) },
+                            enabled = printerAvailable && !controller.working && selectedCandidate != null &&
+                                queue.items.any { it.state == LabelPrintItemState.Pending } &&
+                                queue.items.none { it.state in listOf(LabelPrintItemState.Uncertain,
+                                    LabelPrintItemState.Failed, LabelPrintItemState.Sending) },
+                            modifier = Modifier.weight(1f).testTag("print_queue_start")) {
+                            Text(stringResource(R.string.bluetooth_label_print_start))
+                        }
                     }
                 }
             }
@@ -496,8 +507,12 @@ internal fun BluetoothLabelPrintScreen(
                 localMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
                 if (!controller.loaded || controller.working) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (!hasQueue) {
-                    if (!canCreate) Text(stringResource(R.string.label_ui_print_blocked),
-                        color = MaterialTheme.colorScheme.error)
+                    if (!canCreate && printerAvailable) {
+                        Text(
+                            previewError ?: stringResource(R.string.label_ui_print_blocked),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     if (previewFreeLabel != null) {
                         OutlinedTextField(freeTitle, { freeTitle = it.take(80) },
                             label = { Text(stringResource(R.string.label_tool_title_field)) },
@@ -571,7 +586,9 @@ internal fun BluetoothLabelPrintScreen(
                             label = { Text(if (profile == LabelPrinterProfile.M1) "M1" else "HM-A300E CPCL") })
                     }
                     if (activeProfile == LabelPrinterProfile.HmA300eCpcl) {
-                        Text(stringResource(if (printerAvailable) R.string.label_hm_experimental else R.string.label_hm_sdk_missing))
+                        if (printerAvailable || hasQueue) {
+                            Text(stringResource(if (printerAvailable) R.string.label_hm_experimental else R.string.label_hm_sdk_missing))
+                        }
                         LabelMediaType.entries.forEach { media ->
                             FilterChip(selected = (if (hasQueue) queue.mediaType else controller.selectedMediaType) == media.id,
                                 onClick = { controller.selectMedia(media.id) }, enabled = editable,

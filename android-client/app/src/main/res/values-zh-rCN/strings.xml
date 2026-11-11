@@ -66,13 +66,10 @@
     <string name="inventory_detail_notes_title">描述与备注</string>
     <string name="inventory_detail_recent_movements_title">最近变动</string>
     <string name="inventory_detail_recent_movements_empty">该元件最近没有变动历史。</string>
-    <string name="inventory_usage_remaining">现存</string>
-    <string name="inventory_usage_issued">已出库</string>
-    <string name="inventory_usage_total">统计总量</string>
-    <string name="inventory_usage_issued_value">已出库 %1$d</string>
-    <string name="inventory_usage_total_value">总量 %1$d</string>
-    <string name="inventory_usage_summary">现存 %1$d，已出库 %2$d，统计总量 %3$d</string>
-    <string name="inventory_usage_explanation">统计总量=现存+已记录出库；出库不等于实际消耗，缺失历史无法推算。</string>
+    <string name="inventory_usage_remaining">当前库存</string>
+    <string name="inventory_usage_issued">累计出库</string>
+    <string name="inventory_usage_issued_value">累计出库 %1$d</string>
+    <string name="inventory_usage_summary">当前库存 %1$d，累计出库 %2$d</string>
     <string name="product_image_loading">图片加载中</string>
     <string name="product_image_unavailable">暂无商品图片</string>
     <string name="product_image_description">%1$s 的商品图片</string>
@@ -675,7 +672,7 @@
     <string name="bluetooth_label_print_dismiss_error">关闭</string>
     <string name="label_printer_profile">打印机配置</string>
     <string name="label_hm_experimental">HM-A300E 使用汉印 CPCL SDK 打印。请先在 Android 设置中配对，并让打印机的纸张设置与实际纸卷一致。每张出纸后请核对实物，再继续打印。</string>
-    <string name="label_hm_sdk_missing">HM-A300E 打印需要包含汉印 CPCL SDK 的构建。</string>
+    <string name="label_hm_sdk_missing">当前安装包缺少汉印 CPCL SDK，无法创建 HM-A300E 打印队列。</string>
     <string name="label_media_gap">间隙标签</string>
     <string name="label_media_continuous">连续纸</string>
     <string name="label_hm_printable_width">可打印宽度 25–72 mm（纸卷 25–80 mm）；高度 10–300 mm 是应用首版限制。暂不支持黑标纸。</string>

@@ -422,6 +422,11 @@ private fun InventoryListRowContent(
                     ) {
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
+                                text = stringResource(R.string.inventory_usage_remaining),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
                                 text = item.quantity.toString(),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,

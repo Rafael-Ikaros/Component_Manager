@@ -29,6 +29,11 @@
   <data name="ComponentsViewLocationLabel.Text" xml:space="preserve"><value>Location</value></data>
   <data name="ComponentsViewSortLabel.Text" xml:space="preserve"><value>Sort</value></data>
   <data name="ComponentsViewSkuCaption.Text" xml:space="preserve"><value>SKU</value></data>
+  <data name="ComponentsViewCurrentStockColumn.Text" xml:space="preserve"><value>Current stock</value></data>
+  <data name="ComponentsViewCurrentStockDetail.Text" xml:space="preserve"><value>Current stock</value></data>
+  <data name="ComponentsViewTotalIssuedColumn.Text" xml:space="preserve"><value>Total issued</value></data>
+  <data name="InventoryUsageRing_TotalIssued" xml:space="preserve"><value>Total issued {0}</value></data>
+  <data name="InventoryUsageRing_Summary" xml:space="preserve"><value>Current stock {0}, total issued {1}</value></data>
   <data name="DashboardViewPageTitle.Text" xml:space="preserve"><value>Overview</value></data>
   <data name="DashboardViewPageSubtitle.Text" xml:space="preserve"><value>See inventory scale, risk, and recent work at a glance.</value></data>
   <data name="DashboardOpenInventoryButton.Content" xml:space="preserve"><value>Open inventory</value></data>

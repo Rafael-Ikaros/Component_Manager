@@ -74,13 +74,10 @@
     <string name="inventory_detail_notes_title">Description and notes</string>
     <string name="inventory_detail_recent_movements_title">Recent movements</string>
     <string name="inventory_detail_recent_movements_empty">No recent movement history for this component.</string>
-    <string name="inventory_usage_remaining">Remaining</string>
-    <string name="inventory_usage_issued">Issued</string>
-    <string name="inventory_usage_total">Tracked total</string>
-    <string name="inventory_usage_issued_value">Issued %1$d</string>
-    <string name="inventory_usage_total_value">Total %1$d</string>
-    <string name="inventory_usage_summary">Remaining %1$d, issued %2$d, tracked total %3$d</string>
-    <string name="inventory_usage_explanation">Tracked total = remaining + recorded outbound. Outbound does not mean actual consumption; missing history cannot be inferred.</string>
+    <string name="inventory_usage_remaining">Current stock</string>
+    <string name="inventory_usage_issued">Total issued</string>
+    <string name="inventory_usage_issued_value">Total issued %1$d</string>
+    <string name="inventory_usage_summary">Current stock %1$d, total issued %2$d</string>
     <string name="product_image_loading">Loading image</string>
     <string name="product_image_unavailable">No product image</string>
     <string name="product_image_description">Product image for %1$s</string>
@@ -693,7 +690,7 @@
     <string name="bluetooth_label_print_dismiss_error">Close</string>
     <string name="label_printer_profile">Printer profile</string>
     <string name="label_hm_experimental">HM-A300E printing uses the HPRT CPCL SDK. Pair in Android settings and match the printer’s paper setting to the loaded roll. Check each label before continuing.</string>
-    <string name="label_hm_sdk_missing">HM-A300E printing requires a build with the HPRT CPCL SDK.</string>
+    <string name="label_hm_sdk_missing">This build requires the HPRT CPCL SDK to create an HM-A300E print queue.</string>
     <string name="label_media_gap">Gap labels</string>
     <string name="label_media_continuous">Continuous paper</string>
     <string name="label_hm_printable_width">Printable width: 25–72 mm (paper roll: 25–80 mm). Height: 10–300 mm, an initial app limit. Black mark media is not supported yet.</string>

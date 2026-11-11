@@ -29,6 +29,11 @@
   <data name="ComponentsViewLocationLabel.Text" xml:space="preserve"><value>仓位</value></data>
   <data name="ComponentsViewSortLabel.Text" xml:space="preserve"><value>排序</value></data>
   <data name="ComponentsViewSkuCaption.Text" xml:space="preserve"><value>SKU</value></data>
+  <data name="ComponentsViewCurrentStockColumn.Text" xml:space="preserve"><value>当前库存</value></data>
+  <data name="ComponentsViewCurrentStockDetail.Text" xml:space="preserve"><value>当前库存</value></data>
+  <data name="ComponentsViewTotalIssuedColumn.Text" xml:space="preserve"><value>累计出库</value></data>
+  <data name="InventoryUsageRing_TotalIssued" xml:space="preserve"><value>累计出库 {0}</value></data>
+  <data name="InventoryUsageRing_Summary" xml:space="preserve"><value>当前库存 {0}，累计出库 {1}</value></data>
   <data name="DashboardViewPageTitle.Text" xml:space="preserve"><value>概览</value></data>
   <data name="DashboardViewPageSubtitle.Text" xml:space="preserve"><value>库存规模、风险和最近作业一目了然。</value></data>
   <data name="DashboardOpenInventoryButton.Content" xml:space="preserve"><value>打开库存</value></data>

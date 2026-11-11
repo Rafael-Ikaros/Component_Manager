@@ -3,7 +3,6 @@ package com.componentvault.android.ui.screen
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +33,6 @@ internal fun StockUsageDonut(
         R.string.inventory_usage_summary,
         summary.remaining,
         summary.issued,
-        summary.total,
     )
     val remainingColor = MaterialTheme.colorScheme.primary
     val issuedColor = MaterialTheme.colorScheme.tertiary
@@ -91,17 +89,10 @@ internal fun StockUsageDonut(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                text = stringResource(R.string.inventory_usage_issued_value, summary.issued),
-                style = MaterialTheme.typography.labelMedium,
-                color = issuedColor,
-            )
-            Text(
-                text = stringResource(R.string.inventory_usage_total_value, summary.total),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = stringResource(R.string.inventory_usage_issued_value, summary.issued),
+            style = MaterialTheme.typography.labelMedium,
+            color = issuedColor,
+        )
     }
 }

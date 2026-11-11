@@ -83,7 +83,6 @@ import com.componentvault.android.model.InventoryStockFilter
 import com.componentvault.android.model.officialParameters
 import com.componentvault.android.model.officialParameterKind
 import com.componentvault.android.model.StockMovementRecord
-import com.componentvault.android.model.StockUsageSummary
 import com.componentvault.android.model.StorageLocationRecord
 import com.componentvault.android.ui.theme.VaultWarning
 import com.componentvault.android.ui.theme.VaultWarningContainer
@@ -867,7 +866,6 @@ internal fun InventoryDetailPane(
             SectionPane(title = strings.inventory.detailStockTitle) {
                 ValueBlock(label = "库存均价（CNY）", value = component.inventoryUnitCost ?: "成本未知")
                 ValueBlock(label = "库存价值（CNY）", value = com.componentvault.android.data.InventoryCost.amount(component.inventoryUnitCost, component.quantity)?.let { java.math.BigDecimal(it).setScale(2, java.math.RoundingMode.HALF_EVEN).toPlainString() } ?: "成本未知")
-                val usage = StockUsageSummary(component.quantity, detail.issuedQuantity)
                 ValueBlock(
                     label = androidx.compose.ui.res.stringResource(
                         com.componentvault.android.R.string.inventory_usage_remaining,
@@ -881,25 +879,12 @@ internal fun InventoryDetailPane(
                     value = detail.issuedQuantity.toString(),
                 )
                 ValueBlock(
-                    label = androidx.compose.ui.res.stringResource(
-                        com.componentvault.android.R.string.inventory_usage_total,
-                    ),
-                    value = usage.total.toString(),
-                )
-                ValueBlock(
                     label = strings.inventory.metricMinStock,
                     value = component.minStock.toString(),
                 )
                 ValueBlock(
                     label = strings.common.labelUpdated,
                     value = formatShortLocalTimestamp(component.updatedAt),
-                )
-                Text(
-                    text = androidx.compose.ui.res.stringResource(
-                        com.componentvault.android.R.string.inventory_usage_explanation,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
