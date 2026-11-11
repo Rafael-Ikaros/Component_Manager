@@ -22,6 +22,7 @@ internal class LabelPrintController(context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val store = LabelPrintQueueStore(context.applicationContext)
     private val preferences = context.applicationContext.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE)
+    private val printerPreferences = LabelPrinterPreferences(preferences)
     val transport = BluetoothPrinterDiagnostics(context.applicationContext)
     var queue by mutableStateOf(LabelPrintQueue())
         private set
@@ -37,8 +38,12 @@ internal class LabelPrintController(context: Context) {
         private set
     var selectedAddress by mutableStateOf(preferences.getString("device_address", "").orEmpty())
         private set
-    var selectedProfileId by mutableStateOf(preferences.getString("printer_profile", "m1").orEmpty().let {
-        runCatching { LabelPrinterProfile.fromId(it).id }.getOrDefault("m1")
+    var savedPrinters by mutableStateOf(printerPreferences.load())
+        private set
+    var selectedProfileId by mutableStateOf(preferences.getString("printer_profile", null).orEmpty().let {
+        runCatching { LabelPrinterProfile.fromId(it).configurable.id }.getOrElse {
+            if (selectedAddress.isNotBlank()) LabelPrinterProfile.M1.id else LabelPrinterProfile.GenericCpcl.id
+        }
     })
         private set
     var selectedMediaType by mutableStateOf(preferences.getString("media_type", "gap").orEmpty().let {
@@ -47,21 +52,75 @@ internal class LabelPrintController(context: Context) {
         private set
     fun selectProfile(id: String) {
         if (running || working || closed || queue.items.isNotEmpty()) return
-        selectedProfileId = LabelPrinterProfile.fromId(id).id
-        preferences.edit().putString("printer_profile", id).apply()
+        val profile = LabelPrinterProfile.fromId(id).configurable
+        selectedProfileId = profile.id
+        if (!profile.usesCpcl) selectedMediaType = LabelMediaType.Gap.id
+        savePrinterSelection()
     }
     fun selectMedia(id: String) {
         if (running || working || closed || queue.items.isNotEmpty()) return
         selectedMediaType = LabelMediaType.fromId(id).id
-        preferences.edit().putString("media_type", id).apply()
+        savePrinterSelection()
     }
     private var stopRequested = false
     private var closed = false
 
-    fun selectDevice(address: String) {
-        if (running || working || closed) return
-        selectedAddress = address
-        preferences.edit().putString("device_address", address).apply()
+    private fun profileFor(candidate: PrinterDeviceCandidate): LabelPrinterProfile {
+        val stored = savedPrinters.firstOrNull { it.address == candidate.address }
+        return when {
+            stored != null -> LabelPrinterProfile.fromId(stored.profileId)
+            candidate.address == selectedAddress -> LabelPrinterProfile.fromId(selectedProfileId)
+            candidate.name.equals("M1", ignoreCase = true) ||
+                candidate.name?.startsWith("M1-", ignoreCase = true) == true -> LabelPrinterProfile.M1
+            else -> LabelPrinterProfile.GenericCpcl
+        }
+    }
+
+    fun canSelectDevice(candidate: PrinterDeviceCandidate): Boolean =
+        !running && !working && !closed &&
+            (queue.items.isEmpty() || LabelPrinterProfile.fromId(queue.printerProfileId).usesCpcl == profileFor(candidate).usesCpcl)
+
+    fun selectDevice(candidate: PrinterDeviceCandidate): Boolean {
+        if (!canSelectDevice(candidate)) return false
+        val stored = savedPrinters.firstOrNull { it.address == candidate.address }
+        val profile = profileFor(candidate)
+        val media = if (candidate.address == selectedAddress) selectedMediaType else stored?.mediaType
+        selectedAddress = candidate.address
+        selectedProfileId = profile.id
+        selectedMediaType = if (profile.usesCpcl) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
+        rememberPrinter(candidate)
+        return true
+    }
+
+    fun restoreSavedPrinter(candidate: PrinterDeviceCandidate) {
+        if (candidate.address == selectedAddress && savedPrinters.none { it.address == selectedAddress }) {
+            rememberPrinter(candidate)
+        }
+    }
+
+    fun forgetPrinter(address: String) {
+        if (running || working || closed || (address == selectedAddress && queue.items.isNotEmpty())) return
+        savedPrinters = savedPrinters.filterNot { it.address == address }
+        if (selectedAddress == address) {
+            selectedAddress = ""
+            selectedProfileId = LabelPrinterProfile.GenericCpcl.id
+            selectedMediaType = LabelMediaType.Gap.id
+        }
+        savePrinterSelection()
+    }
+
+    private fun rememberPrinter(candidate: PrinterDeviceCandidate) {
+        val printer = SavedLabelPrinter(candidate.address, candidate.name.orEmpty(), selectedProfileId, selectedMediaType)
+        savedPrinters = listOf(printer) + savedPrinters.filterNot { it.address == candidate.address }
+        savePrinterSelection()
+    }
+
+    private fun savePrinterSelection() {
+        savedPrinters = savedPrinters.map {
+            if (it.address == selectedAddress) it.copy(profileId = selectedProfileId, mediaType = selectedMediaType)
+            else it
+        }
+        printerPreferences.save(savedPrinters, selectedAddress, selectedProfileId, selectedMediaType)
     }
 
     fun load() {
@@ -123,7 +182,7 @@ internal class LabelPrintController(context: Context) {
         mutate {
             // Clear label snapshots but retain the last explicitly chosen paper and templates.
             persist(queue.copy(items = emptyList()))
-            releaseFinishedHprtQueue()
+            releaseFinishedCpclQueue()
             loaded = true
         }
     }
@@ -135,12 +194,12 @@ internal class LabelPrintController(context: Context) {
         if (state !in setOf(LabelPrintItemState.Pending, LabelPrintItemState.Sent, LabelPrintItemState.Skipped)) return
         mutate {
             persist(queue.update(id, state))
-            releaseFinishedHprtQueue()
+            releaseFinishedCpclQueue()
         }
     }
 
-    private fun releaseFinishedHprtQueue() {
-        if (queue.printerProfileId == LabelPrinterProfile.HmA300eCpcl.id &&
+    private fun releaseFinishedCpclQueue() {
+        if (LabelPrinterProfile.fromId(queue.printerProfileId).usesCpcl &&
             queue.items.all { it.state == LabelPrintItemState.Sent || it.state == LabelPrintItemState.Skipped }
         ) transport.stop()
     }
@@ -168,8 +227,8 @@ internal class LabelPrintController(context: Context) {
 
     fun start(candidate: PrinterDeviceCandidate) {
         if (!loaded || working || running || closed || transport.busy) return
-        if (queue.printerProfileId == LabelPrinterProfile.HmA300eCpcl.id && !transport.hprtSdkAvailable) {
-            error = "printer_hprt_sdk_missing"
+        if (!canSelectDevice(candidate)) {
+            error = "printer_profile_mismatch"
             return
         }
         if (queue.items.any { it.state in setOf(LabelPrintItemState.Uncertain, LabelPrintItemState.Failed, LabelPrintItemState.Sending) }) {
@@ -215,10 +274,14 @@ internal class LabelPrintController(context: Context) {
                             sendingId = null
                             break
                         }
-                        if (queue.printerProfileId == LabelPrinterProfile.M1.id)
-                            transport.printM1Label(candidate, bitmap, queue.paper)
-                        else transport.printHmA300eLabel(candidate, bitmap, queue.paper,
-                            queue.mediaType == LabelMediaType.Continuous.id)
+                        val profile = LabelPrinterProfile.fromId(queue.printerProfileId)
+                        val media = LabelMediaType.fromId(queue.mediaType)
+                        when {
+                            profile == LabelPrinterProfile.M1 -> transport.printM1Label(candidate, bitmap, queue.paper)
+                            profile == LabelPrinterProfile.HmA300eCpcl && transport.hprtSdkAvailable ->
+                                transport.printHmA300eLabel(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
+                            else -> transport.printCpclLabel(candidate, bitmap, media)
+                        }
                     } finally {
                         bitmap.recycle()
                     }

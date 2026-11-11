@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_paper_saved">已保存尺寸</string>
+    <string name="label_paper_dimensions">%1$s × %2$s 毫米</string>
+    <string name="label_paper_remove_saved">移除选中的已保存尺寸</string>
+    <string name="label_paper_media">纸型</string>
+    <string name="label_paper_limits">此打印机支持宽 %1$s–%2$s 毫米、走纸长 %3$s–%4$s 毫米。</string>
+    <string name="label_paper_alignment">打印位置</string>
+    <string name="label_paper_alignment_hint">水平偏移为负值时向左移，垂直偏移沿走纸方向调整。</string>
+    <string name="label_paper_alignment_invalid">请输入有效的毫米偏移量。</string>
+    <string name="label_paper_save_size">保存这组纸张尺寸</string>
+    <string name="label_paper_name">名称（可选）</string>
+    <string name="label_paper_save">保存尺寸</string>
+    <string name="label_paper_apply">使用此纸张</string>
+</resources>

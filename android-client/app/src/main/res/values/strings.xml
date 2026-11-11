@@ -689,7 +689,8 @@
     <string name="bluetooth_label_print_error_not_ready">The printer is not ready. Check paper, cover, and connection, then review the failed label.</string>
     <string name="bluetooth_label_print_dismiss_error">Close</string>
     <string name="label_printer_profile">Printer profile</string>
-    <string name="label_hm_experimental">HM-A300E printing uses the HPRT CPCL SDK. Pair in Android settings and match the printer’s paper setting to the loaded roll. Check each label before continuing.</string>
+    <string name="label_cpcl_generic">Generic CPCL</string>
+    <string name="label_hm_experimental">Pair a printer that supports CPCL over Bluetooth Classic. Match the paper type to the loaded roll and check each printed label before continuing.</string>
     <string name="label_hm_sdk_missing">This build requires the HPRT CPCL SDK to create an HM-A300E print queue.</string>
     <string name="label_media_gap">Gap labels</string>
     <string name="label_media_continuous">Continuous paper</string>

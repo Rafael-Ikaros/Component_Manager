@@ -26,14 +26,8 @@
     <string name="label_ui_no_component">选择元件后预览标签</string>
     <string name="label_ui_print_blocked">请先完善标签并检查预览，再建立打印队列。</string>
     <string name="label_ui_export">导出</string>
-    <string name="label_ui_choose_template_hint">先选择标签内容，再选择纸张尺寸。</string>
-    <string name="label_ui_choose_paper">选择标签尺寸</string>
-    <string name="label_ui_choose_paper_hint">请与打印机实际装入的纸卷尺寸一致；进入编辑器后仍可调整。</string>
     <string name="label_ui_common_sizes">常用尺寸（毫米）</string>
     <string name="label_ui_custom_size">自定义尺寸（毫米）</string>
-    <string name="label_ui_paper_range">宽度 20–48 毫米，高度 10–100 毫米。</string>
-    <string name="label_ui_open_editor">编辑并预览</string>
-    <string name="label_ui_m1_size_boundary">M1 已实测 40 × 60 毫米间隙纸；其他尺寸须匹配实际纸卷并检查预览。软件尺寸不会配置打印机纸型。</string>
     <string name="label_ui_change_paper_title">更改标签尺寸？</string>
     <string name="label_ui_change_paper_warning">已编辑的布局会重置以适配新尺寸，库存数据不受影响。</string>
 </resources>
