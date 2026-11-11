@@ -113,7 +113,7 @@ API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管
 | BOM、预设与配料 | [项目用料](docs/bom-and-migration.md) |
 | 采购金额、库存均价与 PCBA 材料成本 | [购买价格与材料成本](docs/inventory-cost.md) |
 | 库位、转移、Excel 备份和标签 Excel | [库存与备份](docs/storage-and-backup.md) |
-| 模板编辑、M1 打印与兼容范围 | [标签打印](docs/m1-printing-feature-matrix.md) |
+| 元件快捷打印、标签编辑、纸张预设与设备校准 | [标签打印](docs/m1-printing-feature-matrix.md) |
 | HM-A300E 配对、纸张设置与兼容范围 | [HM-A300E](docs/hm-a300e.md) |
 | 照片、账户和服务端接入 | [完整文档导航](docs/README.md) |
 

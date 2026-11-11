@@ -38,6 +38,8 @@ internal class LabelPrintController(context: Context) {
         private set
     var selectedAddress by mutableStateOf(preferences.getString("device_address", "").orEmpty())
         private set
+    var printOffset by mutableStateOf(printerPreferences.loadOffset(selectedAddress))
+        private set
     var savedPrinters by mutableStateOf(printerPreferences.load())
         private set
     var selectedProfile by mutableStateOf(
@@ -57,8 +59,14 @@ internal class LabelPrintController(context: Context) {
     val profileForNewQueue: LabelPrinterProfile?
         get() = if (selectedAddress.isBlank()) LabelPrinterProfile.GenericCpcl else selectedProfile
 
+    val canReplaceCompletedQueue: Boolean
+        get() = queue.items.isNotEmpty() && queue.items.all {
+            it.state == LabelPrintItemState.Sent || it.state == LabelPrintItemState.Skipped
+        }
+
     private val queuedProfile: LabelPrinterProfile?
-        get() = if (queue.items.isEmpty()) null else LabelPrinterProfile.fromId(queue.printerProfileId)
+        get() = if (queue.items.isEmpty() || canReplaceCompletedQueue) null
+            else LabelPrinterProfile.fromId(queue.printerProfileId)
 
     fun canSelectProfile(profile: LabelPrinterProfile): Boolean {
         if (running || working || closed || selectedAddress.isBlank()) return false
@@ -74,12 +82,19 @@ internal class LabelPrintController(context: Context) {
         if (candidate?.address == selectedAddress) rememberPrinter(candidate) else savePrinterSelection()
     }
     fun selectMedia(id: String) {
-        if (running || working || closed || queue.items.isNotEmpty()) return
+        if (running || working || closed || queuedProfile != null) return
         selectedMediaType = LabelMediaType.fromId(id).id
         savePrinterSelection()
     }
+
+    fun savePrintOffset(offset: LabelPrintOffset) {
+        if (running || working || closed || queuedProfile != null) return
+        printerPreferences.saveOffset(selectedAddress, offset)
+        printOffset = offset
+    }
     private var stopRequested = false
     private var closed = false
+    private var printerForNewQueue: PrinterDeviceCandidate? = null
 
     private fun profileFor(candidate: PrinterDeviceCandidate): LabelPrinterProfile? =
         savedPrinters.firstOrNull { it.address == candidate.address }?.let { LabelPrinterProfile.fromId(it.profileId) }
@@ -102,6 +117,7 @@ internal class LabelPrintController(context: Context) {
         val profile = profileFor(candidate)
         val media = if (candidate.address == selectedAddress) selectedMediaType else stored?.mediaType
         selectedAddress = candidate.address
+        printOffset = printerPreferences.loadOffset(selectedAddress)
         selectedProfile = profile
         selectedMediaType = if (profile?.usesCpcl == true) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
         if (profile != null) rememberPrinter(candidate)
@@ -116,10 +132,11 @@ internal class LabelPrintController(context: Context) {
     }
 
     fun forgetPrinter(address: String) {
-        if (running || working || closed || (address == selectedAddress && queue.items.isNotEmpty())) return
+        if (running || working || closed || (address == selectedAddress && queuedProfile != null)) return
         savedPrinters = savedPrinters.filterNot { it.address == address }
         if (selectedAddress == address) {
             selectedAddress = ""
+            printOffset = printerPreferences.loadOffset(selectedAddress)
             selectedProfile = null
             selectedMediaType = LabelMediaType.Gap.id
         }
@@ -165,9 +182,10 @@ internal class LabelPrintController(context: Context) {
         textTemplateId: String,
         paper: M1TestPaperProfile,
         designs: Map<String, LabelDesign> = emptyMap(),
+        printWith: PrinterDeviceCandidate? = null,
     ) {
         if (!loaded || working || running || closed) return
-        if (queue.items.isNotEmpty()) {
+        if (queue.items.isNotEmpty() && !canReplaceCompletedQueue) {
             error = "queue_review_required"
             return
         }
@@ -182,11 +200,11 @@ internal class LabelPrintController(context: Context) {
             error = "queue_invalid_selection"
             return
         }
-        mutate { persist(next) }
+        mutate(printWith) { persist(next) }
     }
 
     fun createFree(freeLabel: FreeLabel, copies: Int, paper: M1TestPaperProfile,
-                   design: LabelDesign) {
+                   design: LabelDesign, printWith: PrinterDeviceCandidate? = null) {
         if (!loaded || working || running || closed) return
         if (queue.items.isNotEmpty()) {
             error = "queue_review_required"
@@ -203,7 +221,7 @@ internal class LabelPrintController(context: Context) {
             error = "queue_invalid_selection"
             return
         }
-        mutate { persist(next) }
+        mutate(printWith) { persist(next) }
     }
 
     fun clear() {
@@ -233,18 +251,23 @@ internal class LabelPrintController(context: Context) {
         ) transport.stop()
     }
 
-    private fun mutate(block: suspend () -> Unit) {
+    private fun mutate(printWith: PrinterDeviceCandidate? = null, block: suspend () -> Unit) {
+        printerForNewQueue = printWith
         working = true
         error = null
         scope.launch {
-            try {
+            val printer = try {
                 block()
+                printerForNewQueue
             } catch (exception: Exception) {
                 if (exception is CancellationException) throw exception
                 error = "queue_save_failed"
+                null
             } finally {
+                printerForNewQueue = null
                 working = false
             }
+            printer?.let(::start)
         }
     }
 
@@ -353,6 +376,7 @@ internal class LabelPrintController(context: Context) {
     }
 
     fun stop() {
+        printerForNewQueue = null
         stopRequested = true
         transport.stop()
     }

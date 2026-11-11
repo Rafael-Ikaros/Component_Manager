@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_confirmation_title">Confirm printing</string>
+    <string name="label_confirmation_edit">Edit label</string>
+    <string name="label_confirmation_batch">Select multiple components</string>
+    <string name="label_confirmation_offset_summary">X %1$.1f mm · Y %2$.1f mm</string>
+    <string name="label_confirmation_fewer_copies">One fewer copy</string>
+    <string name="label_confirmation_more_copies">One more copy</string>
+    <string name="label_confirmation_calibration_hint">Adjust where the printer puts the content on the paper. Negative X moves it left and negative Y moves it up.</string>
+    <string name="label_confirmation_default_offset">Restore defaults</string>
+    <string name="label_confirmation_apply_offset">Apply calibration</string>
+    <string name="label_confirmation_invalid_offset">Enter a horizontal offset within ±72 mm and a vertical offset within ±300 mm.</string>
+</resources>

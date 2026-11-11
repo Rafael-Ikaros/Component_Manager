@@ -5,22 +5,27 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,157 +58,189 @@ internal fun LabelPaperPickerSheet(
     val context = LocalContext.current
     val store = remember(context) { LabelPaperPresetStore(context) }
     var savedPapers by remember(store) { mutableStateOf(store.load()) }
+    val currentMedia = if (profile.usesCpcl) media else LabelMediaType.Gap
+    var custom by rememberSaveable { mutableStateOf(false) }
     var widthText by rememberSaveable { mutableStateOf(paper.widthMm.paperNumber()) }
     var heightText by rememberSaveable { mutableStateOf(paper.heightMm.paperNumber()) }
-    var mediaType by rememberSaveable { mutableStateOf(if (profile.usesCpcl) media else LabelMediaType.Gap) }
+    var mediaType by rememberSaveable { mutableStateOf(currentMedia) }
     var rotation by rememberSaveable { mutableStateOf(paper.rotationDegrees) }
-    var horizontalText by rememberSaveable { mutableStateOf(paper.offsetXmm.paperNumber()) }
-    var verticalText by rememberSaveable { mutableStateOf(paper.offsetYmm.paperNumber()) }
-    var showAlignment by rememberSaveable { mutableStateOf(false) }
-    var showSave by rememberSaveable { mutableStateOf(false) }
-    var presetName by rememberSaveable { mutableStateOf("") }
+    var presetName by rememberSaveable {
+        mutableStateOf(savedPapers.firstOrNull { it.matches(paper.widthMm, paper.heightMm, currentMedia) }?.name.orEmpty())
+    }
     val width = widthText.parsePaperNumber()
     val height = heightText.parsePaperNumber()
     val sizeIsValid = width != null && height != null && width in profile.widthRange && height in profile.heightRange
-    val draft = remember(width, height, rotation, horizontalText, verticalText, profile) {
-        runCatching {
-            M1TestPaperProfile(
-                requireNotNull(width), requireNotNull(height), rotation,
-                requireNotNull(horizontalText.parsePaperNumber()), requireNotNull(verticalText.parsePaperNumber()),
-            ).also(profile::validate)
+    val draft = remember(paper, width, height, rotation, profile) {
+        if (width == null || height == null) null else runCatching {
+            paper.copy(widthMm = width, heightMm = height, rotationDegrees = rotation).also(profile::validate)
         }.getOrNull()
     }
-    fun applySize(widthMm: Float, heightMm: Float) {
+    val compatibleSaved = savedPapers.filter {
+        it.widthMm in profile.widthRange && it.heightMm in profile.heightRange &&
+            (profile.usesCpcl || it.media == LabelMediaType.Gap)
+    }
+    val selectedSaved = compatibleSaved.firstOrNull { it.matches(width, height, mediaType) }
+
+    fun selectSize(widthMm: Float, heightMm: Float, type: LabelMediaType, name: String = "") {
         widthText = widthMm.paperNumber()
         heightText = heightMm.paperNumber()
+        mediaType = type
+        presetName = name
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
-        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp)) {
-            Text(stringResource(R.string.label_ui_paper), style = MaterialTheme.typography.titleLarge)
+    val scrollState = if (custom) rememberScrollState() else rememberScrollState()
+    SecondaryPageScaffold(
+        title = stringResource(R.string.label_paper_picker_title),
+        onBack = onDismiss,
+        bottomBar = {
+            Surface(tonalElevation = 2.dp) {
+                Row(
+                    Modifier.fillMaxWidth().imePadding().navigationBarsPadding().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { draft?.let { onApply(it, mediaType) } },
+                        enabled = draft != null,
+                        modifier = Modifier.weight(1f).testTag("label_paper_apply"),
+                    ) { Text(stringResource(R.string.label_paper_use_once)) }
+                    Button(
+                        onClick = {
+                            draft?.let {
+                                val preset = SavedLabelPaper(presetName.trim(), it.widthMm, it.heightMm, mediaType)
+                                store.save(listOf(preset) + savedPapers.filterNot { saved ->
+                                    saved.matches(it.widthMm, it.heightMm, mediaType)
+                                })
+                                onApply(it, mediaType)
+                            }
+                        },
+                        enabled = draft != null,
+                        modifier = Modifier.weight(1f).testTag("label_paper_save_apply"),
+                    ) { Text(stringResource(R.string.label_paper_save_apply)) }
+                }
+            }
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).padding(horizontal = 16.dp)) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                SegmentedButton(
+                    selected = !custom,
+                    onClick = { custom = false },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                ) { Text(stringResource(R.string.label_paper_common_tab)) }
+                SegmentedButton(
+                    selected = custom,
+                    onClick = { custom = true },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    modifier = Modifier.testTag("label_paper_custom_tab"),
+                ) { Text(stringResource(R.string.label_paper_custom_tab)) }
+            }
             Column(
-                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 12.dp),
+                Modifier.fillMaxWidth().verticalScroll(scrollState).padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                val compatibleSaved = savedPapers.filter {
-                    it.widthMm in profile.widthRange && it.heightMm in profile.heightRange &&
-                        (profile.usesCpcl || it.media == LabelMediaType.Gap)
-                }
-                if (compatibleSaved.isNotEmpty()) {
-                    Text(stringResource(R.string.label_paper_saved), style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        compatibleSaved.forEach { saved ->
-                            val label = saved.name.ifBlank {
-                                stringResource(R.string.label_paper_dimensions, saved.widthMm.paperNumber(), saved.heightMm.paperNumber())
-                            }
-                            FilterChip(
-                                selected = saved.matches(width, height, mediaType),
-                                onClick = {
-                                    applySize(saved.widthMm, saved.heightMm)
-                                    mediaType = saved.media
-                                },
-                                label = { Text(label) },
-                            )
-                        }
+                if (draft != null) Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(paperDimensions(draft.widthMm, draft.heightMm), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.label_paper_dimension_order), style = MaterialTheme.typography.bodySmall)
                     }
-                    val selectedSaved = compatibleSaved.firstOrNull { it.matches(width, height, mediaType) }
-                    if (selectedSaved != null) TextButton(onClick = {
-                        savedPapers = savedPapers - selectedSaved
-                        store.save(savedPapers)
-                    }) { Text(stringResource(R.string.label_paper_remove_saved)) }
                 }
-                Text(stringResource(R.string.label_ui_common_sizes), style = MaterialTheme.typography.titleSmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LabelPaperSize.entries.filter { it.widthMm in profile.widthRange && it.heightMm in profile.heightRange }
-                        .forEach { size ->
-                            FilterChip(
-                                selected = width == size.widthMm && height == size.heightMm,
-                                onClick = { applySize(size.widthMm, size.heightMm) },
-                                label = { Text("${size.widthMm.paperNumber()} × ${size.heightMm.paperNumber()}") },
-                            )
+                if (custom) {
+                    Text(stringResource(R.string.label_ui_custom_size), style = MaterialTheme.typography.titleSmall)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PaperField(widthText, { widthText = it }, stringResource(R.string.bluetooth_label_print_width),
+                            Modifier.weight(1f).testTag("label_paper_width"))
+                        PaperField(heightText, { heightText = it }, stringResource(R.string.bluetooth_label_print_height),
+                            Modifier.weight(1f).testTag("label_paper_height"))
+                    }
+                } else {
+                    if (paper.widthMm in profile.widthRange && paper.heightMm in profile.heightRange) {
+                        Text(stringResource(R.string.label_paper_current), style = MaterialTheme.typography.titleSmall)
+                        FilterChip(
+                            selected = width == paper.widthMm && height == paper.heightMm && mediaType == currentMedia,
+                            onClick = {
+                                val current = compatibleSaved.firstOrNull { it.matches(paper.widthMm, paper.heightMm, currentMedia) }
+                                selectSize(paper.widthMm, paper.heightMm, currentMedia, current?.name.orEmpty())
+                            },
+                            label = { Text(paperDimensions(paper.widthMm, paper.heightMm)) },
+                        )
+                    }
+                    if (compatibleSaved.isNotEmpty()) {
+                        Text(stringResource(R.string.label_paper_saved), style = MaterialTheme.typography.titleSmall)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            compatibleSaved.forEach { saved ->
+                                FilterChip(
+                                    selected = saved == selectedSaved,
+                                    onClick = { selectSize(saved.widthMm, saved.heightMm, saved.media, saved.name) },
+                                    label = { Text(saved.name.ifBlank { paperDimensions(saved.widthMm, saved.heightMm) }) },
+                                )
+                            }
                         }
+                        if (selectedSaved != null) TextButton(onClick = {
+                            savedPapers = savedPapers - selectedSaved
+                            store.save(savedPapers)
+                            presetName = ""
+                        }) { Text(stringResource(R.string.label_paper_remove_saved)) }
+                    }
+                    Text(stringResource(R.string.label_ui_common_sizes), style = MaterialTheme.typography.titleSmall)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LabelPaperSize.entries.filter { it.widthMm in profile.widthRange && it.heightMm in profile.heightRange }
+                            .forEach { size ->
+                                FilterChip(
+                                    selected = width == size.widthMm && height == size.heightMm,
+                                    onClick = {
+                                        val saved = compatibleSaved.firstOrNull { it.matches(size.widthMm, size.heightMm, mediaType) }
+                                        selectSize(size.widthMm, size.heightMm, mediaType, saved?.name.orEmpty())
+                                    },
+                                    label = { Text("${size.widthMm.paperNumber()} × ${size.heightMm.paperNumber()}") },
+                                )
+                            }
+                    }
                 }
-                Text(stringResource(R.string.label_ui_custom_size), style = MaterialTheme.typography.titleSmall)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PaperField(widthText, { widthText = it }, stringResource(R.string.bluetooth_label_print_width),
-                        Modifier.weight(1f).testTag("label_paper_width"))
-                    PaperField(heightText, { heightText = it }, stringResource(R.string.bluetooth_label_print_height),
-                        Modifier.weight(1f).testTag("label_paper_height"))
-                }
-                if (!sizeIsValid) Text(
+                if (custom || !sizeIsValid) Text(
                     stringResource(R.string.label_paper_limits, profile.widthRange.start.paperNumber(),
                         profile.widthRange.endInclusive.paperNumber(), profile.heightRange.start.paperNumber(),
                         profile.heightRange.endInclusive.paperNumber()),
                     style = MaterialTheme.typography.bodySmall,
+                    color = if (sizeIsValid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                )
+                if (sizeIsValid && draft == null) Text(
+                    stringResource(R.string.label_paper_alignment_invalid),
                     color = MaterialTheme.colorScheme.error,
                 )
-                if (profile.usesCpcl) {
-                    Text(stringResource(R.string.label_paper_media), style = MaterialTheme.typography.titleSmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LabelMediaType.entries.forEach { option ->
-                            FilterChip(
-                                selected = option == mediaType, onClick = { mediaType = option },
-                                label = { Text(stringResource(if (option == LabelMediaType.Gap) R.string.label_media_gap
-                                    else R.string.label_media_continuous)) },
-                            )
-                        }
+                Text(stringResource(R.string.label_paper_media), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val options = if (profile.usesCpcl) LabelMediaType.entries else listOf(LabelMediaType.Gap)
+                    options.forEach { option ->
+                        FilterChip(
+                            selected = option == mediaType,
+                            onClick = {
+                                mediaType = option
+                                presetName = compatibleSaved.firstOrNull { it.matches(width, height, option) }?.name.orEmpty()
+                            },
+                            label = { Text(stringResource(if (option == LabelMediaType.Gap) R.string.label_media_gap
+                                else R.string.label_media_continuous)) },
+                        )
                     }
                 }
-                TextButton(onClick = { showAlignment = !showAlignment }) { Text(stringResource(R.string.label_paper_alignment)) }
-                if (showAlignment) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        M1TestPaperProfile.Rotations.forEach { degrees ->
-                            FilterChip(rotation == degrees, { rotation = degrees }, { Text("$degrees°") })
-                        }
+                Text(stringResource(R.string.label_paper_rotation), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    M1TestPaperProfile.Rotations.forEach { degrees ->
+                        FilterChip(rotation == degrees, { rotation = degrees }, { Text("$degrees°") })
                     }
-                    PaperField(horizontalText, { horizontalText = it }, stringResource(R.string.bluetooth_label_print_offset_x),
-                        Modifier.fillMaxWidth().testTag("label_paper_offset_x"), signed = true)
-                    PaperField(verticalText, { verticalText = it }, stringResource(R.string.bluetooth_label_print_offset_y),
-                        Modifier.fillMaxWidth().testTag("label_paper_offset_y"), signed = true)
-                    Text(stringResource(R.string.label_paper_alignment_hint), style = MaterialTheme.typography.bodySmall)
-                    if (sizeIsValid && draft == null) Text(
-                        stringResource(R.string.label_paper_alignment_invalid), color = MaterialTheme.colorScheme.error,
-                    )
                 }
-                TextButton(
-                    onClick = {
-                        presetName = savedPapers.firstOrNull { it.matches(width, height, mediaType) }?.name.orEmpty()
-                        showSave = true
-                    },
-                    enabled = sizeIsValid,
-                ) { Text(stringResource(R.string.label_paper_save_size)) }
-            }
-            Button(
-                onClick = { draft?.let { onApply(it, mediaType) } },
-                enabled = draft != null,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).testTag("label_paper_apply"),
-            ) { Text(stringResource(R.string.label_paper_apply)) }
-        }
-    }
-    if (showSave && sizeIsValid) {
-        AlertDialog(
-            onDismissRequest = { showSave = false },
-            title = { Text(stringResource(R.string.label_paper_save_size)) },
-            text = {
-                OutlinedTextField(
-                    presetName, { presetName = it.take(60) }, singleLine = true,
+                if (custom) OutlinedTextField(
+                    value = presetName,
+                    onValueChange = { presetName = it.take(60) },
+                    singleLine = true,
                     label = { Text(stringResource(R.string.label_paper_name)) },
                     modifier = Modifier.fillMaxWidth().testTag("label_paper_name"),
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val preset = SavedLabelPaper(presetName.trim(), width, height, mediaType)
-                    savedPapers = listOf(preset) + savedPapers.filterNot { it.matches(width, height, mediaType) }
-                    store.save(savedPapers)
-                    showSave = false
-                }) { Text(stringResource(R.string.label_paper_save)) }
-            },
-            dismissButton = { TextButton(onClick = { showSave = false }) { Text(stringResource(R.string.bluetooth_label_print_cancel)) } },
-        )
+            }
+        }
     }
 }
 
@@ -213,14 +250,20 @@ private fun PaperField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier,
-    signed: Boolean = false,
 ) {
     OutlinedTextField(
-        value = value, onValueChange = onValueChange, label = { Text(label) },
-        singleLine = true, modifier = modifier,
-        keyboardOptions = KeyboardOptions(keyboardType = if (signed) KeyboardType.Text else KeyboardType.Decimal),
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        modifier = modifier,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
     )
 }
 
-private fun String.parsePaperNumber() = trim().replace(',', '.').replace('−', '-').toFloatOrNull()
+@Composable
+private fun paperDimensions(widthMm: Float, heightMm: Float) =
+    stringResource(R.string.label_paper_dimensions, widthMm.paperNumber(), heightMm.paperNumber())
+
+private fun String.parsePaperNumber() = trim().replace(',', '.').toFloatOrNull()
 private fun Float.paperNumber() = if (toInt().toFloat() == this) toInt().toString() else toString()

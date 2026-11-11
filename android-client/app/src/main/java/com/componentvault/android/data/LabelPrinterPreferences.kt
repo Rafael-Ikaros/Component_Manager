@@ -11,6 +11,16 @@ internal data class SavedLabelPrinter(
     val mediaType: String,
 )
 
+internal data class LabelPrintOffset(val xMm: Float, val yMm: Float) {
+    init {
+        require(xMm in M1TestPaperProfile.OffsetXRange && yMm in M1TestPaperProfile.OffsetYRange)
+    }
+
+    companion object {
+        val Default = LabelPrintOffset(-2.5f, 0f)
+    }
+}
+
 internal class LabelPrinterPreferences(private val preferences: SharedPreferences) {
     fun load(): List<SavedLabelPrinter> {
         val entries = runCatching { JSONArray(preferences.getString(Key, null) ?: "[]") }.getOrNull()
@@ -36,8 +46,24 @@ internal class LabelPrinterPreferences(private val preferences: SharedPreference
             .apply()
     }
 
+    fun loadOffset(address: String): LabelPrintOffset = runCatching {
+        LabelPrintOffset(
+            preferences.getFloat("print_offset_x:$address", LabelPrintOffset.Default.xMm),
+            preferences.getFloat("print_offset_y:$address", LabelPrintOffset.Default.yMm),
+        )
+    }.getOrDefault(LabelPrintOffset.Default)
+
+    fun saveOffset(address: String, offset: LabelPrintOffset) {
+        preferences.edit()
+            .putFloat("print_offset_x:$address", offset.xMm)
+            .putFloat("print_offset_y:$address", offset.yMm)
+            .apply()
+    }
+
     fun forget(address: String, remaining: List<SavedLabelPrinter>) {
         val editor = editPrinters(remaining)
+            .remove("print_offset_x:$address")
+            .remove("print_offset_y:$address")
         if (preferences.getString("device_address", null) == address) {
             editor.remove("device_address").remove("printer_profile").remove("media_type")
         }
