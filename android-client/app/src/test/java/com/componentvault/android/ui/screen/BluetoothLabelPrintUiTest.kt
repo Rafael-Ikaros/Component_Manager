@@ -1,6 +1,9 @@
 package com.componentvault.android.ui.screen
 
+import android.Manifest
 import android.app.Application
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -12,8 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
@@ -28,6 +33,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import com.componentvault.android.R
@@ -48,11 +54,30 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadow.api.Shadow
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+
+// Robolectric's BluetoothDevice shadow references BluetoothAddress, which is absent on API 28.
+@Implements(BluetoothDevice::class)
+class PairedLabelPrinterShadow {
+    var advertisedName = ""
+
+    @Implementation
+    protected fun getName() = advertisedName
+
+    @Implementation
+    protected fun getType() = BluetoothDevice.DEVICE_TYPE_CLASSIC
+
+    @Implementation
+    protected fun getBondState() = BluetoothDevice.BOND_BONDED
+}
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
@@ -74,6 +99,93 @@ class BluetoothLabelPrintUiTest {
             ).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithContentDescription(context.getString(R.string.action_back)).performClick()
+    }
+
+    private fun pairTestPrinters(vararg printers: Pair<String, String>) {
+        shadowOf(context).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val adapter = context.getSystemService(BluetoothManager::class.java).adapter
+        shadowOf(adapter).setEnabled(true)
+        shadowOf(adapter).setBondedDevices(printers.map { (address, name) ->
+            adapter.getRemoteDevice(address).also {
+                Shadow.extract<PairedLabelPrinterShadow>(it).advertisedName = name
+            }
+        }.toSet())
+    }
+
+    @Test
+    @Config(shadows = [PairedLabelPrinterShadow::class])
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun knownPrintersSelectTheirProtocolAndOtherDevicesRequireAChoice() {
+        LabelPrintQueueStore(context).clear()
+        val m1 = "00:11:22:33:44:01" to "M1-6870"
+        val hm = "00:11:22:33:44:02" to "HM-A300-8EDA"
+        val other = "00:11:22:33:44:03" to "HM-A300ER-8EDA"
+        pairTestPrinters(m1, hm, other)
+        val preferences = LabelPrinterPreferences(context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE))
+        val seed = ComponentLabelSeed("TEST-CPCL", "Resistor", "Passive", "0603", "A", 1, 0)
+        setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("label_print_open") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("label_print_open").performClick()
+        compose.onNodeWithTag("label_print_device").performScrollTo().performClick()
+        val m1Chip = compose.onNodeWithTag("label_print_protocol_m1")
+        val cpclChip = compose.onNodeWithTag("label_print_protocol_cpcl-spp")
+        fun chooseDevice(name: String) = compose.onNodeWithText(name).performScrollTo().performClick()
+        fun closePicker() = compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+        chooseDevice(m1.second)
+        m1Chip.assertIsSelected()
+        chooseDevice(hm.second)
+        cpclChip.assertIsSelected()
+        chooseDevice(other.second)
+        m1Chip.assertIsNotSelected().assertIsEnabled()
+        cpclChip.assertIsNotSelected().assertIsEnabled()
+        closePicker()
+        compose.onNodeWithTag("label_print_submit").assertIsNotEnabled()
+        compose.onNodeWithTag("label_print_device").performScrollTo().performClick()
+        m1Chip.performSemanticsAction(SemanticsActions.OnClick) { click -> assertTrue(click()) }
+        m1Chip.assertIsSelected()
+        compose.runOnIdle {
+            assertEquals("m1", preferences.load().single { it.address == other.first }.profileId)
+        }
+        chooseDevice(hm.second)
+        cpclChip.assertIsSelected()
+        chooseDevice(other.second)
+        m1Chip.assertIsSelected()
+        closePicker()
+        compose.runOnIdle {
+            assertEquals(
+                mapOf(m1.first to "m1", hm.first to "cpcl-spp", other.first to "m1"),
+                preferences.load().associate { it.address to it.profileId },
+            )
+        }
+    }
+
+    @Test
+    @Config(shadows = [PairedLabelPrinterShadow::class])
+    fun restoredCpclQueueCanUseNewDeviceAfterManualCompatibleChoice() {
+        val seed = ComponentLabelSeed("TEST-QUEUE", "Resistor", "Passive", "0603", "A", 1, 0)
+        val store = LabelPrintQueueStore(context)
+        val queue = LabelPrintQueue.create(listOf(seed to 1), printerProfileId = LabelPrinterProfile.HmA300eCpcl.id)
+        store.save(queue)
+        try {
+            pairTestPrinters("00:11:22:33:44:04" to "Label printer")
+            setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("print_queue_start").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText(context.getString(R.string.label_flow_printer_details)).performClick()
+            compose.onNodeWithText("Label printer").performScrollTo().performClick()
+            compose.onNodeWithTag("label_print_protocol_m1").assertIsNotEnabled()
+            val cpclChip = compose.onNodeWithTag("label_print_protocol_cpcl-spp")
+            cpclChip.assertIsNotSelected().assertIsEnabled()
+            cpclChip.performScrollTo().performClick()
+            compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+            compose.onNodeWithTag("print_queue_start").assertIsEnabled()
+            compose.runOnIdle { assertEquals(queue, store.load()) }
+        } finally {
+            store.clear()
+        }
     }
 
     @Test

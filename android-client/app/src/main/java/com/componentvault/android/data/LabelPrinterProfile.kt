@@ -14,6 +14,18 @@ internal enum class LabelPrinterProfile(val id: String, val widthRange: ClosedFl
     }
 
     companion object {
+        private val m1BluetoothName = Regex("(?:HPRT +)?M1(?:-[0-9A-F]{4})?", RegexOption.IGNORE_CASE)
+        private val hmA300BluetoothName = Regex("(?:HPRT +)?HM-A300E?(?:-[0-9A-F]{4})?", RegexOption.IGNORE_CASE)
+
+        fun defaultForDeviceName(name: String?): LabelPrinterProfile? {
+            val bluetoothName = name?.trim() ?: return null
+            return when {
+                m1BluetoothName.matches(bluetoothName) -> M1
+                hmA300BluetoothName.matches(bluetoothName) -> GenericCpcl
+                else -> null
+            }
+        }
+
         fun fromId(id: String): LabelPrinterProfile = entries.firstOrNull { it.id == id }
             ?: throw IllegalArgumentException("Unsupported printer profile: $id")
     }

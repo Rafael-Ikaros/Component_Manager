@@ -40,22 +40,38 @@ internal class LabelPrintController(context: Context) {
         private set
     var savedPrinters by mutableStateOf(printerPreferences.load())
         private set
-    var selectedProfileId by mutableStateOf(preferences.getString("printer_profile", null).orEmpty().let {
-        runCatching { LabelPrinterProfile.fromId(it).configurable.id }.getOrElse {
-            if (selectedAddress.isNotBlank()) LabelPrinterProfile.M1.id else LabelPrinterProfile.GenericCpcl.id
-        }
-    })
+    var selectedProfile by mutableStateOf(
+        if (selectedAddress.isBlank()) null else {
+            val savedId = savedPrinters.firstOrNull { it.address == selectedAddress }?.profileId
+                ?: preferences.getString("printer_profile", null)
+            // A device saved before protocol selection was introduced used the M1 driver.
+            if (savedId == null) LabelPrinterProfile.M1
+            else runCatching { LabelPrinterProfile.fromId(savedId).configurable }.getOrNull()
+        },
+    )
         private set
     var selectedMediaType by mutableStateOf(preferences.getString("media_type", "gap").orEmpty().let {
         runCatching { LabelMediaType.fromId(it).id }.getOrDefault("gap")
     })
         private set
-    fun selectProfile(id: String) {
-        if (running || working || closed || queue.items.isNotEmpty()) return
-        val profile = LabelPrinterProfile.fromId(id).configurable
-        selectedProfileId = profile.id
+    val profileForNewQueue: LabelPrinterProfile?
+        get() = if (selectedAddress.isBlank()) LabelPrinterProfile.GenericCpcl else selectedProfile
+
+    private val queuedProfile: LabelPrinterProfile?
+        get() = if (queue.items.isEmpty()) null else LabelPrinterProfile.fromId(queue.printerProfileId)
+
+    fun canSelectProfile(profile: LabelPrinterProfile): Boolean {
+        if (running || working || closed || selectedAddress.isBlank()) return false
+        val required = queuedProfile ?: return true
+        return selectedProfile == null && required.configurable == profile.configurable
+    }
+
+    fun selectProfile(profile: LabelPrinterProfile, candidate: PrinterDeviceCandidate?) {
+        if (!canSelectProfile(profile)) return
+        if (selectedProfile == null && candidate?.address != selectedAddress) return
+        selectedProfile = profile.configurable
         if (!profile.usesCpcl) selectedMediaType = LabelMediaType.Gap.id
-        savePrinterSelection()
+        if (candidate?.address == selectedAddress) rememberPrinter(candidate) else savePrinterSelection()
     }
     fun selectMedia(id: String) {
         if (running || working || closed || queue.items.isNotEmpty()) return
@@ -65,20 +81,20 @@ internal class LabelPrintController(context: Context) {
     private var stopRequested = false
     private var closed = false
 
-    private fun profileFor(candidate: PrinterDeviceCandidate): LabelPrinterProfile {
-        val stored = savedPrinters.firstOrNull { it.address == candidate.address }
-        return when {
-            stored != null -> LabelPrinterProfile.fromId(stored.profileId)
-            candidate.address == selectedAddress -> LabelPrinterProfile.fromId(selectedProfileId)
-            candidate.name.equals("M1", ignoreCase = true) ||
-                candidate.name?.startsWith("M1-", ignoreCase = true) == true -> LabelPrinterProfile.M1
-            else -> LabelPrinterProfile.GenericCpcl
-        }
+    private fun profileFor(candidate: PrinterDeviceCandidate): LabelPrinterProfile? =
+        savedPrinters.firstOrNull { it.address == candidate.address }?.let { LabelPrinterProfile.fromId(it.profileId) }
+            ?: selectedProfile.takeIf { candidate.address == selectedAddress }
+            ?: LabelPrinterProfile.defaultForDeviceName(candidate.name)
+
+    fun canSelectDevice(candidate: PrinterDeviceCandidate): Boolean {
+        if (running || working || closed) return false
+        val required = queuedProfile ?: return true
+        val profile = profileFor(candidate) ?: return true
+        return required.configurable == profile.configurable
     }
 
-    fun canSelectDevice(candidate: PrinterDeviceCandidate): Boolean =
-        !running && !working && !closed &&
-            (queue.items.isEmpty() || LabelPrinterProfile.fromId(queue.printerProfileId).usesCpcl == profileFor(candidate).usesCpcl)
+    fun canStartWithDevice(candidate: PrinterDeviceCandidate): Boolean =
+        canSelectDevice(candidate) && profileFor(candidate) != null
 
     fun selectDevice(candidate: PrinterDeviceCandidate): Boolean {
         if (!canSelectDevice(candidate)) return false
@@ -86,14 +102,15 @@ internal class LabelPrintController(context: Context) {
         val profile = profileFor(candidate)
         val media = if (candidate.address == selectedAddress) selectedMediaType else stored?.mediaType
         selectedAddress = candidate.address
-        selectedProfileId = profile.id
-        selectedMediaType = if (profile.usesCpcl) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
-        rememberPrinter(candidate)
+        selectedProfile = profile
+        selectedMediaType = if (profile?.usesCpcl == true) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
+        if (profile != null) rememberPrinter(candidate)
         return true
     }
 
     fun restoreSavedPrinter(candidate: PrinterDeviceCandidate) {
         if (candidate.address == selectedAddress && savedPrinters.none { it.address == selectedAddress }) {
+            selectedProfile = profileFor(candidate) ?: return
             rememberPrinter(candidate)
         }
     }
@@ -103,24 +120,26 @@ internal class LabelPrintController(context: Context) {
         savedPrinters = savedPrinters.filterNot { it.address == address }
         if (selectedAddress == address) {
             selectedAddress = ""
-            selectedProfileId = LabelPrinterProfile.GenericCpcl.id
+            selectedProfile = null
             selectedMediaType = LabelMediaType.Gap.id
         }
-        savePrinterSelection()
+        printerPreferences.forget(address, savedPrinters)
     }
 
     private fun rememberPrinter(candidate: PrinterDeviceCandidate) {
-        val printer = SavedLabelPrinter(candidate.address, candidate.name.orEmpty(), selectedProfileId, selectedMediaType)
+        val profile = selectedProfile ?: return
+        val printer = SavedLabelPrinter(candidate.address, candidate.name.orEmpty(), profile.id, selectedMediaType)
         savedPrinters = listOf(printer) + savedPrinters.filterNot { it.address == candidate.address }
         savePrinterSelection()
     }
 
     private fun savePrinterSelection() {
+        val profile = selectedProfile ?: if (selectedAddress.isBlank()) LabelPrinterProfile.GenericCpcl else return
         savedPrinters = savedPrinters.map {
-            if (it.address == selectedAddress) it.copy(profileId = selectedProfileId, mediaType = selectedMediaType)
+            if (it.address == selectedAddress) it.copy(profileId = profile.id, mediaType = selectedMediaType)
             else it
         }
-        printerPreferences.save(savedPrinters, selectedAddress, selectedProfileId, selectedMediaType)
+        printerPreferences.save(savedPrinters, selectedAddress, profile.id, selectedMediaType)
     }
 
     fun load() {
@@ -152,8 +171,13 @@ internal class LabelPrintController(context: Context) {
             error = "queue_review_required"
             return
         }
+        val profile = profileForNewQueue
+        if (profile == null) {
+            error = "printer_profile_required"
+            return
+        }
         val next = try {
-            LabelPrintQueue.create(selections, templateId, textTemplateId, paper, designs, selectedProfileId, selectedMediaType)
+            LabelPrintQueue.create(selections, templateId, textTemplateId, paper, designs, profile.id, selectedMediaType)
         } catch (_: IllegalArgumentException) {
             error = "queue_invalid_selection"
             return
@@ -168,8 +192,13 @@ internal class LabelPrintController(context: Context) {
             error = "queue_review_required"
             return
         }
+        val profile = profileForNewQueue
+        if (profile == null) {
+            error = "printer_profile_required"
+            return
+        }
         val next = try {
-            LabelPrintQueue.createFree(freeLabel, copies, paper, design, selectedProfileId, selectedMediaType)
+            LabelPrintQueue.createFree(freeLabel, copies, paper, design, profile.id, selectedMediaType)
         } catch (_: IllegalArgumentException) {
             error = "queue_invalid_selection"
             return
@@ -227,8 +256,8 @@ internal class LabelPrintController(context: Context) {
 
     fun start(candidate: PrinterDeviceCandidate) {
         if (!loaded || working || running || closed || transport.busy) return
-        if (!canSelectDevice(candidate)) {
-            error = "printer_profile_mismatch"
+        if (!canStartWithDevice(candidate)) {
+            error = if (profileFor(candidate) == null) "printer_profile_required" else "printer_profile_mismatch"
             return
         }
         if (queue.items.any { it.state in setOf(LabelPrintItemState.Uncertain, LabelPrintItemState.Failed, LabelPrintItemState.Sending) }) {

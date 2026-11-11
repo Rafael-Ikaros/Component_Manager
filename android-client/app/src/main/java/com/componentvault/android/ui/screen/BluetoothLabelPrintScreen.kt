@@ -246,7 +246,8 @@ internal fun BluetoothLabelPrintScreen(
             permissionRequest.launch(permissions)
         }
     }
-    val activeProfile = LabelPrinterProfile.fromId(if (controller.queue.items.isNotEmpty()) controller.queue.printerProfileId else controller.selectedProfileId)
+    val activeProfile = if (controller.queue.items.isNotEmpty()) LabelPrinterProfile.fromId(controller.queue.printerProfileId)
+        else controller.profileForNewQueue ?: LabelPrinterProfile.GenericCpcl
     val paper = remember(widthText, heightText, rotationText, offsetXText, offsetYText) {
         runCatching {
             M1TestPaperProfile(
@@ -377,10 +378,12 @@ internal fun BluetoothLabelPrintScreen(
     val pairedByAddress = pairedPrinters.associateBy { it.address }
     val savedPrinters = controller.savedPrinters
     val savedAddresses = savedPrinters.mapTo(mutableSetOf()) { it.address }
-    val selectedCandidate = pairedByAddress[controller.selectedAddress]?.takeIf(controller::canSelectDevice)
+    val selectedPairedPrinter = pairedByAddress[controller.selectedAddress]
+    val selectedCandidate = selectedPairedPrinter?.takeIf(controller::canStartWithDevice)
     val selectedSavedPrinter = savedPrinters.firstOrNull { it.address == controller.selectedAddress }
-    LaunchedEffect(selectedCandidate) {
-        selectedCandidate?.let(controller::restoreSavedPrinter)
+    val needsProtocol = controller.profileForNewQueue == null
+    LaunchedEffect(selectedPairedPrinter) {
+        selectedPairedPrinter?.let(controller::restoreSavedPrinter)
     }
     LaunchedEffect(showPrintView, hasQueue) {
         if ((showPrintView || hasQueue) && BluetoothPrinterDiagnostics.permissions().all {
@@ -403,7 +406,7 @@ internal fun BluetoothLabelPrintScreen(
     val previewError = preview.error.takeIf { preview.request == previewRequest }
     val canCreate = editable && (if (draftFreeLabel != null) validFree
         else validSelection && printDesigns.size == draftSelections.size) &&
-        compatiblePaper && invalidGeometryFields.isEmpty() && !blankQr &&
+        !needsProtocol && compatiblePaper && invalidGeometryFields.isEmpty() && !blankQr &&
         preview.request == previewRequest && preview.bitmap != null && preview.error == null
     val selectedElement = activeDesign?.elements?.firstOrNull { it.id == selectedElementId }
     fun elementCaption(element: LabelElement, limit: Int): String = element.text.take(limit).ifBlank {
@@ -435,6 +438,10 @@ internal fun BluetoothLabelPrintScreen(
     val mediaName = stringResource(if (media == LabelMediaType.Gap) R.string.label_media_gap else R.string.label_media_continuous)
     val unknownPrinter = stringResource(R.string.bluetooth_label_print_unknown_device)
     val printerSummary = when {
+        needsProtocol -> {
+            val name = selectedPairedPrinter?.name.orEmpty().ifBlank { unknownPrinter }
+            "$name · ${stringResource(R.string.label_flow_choose_protocol)}"
+        }
         selectedCandidate != null ->
             "${selectedCandidate.name.orEmpty().ifBlank { unknownPrinter }} · ${labelPrinterProtocolName(activeProfile)}"
         selectedSavedPrinter != null ->
@@ -567,6 +574,7 @@ internal fun BluetoothLabelPrintScreen(
                 if (!canCreate) {
                     Text(
                         when {
+                            needsProtocol -> stringResource(R.string.label_flow_choose_protocol)
                             paper != null && !compatiblePaper -> stringResource(R.string.bluetooth_label_print_paper_invalid)
                             previewError != null -> previewError
                             else -> stringResource(R.string.label_ui_print_blocked)
@@ -612,6 +620,7 @@ internal fun BluetoothLabelPrintScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(paperSummary(queue.paper), style = MaterialTheme.typography.bodyMedium)
+                if (needsProtocol) Text(stringResource(R.string.label_flow_choose_protocol))
                 if (controller.pauseRequested) Text(stringResource(R.string.bluetooth_label_print_pausing))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("print_queue_list")) {
                     items(queue.items, key = { it.id }) { item ->
@@ -824,20 +833,22 @@ internal fun BluetoothLabelPrintScreen(
                     } else if (pairedPrinters.isEmpty()) {
                         Text(stringResource(R.string.bluetooth_label_print_pair_hint))
                     }
-                    if (selectedSavedPrinter != null || selectedCandidate != null) {
+                    if (selectedSavedPrinter != null || selectedPairedPrinter != null) {
                         Text(stringResource(R.string.label_printer_profile))
+                        if (needsProtocol) Text(stringResource(R.string.label_flow_choose_protocol))
                         Row(Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(LabelPrinterProfile.M1, LabelPrinterProfile.GenericCpcl).forEach { profile ->
                                 FilterChip(
-                                    selected = activeProfile.usesCpcl == profile.usesCpcl,
-                                    onClick = { controller.selectProfile(profile.id) },
-                                    enabled = editable,
+                                    selected = controller.selectedProfile == profile,
+                                    onClick = { controller.selectProfile(profile, selectedPairedPrinter) },
+                                    enabled = controller.canSelectProfile(profile),
                                     label = { Text(labelPrinterProtocolName(profile)) },
+                                    modifier = Modifier.testTag("label_print_protocol_${profile.id}"),
                                 )
                             }
                         }
-                        if (activeProfile.usesCpcl) Text(stringResource(R.string.label_hm_experimental))
+                        if (controller.selectedProfile?.usesCpcl == true) Text(stringResource(R.string.label_hm_experimental))
                     }
                     OutlinedButton(onClick = ::refreshDevices) {
                         Text(stringResource(R.string.bluetooth_label_print_refresh_devices))
@@ -1102,6 +1113,7 @@ private fun printErrorText(code: String, context: android.content.Context): Stri
     "printer_permission_required" -> R.string.bluetooth_label_print_permission
     "printer_not_m1" -> R.string.bluetooth_label_print_error_not_m1
     "printer_profile_mismatch" -> R.string.label_flow_printer_incompatible
+    "printer_profile_required" -> R.string.label_flow_choose_protocol
     "printer_no_response" -> R.string.bluetooth_label_print_error_no_response
     "printer_hprt_sdk_missing" -> R.string.label_hm_sdk_missing
     else -> R.string.bluetooth_label_print_error_not_ready

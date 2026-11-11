@@ -11,5 +11,6 @@
     <string name="label_flow_other_printers">其他已配对设备</string>
     <string name="label_flow_printer_unavailable">暂不可用</string>
     <string name="label_flow_printer_incompatible">打印协议不同</string>
+    <string name="label_flow_choose_protocol">请选择打印协议</string>
     <string name="label_flow_forget_printer">移除</string>
 </resources>

@@ -29,6 +29,22 @@ internal class LabelPrinterPreferences(private val preferences: SharedPreference
     }
 
     fun save(printers: List<SavedLabelPrinter>, activeAddress: String, profileId: String, mediaType: String) {
+        editPrinters(printers)
+            .putString("device_address", activeAddress)
+            .putString("printer_profile", profileId)
+            .putString("media_type", mediaType)
+            .apply()
+    }
+
+    fun forget(address: String, remaining: List<SavedLabelPrinter>) {
+        val editor = editPrinters(remaining)
+        if (preferences.getString("device_address", null) == address) {
+            editor.remove("device_address").remove("printer_profile").remove("media_type")
+        }
+        editor.apply()
+    }
+
+    private fun editPrinters(printers: List<SavedLabelPrinter>): SharedPreferences.Editor {
         val entries = JSONArray()
         for (printer in printers) {
             entries.put(JSONObject().apply {
@@ -38,12 +54,7 @@ internal class LabelPrinterPreferences(private val preferences: SharedPreference
                 put("media", printer.mediaType)
             })
         }
-        preferences.edit()
-            .putString(Key, entries.toString())
-            .putString("device_address", activeAddress)
-            .putString("printer_profile", profileId)
-            .putString("media_type", mediaType)
-            .apply()
+        return preferences.edit().putString(Key, entries.toString())
     }
 
     private companion object {

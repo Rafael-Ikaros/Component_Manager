@@ -11,5 +11,6 @@
     <string name="label_flow_other_printers">Other paired devices</string>
     <string name="label_flow_printer_unavailable">Unavailable</string>
     <string name="label_flow_printer_incompatible">Different print protocol</string>
+    <string name="label_flow_choose_protocol">Choose a print protocol</string>
     <string name="label_flow_forget_printer">Forget</string>
 </resources>
