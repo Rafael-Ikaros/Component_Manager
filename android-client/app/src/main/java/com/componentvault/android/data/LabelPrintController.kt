@@ -215,10 +215,13 @@ internal class LabelPrintController(context: Context) {
                             sendingId = null
                             break
                         }
-                        if (queue.printerProfileId == LabelPrinterProfile.M1.id)
-                            transport.printM1Label(candidate, bitmap, queue.paper)
-                        else transport.printHmA300eLabel(candidate, bitmap, queue.paper,
-                            queue.mediaType == LabelMediaType.Continuous.id)
+                        when (LabelPrinterProfile.fromId(queue.printerProfileId)) {
+                            LabelPrinterProfile.M1 -> transport.printM1Label(candidate, bitmap, queue.paper)
+                            LabelPrinterProfile.HmA300eCpcl -> transport.printHmA300eLabel(candidate, bitmap, queue.paper,
+                                queue.mediaType == LabelMediaType.Continuous.id)
+                            LabelPrinterProfile.DetongerP1 -> transport.printDetongerP1Label(candidate, bitmap, queue.paper,
+                                queue.mediaType == LabelMediaType.Continuous.id)
+                        }
                     } finally {
                         bitmap.recycle()
                     }

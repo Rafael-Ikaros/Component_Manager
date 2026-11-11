@@ -394,6 +394,33 @@ class InventoryInteractionUiTest {
     }
 
     @Test
+    fun selectedInventoryItemsOpenBatchPrinting() {
+        val second = item.copy(id = "part-2", sku = "C-200", name = "Resistor")
+        var printed = emptyList<String>()
+        setInventoryContent {
+            MaterialTheme {
+                InventoryContent(
+                    contentPadding = PaddingValues(),
+                    uiState = InventoryScreenUiState(list = InventoryListUiState(items = listOf(item, second))),
+                    statusMessage = "", layoutMode = compactMode,
+                    onQueryChange = {}, onStockFilterChange = {}, onCategoryChange = {}, onLocationChange = {},
+                    onSortChange = {}, onSelectComponent = {}, onOpenComponentDetail = {}, onImportComponent = {},
+                    onGenerateLabel = {}, onEditComponent = {}, onRequestDeleteComponent = {}, onRecordMovement = {},
+                    onPrintSelectedComponents = { printed = it },
+                )
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.inventory_ui_select)).performClick()
+        compose.onNodeWithTag("inventory_print_selected").assertIsNotEnabled()
+        compose.onNodeWithText(item.name).performScrollTo().performClick()
+        compose.onNodeWithTag("inventory_print_selected").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(listOf(item.id), printed) }
+        compose.onNodeWithText(context.getString(R.string.label_batch_select_results)).performClick()
+        compose.onNodeWithTag("inventory_print_selected").performClick()
+        compose.runOnIdle { assertEquals(listOf(item.id, second.id), printed) }
+    }
+
+    @Test
     fun transferReviewKeepsConfirmVisibleAndSubmitsReviewedLines() {
         var submitted = 0
         val locations = listOf(

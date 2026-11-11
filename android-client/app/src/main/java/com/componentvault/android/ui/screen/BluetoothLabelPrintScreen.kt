@@ -83,7 +83,7 @@ import com.componentvault.android.data.M1ComponentLabelRenderer
 import com.componentvault.android.data.LabelPrinterProfile
 import com.componentvault.android.data.LabelMediaType
 import com.componentvault.android.data.M1TestPaperProfile
-import com.componentvault.android.data.LabelPaperSize
+import com.componentvault.android.data.LabelPaperPresetStore
 import com.componentvault.android.model.ComponentLabelSeed
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.toLabelSeed
@@ -120,6 +120,7 @@ internal fun BluetoothLabelPrintScreen(
     initialPaper: M1TestPaperProfile? = null,
     initialFreeTitle: String? = null,
     initialFreeQrPayload: String? = null,
+    initialComponentIds: List<String> = emptyList(),
     onDismiss: () -> Unit,
 ) {
     val freeMode = initialToolTemplate !in setOf(
@@ -138,6 +139,9 @@ internal fun BluetoothLabelPrintScreen(
     val clipboard = LocalClipboardManager.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember(context) { LabelPrintController(context) }
+    val paperStore = remember(context) {
+        LabelPaperPresetStore(context.getSharedPreferences("label_paper_settings", android.content.Context.MODE_PRIVATE))
+    }
     val choices = remember(components, initialSeed, freeMode) {
         if (freeMode) emptyList<PrintableComponent>() else buildList {
             if (initialSeed != null) add(PrintableComponent("initial:${initialSeed.sku}", initialSeed))
@@ -145,8 +149,8 @@ internal fun BluetoothLabelPrintScreen(
                 .forEach { add(PrintableComponent(it.id, it.toLabelSeed())) }
         }
     }
-    val initiallySelected = remember(choices, initialSeed) {
-        if (initialSeed == null) null else "initial:${initialSeed.sku}"
+    val initiallySelected = remember(choices, initialSeed, initialComponentIds) {
+        choices.filter { it.id in initialComponentIds || it.id == "initial:${initialSeed?.sku}" }.map { it.id }
     }
     val selected = rememberSaveable(initiallySelected, saver = mapSaver(
         save = { it.toMap() },
@@ -154,7 +158,7 @@ internal fun BluetoothLabelPrintScreen(
             saved.forEach { (key, value) -> put(key, value as Boolean) }
         } },
     )) {
-        mutableStateMapOf<String, Boolean>().apply { initiallySelected?.let { put(it, true) } }
+        mutableStateMapOf<String, Boolean>().apply { initiallySelected.forEach { put(it, true) } }
     }
     val copies = rememberSaveable(saver = mapSaver(
         save = { it.toMap() },
@@ -181,7 +185,7 @@ internal fun BluetoothLabelPrintScreen(
     var draftDesignJson by rememberSaveable { mutableStateOf("{}") }
     var pendingTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingTextTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingPaperSize by remember { mutableStateOf<LabelPaperSize?>(null) }
+    var pendingPaperSize by remember { mutableStateOf<M1TestPaperProfile?>(null) }
     val draftDesigns = remember(draftDesignJson) { readLabelDrafts(draftDesignJson) }
     var templateId by rememberSaveable(selectedInitialTemplateId) { mutableStateOf(selectedInitialTemplateId) }
     var textTemplateId by rememberSaveable(initialTextTemplateId) { mutableStateOf(initialTextTemplateId) }
@@ -191,6 +195,13 @@ internal fun BluetoothLabelPrintScreen(
     var offsetXText by rememberSaveable { mutableStateOf("0") }
     var offsetYText by rememberSaveable { mutableStateOf("0") }
     var restoredPaper by rememberSaveable { mutableStateOf(false) }
+    fun applyPaper(value: M1TestPaperProfile) {
+        widthText = value.widthMm.toString()
+        heightText = value.heightMm.toString()
+        rotationText = value.rotationDegrees.toString()
+        offsetXText = value.offsetXmm.toString()
+        offsetYText = value.offsetYmm.toString()
+    }
     var confirmNewQueue by remember { mutableStateOf(false) }
     var reviewItemId by remember { mutableStateOf<String?>(null) }
     var previewQueueItemId by remember { mutableStateOf<String?>(null) }
@@ -244,9 +255,13 @@ internal fun BluetoothLabelPrintScreen(
                 rotationDegrees = rotationText.toInt(),
                 offsetXmm = offsetXText.toFloat(),
                 offsetYmm = offsetYText.toFloat(),
-            ).also { activeProfile.validate(it) }
+            )
         }.getOrNull()
     }
+    val paperFitsPrinter = paper?.let { runCatching { activeProfile.validate(it) }.isSuccess } == true
+    val printerPaperHint = stringResource(R.string.label_printer_paper_range, activeProfile.displayName,
+        activeProfile.widthRange.start.toString(), activeProfile.widthRange.endInclusive.toString(),
+        activeProfile.heightRange.start.toString(), activeProfile.heightRange.endInclusive.toString())
     val draftSelections = choices.mapNotNull { choice ->
         if (selected[choice.id] != true) return@mapNotNull null
         val count = (copies[choice.id] ?: "1").toIntOrNull() ?: 0
@@ -264,8 +279,8 @@ internal fun BluetoothLabelPrintScreen(
     }
     LaunchedEffect(controller.loaded, hasQueue) {
         if (controller.loaded && !hasQueue && !restoredPaper) {
-            val selectedPaper = initialPaper ?: if (initialSeed != null)
-                queue.paper.copy(rotationDegrees = 0) else queue.paper
+            val lastPaper = paperStore.last()
+            val selectedPaper = initialPaper ?: lastPaper ?: queue.paper
             widthText = selectedPaper.widthMm.toString()
             heightText = selectedPaper.heightMm.toString()
             rotationText = selectedPaper.rotationDegrees.toString()
@@ -279,6 +294,9 @@ internal fun BluetoothLabelPrintScreen(
         }
     }
     val editable = !hasQueue && controller.loaded && !controller.running && !controller.working
+    LaunchedEffect(paper, editable, restoredPaper) {
+        if (restoredPaper && editable && paper != null) paperStore.saveLast(paper)
+    }
     val previewQueueItem = if (hasQueue) queue.items.firstOrNull { it.id == previewQueueItemId }
         ?: queue.items.firstOrNull() else null
     val previewFreeLabel = previewQueueItem?.freeLabel ?: if (!hasQueue) draftFreeLabel else null
@@ -371,10 +389,10 @@ internal fun BluetoothLabelPrintScreen(
         it.type == LabelElementType.Qr && it.text.isBlank()
     } == true
     val previewError = preview.error.takeIf { preview.request == previewRequest }
-    val printerAvailable = activeProfile == LabelPrinterProfile.M1 || controller.transport.hprtSdkAvailable
+    val printerAvailable = activeProfile != LabelPrinterProfile.HmA300eCpcl || controller.transport.hprtSdkAvailable
     val canCreate = printerAvailable && editable && (if (draftFreeLabel != null) validFree
         else validSelection && printDesigns.size == draftSelections.size) &&
-        paper != null && invalidGeometryFields.isEmpty() && !blankQr &&
+        paper != null && paperFitsPrinter && invalidGeometryFields.isEmpty() && !blankQr &&
         preview.request == previewRequest && preview.bitmap != null && preview.error == null
     val selectedElement = activeDesign?.elements?.firstOrNull { it.id == selectedElementId }
     fun elementCaption(element: LabelElement, limit: Int): String = element.text.take(limit).ifBlank {
@@ -397,6 +415,10 @@ internal fun BluetoothLabelPrintScreen(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                }
+                if (showPrintView && !hasQueue && paper != null && !paperFitsPrinter) {
+                    Text(printerPaperHint, color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!showPrintView) {
@@ -583,12 +605,15 @@ internal fun BluetoothLabelPrintScreen(
                     LabelPrinterProfile.entries.forEach { profile ->
                         FilterChip(selected = activeProfile == profile,
                             onClick = { controller.selectProfile(profile.id) }, enabled = editable,
-                            label = { Text(if (profile == LabelPrinterProfile.M1) "M1" else "HM-A300E CPCL") })
+                            label = { Text(profile.displayName) })
                     }
                     if (activeProfile == LabelPrinterProfile.HmA300eCpcl) {
                         if (printerAvailable || hasQueue) {
                             Text(stringResource(if (printerAvailable) R.string.label_hm_experimental else R.string.label_hm_sdk_missing))
                         }
+                    }
+                    if (activeProfile == LabelPrinterProfile.DetongerP1) Text(stringResource(R.string.label_p1_hint))
+                    if (activeProfile != LabelPrinterProfile.M1) {
                         LabelMediaType.entries.forEach { media ->
                             FilterChip(selected = (if (hasQueue) queue.mediaType else controller.selectedMediaType) == media.id,
                                 onClick = { controller.selectMedia(media.id) }, enabled = editable,
@@ -623,7 +648,7 @@ internal fun BluetoothLabelPrintScreen(
                         Text(stringResource(R.string.label_editor_troubleshooting))
                     }
                     if (troubleshootingExpanded) {
-                        if (activeProfile == LabelPrinterProfile.HmA300eCpcl && controller.transport.report.isNotBlank()) {
+                        if (activeProfile != LabelPrinterProfile.M1 && controller.transport.report.isNotBlank()) {
                             SelectionContainer {
                                 Text(controller.transport.report, style = MaterialTheme.typography.bodySmall)
                             }
@@ -719,10 +744,18 @@ internal fun BluetoothLabelPrintScreen(
                 }
                 "paper" -> {
                     Text(stringResource(R.string.label_ui_paper), style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.label_editor_paper_range), style = MaterialTheme.typography.bodySmall)
+                    LabelPaperPresets(paperStore, paper, editable) { selectedPaper ->
+                        if (draftDesigns.isNotEmpty() &&
+                            (selectedPaper.widthMm != paper?.widthMm || selectedPaper.heightMm != paper?.heightMm))
+                            pendingPaperSize = selectedPaper
+                        else applyPaper(selectedPaper)
+                    }
                     if (activeProfile == LabelPrinterProfile.HmA300eCpcl) Text(stringResource(R.string.label_hm_printable_width))
                     LabelPaperChoices(paper?.widthMm, paper?.heightMm, editable, isM1 = activeProfile == LabelPrinterProfile.M1) { size ->
                         if (paper?.let { it.widthMm == size.widthMm && it.heightMm == size.heightMm } != true) {
-                            if (draftDesigns.isNotEmpty()) pendingPaperSize = size
+                            if (draftDesigns.isNotEmpty()) pendingPaperSize = (paper ?: M1TestPaperProfile(40f, 60f))
+                                .copy(widthMm = size.widthMm, heightMm = size.heightMm)
                             else {
                                 widthText = size.widthMm.toInt().toString()
                                 heightText = size.heightMm.toInt().toString()
@@ -783,6 +816,7 @@ internal fun BluetoothLabelPrintScreen(
                     }
                     if (paper == null) Text(stringResource(R.string.bluetooth_label_print_paper_invalid),
                         color = MaterialTheme.colorScheme.error)
+                    else if (!paperFitsPrinter) Text(printerPaperHint, color = MaterialTheme.colorScheme.error)
                 }
                 "components" -> {
                     Text(stringResource(R.string.label_ui_components), style = MaterialTheme.typography.titleLarge)
@@ -886,8 +920,7 @@ internal fun BluetoothLabelPrintScreen(
         text = { Text(stringResource(R.string.label_ui_change_paper_warning)) },
         confirmButton = { TextButton(onClick = {
             pendingPaperSize?.let { size ->
-                widthText = size.widthMm.toInt().toString()
-                heightText = size.heightMm.toInt().toString()
+                applyPaper(size)
                 draftDesignJson = "{}"
                 selectedElementId = null
                 invalidGeometryFields = arrayListOf()

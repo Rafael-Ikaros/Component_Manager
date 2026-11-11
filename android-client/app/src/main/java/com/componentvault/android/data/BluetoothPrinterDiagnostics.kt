@@ -122,6 +122,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     private val hprtPort: HprtCpclPort? by lazy { createHprtCpclPort(this.context) }
     private var hprtSession: HprtCpclSession? = null
     private var hprtOperation: Deferred<HprtCpclOutcome>? = null
+    private var p1Operation: Deferred<DetongerP1Outcome>? = null
     val hprtSdkAvailable get() = hprtPort != null
 
     var candidates by mutableStateOf<List<PrinterDeviceCandidate>>(emptyList())
@@ -328,6 +329,50 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         printM1Bitmap(candidate, bitmap, paper, M1FeedMode.Label, "m1_component_label")
 
     /** A successful SDK write leaves the label pending physical verification. */
+    suspend fun printDetongerP1Label(candidate: PrinterDeviceCandidate, bitmap: Bitmap,
+                                    paper: M1TestPaperProfile, continuous: Boolean) {
+        stopInternal(recordPrintInterruption = false)
+        printResult = M1TestPrintResult.None
+        canContinueBatch = false
+        report = "transport=detonger_lpapi_spp\n"
+        if (!candidate.paired || candidate.type !in setOf(BluetoothDevice.DEVICE_TYPE_CLASSIC, BluetoothDevice.DEVICE_TYPE_DUAL)) {
+            finish(PrinterProbeStatus.Unsupported, "error=p1_unsupported_device")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        try {
+            if (adapter?.isEnabled != true) {
+                finish(PrinterProbeStatus.BluetoothOff, "error=bluetooth_off")
+                printResult = M1TestPrintResult.Rejected
+                return
+            }
+        } catch (_: SecurityException) {
+            finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        status = PrinterProbeStatus.Connecting
+        coroutineScope {
+            val attempt = async(start = CoroutineStart.LAZY) {
+                DetongerP1Session().print(candidate.name.orEmpty(), candidate.address, bitmap, paper, continuous) {
+                    status = PrinterProbeStatus.Printing
+                }
+            }
+            p1Operation = attempt
+            try {
+                val outcome = attempt.await()
+                report = outcome.report
+                status = outcome.status
+                printResult = outcome.result
+                canContinueBatch = outcome.batchReady
+            } catch (_: CancellationException) {
+                currentCoroutineContext().ensureActive()
+            } finally {
+                if (p1Operation === attempt) p1Operation = null
+            }
+        }
+    }
+
     suspend fun printHmA300eLabel(
         candidate: PrinterDeviceCandidate,
         bitmap: Bitmap,
@@ -960,6 +1005,12 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     fun stop() = stopInternal(recordPrintInterruption = true)
 
     private fun stopInternal(recordPrintInterruption: Boolean) {
+        if (recordPrintInterruption && p1Operation != null && busy) {
+            printResult = if (status == PrinterProbeStatus.Printing) M1TestPrintResult.Partial else M1TestPrintResult.Interrupted
+            report += "error=p1_cancelled\n"
+        }
+        p1Operation?.cancel()
+        p1Operation = null
         if (recordPrintInterruption && hprtOperation != null && busy) {
             printResult = if (status == PrinterProbeStatus.Printing) M1TestPrintResult.Partial else M1TestPrintResult.Interrupted
             report += "error=hprt_cancelled\n"

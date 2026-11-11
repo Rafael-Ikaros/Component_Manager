@@ -620,7 +620,7 @@
     <string name="bluetooth_label_print_rotation">旋转（0、90、180、270°）</string>
     <string name="bluetooth_label_print_offset_x">水平偏移（mm）</string>
     <string name="bluetooth_label_print_offset_y">垂直偏移（mm）</string>
-    <string name="bluetooth_label_print_paper_invalid">请输入有效的纸张尺寸、旋转角度与偏移。</string>
+    <string name="bluetooth_label_print_paper_invalid">纸张宽高应为 10–300 mm，旋转为 0°、90°、180° 或 270°，偏移应为 −300–300 mm。</string>
     <string name="bluetooth_label_print_paper_hint">默认 40 × 60 mm；预览会检查每个所选标签能否完整排入纸张。</string>
     <string name="bluetooth_label_print_preview">打印预览</string>
     <string name="bluetooth_label_print_preview_unavailable">选择元件并填写有效纸张参数后可预览。</string>

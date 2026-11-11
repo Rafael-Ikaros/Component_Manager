@@ -1,0 +1,13 @@
+<resources>
+    <string name="label_batch_select_results">全选筛选结果</string>
+    <string name="label_batch_print_selected">打印所选标签</string>
+    <string name="label_paper_presets">我的纸张预设（最多 12 个）</string>
+    <string name="label_paper_presets_hint">仅保存尺寸、旋转和 X/Y 偏移；元件标签内容仍由当前元件生成。</string>
+    <string name="label_paper_preset_name">预设名称</string>
+    <string name="label_paper_preset_save">保存当前尺寸、旋转和偏移</string>
+    <string name="label_paper_preset_update">更新此预设</string>
+    <string name="label_paper_preset_delete">删除</string>
+    <string name="label_editor_paper_range">画布宽高均为 10–300 mm；旋转为 0°、90°、180°、270°；偏移为 −300–300 mm。有效设置会自动记住。</string>
+    <string name="label_printer_paper_range">%1$s 可打印宽度为 %2$s–%3$s mm，走纸高度为 %4$s–%5$s mm。打印前请调整纸张或选择其他打印机。</string>
+    <string name="label_p1_hint">P1 最大打印宽度为 48 mm。请先在系统蓝牙中配对，并关闭其他占用打印机的应用；纸型需与装入的纸张一致。</string>
+</resources>

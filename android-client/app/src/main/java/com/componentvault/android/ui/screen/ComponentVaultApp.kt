@@ -110,6 +110,7 @@ fun ComponentVaultApp(
     var componentEditorImportCandidate by rememberSaveable(stateSaver = ComponentImportCandidateSaver) { mutableStateOf<ComponentImportCandidate?>(null) }
     var labelPrintSeed by rememberSaveable(stateSaver = LabelSeedSaver) { mutableStateOf<ComponentLabelSeed?>(null) }
     var labelPrintVisible by rememberSaveable { mutableStateOf(false) }
+    var labelPrintComponentIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var labelToolPickerVisible by rememberSaveable { mutableStateOf(false) }
     var labelToolTemplate by rememberSaveable { mutableStateOf(LabelToolTemplate.Component) }
     var labelToolPaper by remember { mutableStateOf<M1TestPaperProfile?>(null) }
@@ -508,6 +509,7 @@ fun ComponentVaultApp(
             labelPrintVisible -> BluetoothLabelPrintScreen(
                 components = uiState.availableComponents,
                 initialSeed = labelPrintSeed,
+                initialComponentIds = labelPrintComponentIds,
                 initialToolTemplate = if (labelPrintSeed != null) LabelToolTemplate.Component else labelToolTemplate,
                 initialPaper = if (labelPrintFromToolPicker) labelToolPaper else null,
                 initialFreeTitle = locationLabelTargetId?.let { id ->
@@ -519,6 +521,7 @@ fun ComponentVaultApp(
                 onDismiss = {
                     labelPrintVisible = false
                     labelPrintSeed = null
+                    labelPrintComponentIds = emptyList()
                     if (locationLabelTargetId != null) storageLocationsVisible = true
                     locationLabelTargetId = null
                     if (labelPrintFromToolPicker) labelToolPickerVisible = true
@@ -594,6 +597,14 @@ fun ComponentVaultApp(
                             labelPrintSeed = null
                             labelPrintFromToolPicker = false
                             labelToolPickerVisible = true
+                        },
+                        onPrintSelectedComponents = { ids ->
+                            locationLabelTargetId = null
+                            labelPrintSeed = null
+                            labelPrintComponentIds = ids
+                            labelToolTemplate = LabelToolTemplate.Component
+                            labelPrintFromToolPicker = false
+                            labelPrintVisible = true
                         },
                         onEditComponent = { componentId ->
                             viewModel.selectComponent(componentId)

@@ -22,6 +22,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.componentvault.android.R
 import com.componentvault.android.data.M1TestPaperProfile
+import com.componentvault.android.data.LabelPaperPresetStore
 
 internal enum class LabelToolTemplate { Component, ComponentCompact, ComponentText, Text, Qr, Free }
 
@@ -42,17 +45,20 @@ internal fun LabelToolTemplatePicker(
     onSelect: (LabelToolTemplate, M1TestPaperProfile) -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val lastPaper = remember { LabelPaperPresetStore(context.getSharedPreferences("label_paper_settings", 0)).last()
+        ?: M1TestPaperProfile(40f, 60f) }
     var chosen by rememberSaveable { mutableStateOf<String?>(null) }
-    var widthText by rememberSaveable { mutableStateOf("40") }
-    var heightText by rememberSaveable { mutableStateOf("60") }
-    val paper = runCatching { M1TestPaperProfile(widthText.toFloat(), heightText.toFloat()) }.getOrNull()
+    var widthText by rememberSaveable { mutableStateOf(lastPaper.widthMm.toString()) }
+    var heightText by rememberSaveable { mutableStateOf(lastPaper.heightMm.toString()) }
+    val paper = runCatching { lastPaper.copy(widthMm = widthText.toFloat(), heightMm = heightText.toFloat()) }.getOrNull()
     val template = chosen?.let { name -> LabelToolTemplate.entries.firstOrNull { it.name == name } }
 
     SecondaryPageScaffold(
         title = stringResource(if (template == null) R.string.label_tool_title else R.string.label_ui_choose_paper),
         onBack = { if (template == null) onBack() else chosen = null },
         bottomBar = {
-            if (template != null) Button(onClick = { if (template != null && paper != null) onSelect(template, paper) },
+            if (template != null) Button(onClick = { if (paper != null) onSelect(template, paper) },
                 enabled = paper != null,
                 modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(16.dp)) {
                 Text(stringResource(R.string.label_ui_open_editor))
@@ -114,7 +120,7 @@ internal fun LabelToolTemplatePicker(
             } else {
                 Text(stringResource(R.string.label_ui_choose_paper_hint),
                     style = MaterialTheme.typography.bodyMedium)
-                LabelPaperChoices(paper?.widthMm, paper?.heightMm, true) { size ->
+                LabelPaperChoices(paper?.widthMm, paper?.heightMm, true, isM1 = false) { size ->
                     widthText = size.widthMm.toInt().toString()
                     heightText = size.heightMm.toInt().toString()
                 }
@@ -129,7 +135,7 @@ internal fun LabelToolTemplatePicker(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true, modifier = Modifier.weight(1f).testTag("label_paper_height"))
                 }
-                if (paper == null) Text(stringResource(R.string.label_ui_paper_range),
+                if (paper == null) Text(stringResource(R.string.label_editor_paper_range),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall)
             }
