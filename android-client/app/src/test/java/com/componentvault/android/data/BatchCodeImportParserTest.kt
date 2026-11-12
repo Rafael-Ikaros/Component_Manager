@@ -63,16 +63,60 @@ class BatchCodeImportParserTest {
         assertTrue(error.message!!.contains("公式"))
     }
 
-    @Test fun reimportingIdenticalContentDoesNotDuplicateDraftOrCommittedRows() {
+    @Test fun reimportingIdenticalContentRequiresChoiceAndKeepsReceiptProtection() {
         val rows = BatchCodeImportParser.text("C123 2\nC456 3", "LOC-A", locations)
         val reordered = BatchCodeImportParser.text("C456 3\nc123 2", "LOC-A", locations)
         assertEquals(rows.map { it.id }.toSet(), reordered.map { it.id }.toSet())
-        val (draft, skipped) = BatchCodeImportParser.append(BatchJlcDraft(rows = rows), reordered, emptySet())
-        assertEquals(2, skipped)
+        assertFailsWith<IllegalArgumentException> { BatchCodeImportParser.append(BatchJlcDraft(rows = rows), reordered, emptySet()) }
+        val (draft, skipped) = BatchCodeImportParser.append(BatchJlcDraft(rows = rows), reordered, emptySet(), CodeImportResolution.Replace)
+        assertEquals(0, skipped)
         assertEquals(2, draft.rows.size)
         val (recovered, receiptSkipped) = BatchCodeImportParser.append(BatchJlcDraft(), rows, rows.map { it.id }.toSet())
         assertEquals(2, receiptSkipped)
         assertTrue(recovered.rows.isEmpty())
+    }
+
+    @Test fun correctingOneRowRequiresChoiceAndReplaceDoesNotDoubleOtherRows() {
+        val original = BatchCodeImportParser.text("C123 2\nC456 3", "LOC-A", locations)
+        val text = BatchCodeImportParser.text("C123 2\nC456 4", "LOC-A", locations)
+        val xlsx = BatchCodeImportParser.xlsx(workbook("""
+            <row r="1">${cell("A1", "C123")}${cell("B1", "2")}${cell("C1", "LOC-A")}</row>
+            <row r="2">${cell("A2", "C456")}${cell("B2", "4")}${cell("C2", "LOC-A")}</row>
+        """).inputStream(), "", locations)
+        assertEquals(original.first().id, text.first().id)
+        // Also cover drafts written by the old whole-batch identity scheme.
+        val legacy = original.mapIndexed { index, row -> row.copy(id = "legacy-$index", status = BatchJlcStatus.Ready) }
+        val untouched = original.first().copy(id = "other-location", location = "LOC-B")
+        val draft = BatchJlcDraft(rows = legacy + untouched)
+        for (incoming in listOf(text, xlsx)) {
+            assertEquals(listOf("C123", "C456"), BatchCodeImportParser.overlaps(draft, incoming, emptySet()).map { it.incoming.sku })
+            assertFailsWith<IllegalArgumentException> { BatchCodeImportParser.append(draft, incoming, emptySet()) }
+            val (replaced, _) = BatchCodeImportParser.append(draft, incoming, emptySet(), CodeImportResolution.Replace)
+            assertEquals(listOf("2", "4"), replaced.rows.filter { it.location == "LOC-A" }.map { it.quantityText })
+            assertEquals(3, replaced.rows.size)
+            assertEquals(untouched, replaced.rows.single { it.location == "LOC-B" })
+            assertEquals(legacy.map { it.id }, replaced.rows.filter { it.location == "LOC-A" }.map { it.id })
+            val (appended, _) = BatchCodeImportParser.append(draft, incoming, emptySet(), CodeImportResolution.Append)
+            assertEquals(mapOf("C123" to 4, "C456" to 7), appended.rows.filter { it.location == "LOC-A" }
+                .groupBy { it.sku }.mapValues { (_, rows) -> rows.sumOf { it.quantityText.toInt() } })
+            assertEquals(appended.rows.size, appended.rows.map { it.id }.distinct().size)
+        }
+    }
+
+    @Test fun committedOverlapsCannotBeReplacedButExplicitAppendHasFreshReceipts() {
+        val rows = BatchCodeImportParser.text("C123 2", "LOC-A", locations)
+        val receipts = setOf(rows.single().id)
+        for (status in listOf(BatchJlcStatus.Committed, BatchJlcStatus.Ready)) {
+            val draft = BatchJlcDraft(rows = rows.map { it.copy(status = status) })
+            assertTrue(BatchCodeImportParser.overlaps(draft, rows, receipts).single().committed)
+            assertFailsWith<IllegalArgumentException> {
+                BatchCodeImportParser.append(draft, rows, receipts, CodeImportResolution.Replace)
+            }
+            val (appended, _) = BatchCodeImportParser.append(draft, rows, receipts, CodeImportResolution.Append)
+            assertEquals(2, appended.rows.size)
+            assertTrue(appended.rows.last().id !in receipts)
+            assertEquals(draft.rows.first(), appended.rows.first())
+        }
     }
 
     @Test fun limitsRejectOverflowAndOversizedDrafts() {

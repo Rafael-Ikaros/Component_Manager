@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,6 +15,8 @@ import androidx.compose.ui.test.performTextReplacement
 import com.componentvault.android.R
 import com.componentvault.android.data.BatchJlcDraftStore
 import com.componentvault.android.data.BatchJlcStatus
+import com.componentvault.android.data.BatchJlcDraft
+import com.componentvault.android.data.BatchCodeImportParser
 import com.componentvault.android.data.InventoryDatabaseHelper
 import com.componentvault.android.data.InventoryRepository
 import com.componentvault.android.model.AppPreferences
@@ -102,5 +105,65 @@ class BatchCodeImportUiTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("第 2 行：", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         assertTrue(BatchJlcDraftStore(context).load().rows.isEmpty())
         assertEquals(10, runBlocking { repository.loadComponents().single().quantity })
+    }
+
+    private fun openCorrectedImport() : BatchJlcDraft {
+        runBlocking {
+            for (sku in listOf("C123", "C456")) assertTrue(repository.saveComponent(ComponentDraft(
+                sku = sku, name = sku, category = "IC", packageName = "SMD", location = "A",
+                description = "", quantity = 10, minStock = 1)).isSuccess)
+        }
+        val original = BatchJlcDraft(rows = BatchCodeImportParser.text("C123 2\nC456 3", "A", setOf("A")))
+        BatchJlcDraftStore(context).save(original)
+        open()
+        compose.onNodeWithTag("batch_codes_input").performScrollTo().performTextReplacement("C123 2\nC456 4")
+        parse()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.batch_codes_replace))).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(context.getString(R.string.batch_codes_overlap_row, "C123", "A", "2", "2")).assertExists()
+        compose.onNodeWithText(context.getString(R.string.batch_codes_overlap_row, "C456", "A", "3", "4")).assertExists()
+        assertEquals(original, BatchJlcDraftStore(context).load())
+        return original
+    }
+
+    private fun waitForReviewedImport() {
+        compose.waitUntil(15_000) {
+            compose.onAllNodes(hasText(context.getString(R.string.batch_commit)) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test fun correctedReimportDoesNotChangeDraftBeforeChoiceAndReplaceUsesNewQuantities() {
+        openCorrectedImport()
+        compose.onNodeWithTag("batch_codes_replace").performClick()
+        waitForReviewedImport()
+        val rows = BatchJlcDraftStore(context).load().rows
+        assertEquals(listOf("2", "4"), rows.map { it.quantityText })
+        assertEquals(listOf("C123", "C456"), rows.map { it.sku })
+        assertTrue(runBlocking { repository.loadComponents() }.all { it.quantity == 10 })
+    }
+
+    @Test fun explicitAppendRetainsOriginalRowsAndCancelLeavesThemUnchanged() {
+        val original = openCorrectedImport()
+        compose.onNodeWithText(context.getString(R.string.action_cancel)).performClick()
+        assertEquals(original, BatchJlcDraftStore(context).load())
+        parse()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.batch_codes_append))).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("batch_codes_append").performClick()
+        waitForReviewedImport()
+        val rows = BatchJlcDraftStore(context).load().rows
+        assertEquals(mapOf("C123" to 4, "C456" to 7), rows.groupBy { it.sku }
+            .mapValues { (_, values) -> values.sumOf { it.quantityText.toInt() } })
+        assertEquals(4, rows.map { it.id }.distinct().size)
+    }
+
+    @Test fun committedOverlapDisablesReplacement() {
+        val original = BatchJlcDraft(rows = BatchCodeImportParser.text("C70565 2", "A", setOf("A"))
+            .map { it.copy(status = BatchJlcStatus.Committed) })
+        BatchJlcDraftStore(context).save(original)
+        open()
+        compose.onNodeWithTag("batch_codes_input").performScrollTo().performTextReplacement("C70565 4")
+        parse()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.batch_codes_replace))).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("batch_codes_replace").assertIsNotEnabled()
+        assertEquals(original, BatchJlcDraftStore(context).load())
     }
 }

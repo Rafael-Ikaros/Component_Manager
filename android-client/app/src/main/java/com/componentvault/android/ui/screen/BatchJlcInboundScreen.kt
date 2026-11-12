@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import com.componentvault.android.R
 import com.componentvault.android.data.BatchJlcCommitPlanner
 import com.componentvault.android.data.BatchCodeImportParser
+import com.componentvault.android.data.CodeImportResolution
+import com.componentvault.android.data.CodeImportOverlap
 import com.componentvault.android.data.BatchJlcDraft
 import com.componentvault.android.data.BatchJlcDraftCodec
 import com.componentvault.android.data.BatchJlcDraftStore
@@ -120,6 +122,8 @@ internal fun BatchJlcInboundScreen(
     var summaryExpanded by rememberSaveable { mutableStateOf(false) }
     var showCodeImport by rememberSaveable { mutableStateOf(initialCodeImport) }
     var codeImportError by remember { mutableStateOf<String?>(null) }
+    var pendingCodeRows by remember { mutableStateOf<List<BatchJlcRow>?>(null) }
+    var codeOverlaps by remember { mutableStateOf<List<CodeImportOverlap>>(emptyList()) }
     fun save(value: BatchJlcDraft) {
         draft = value
         val revision = saveRevision.incrementAndGet()
@@ -306,7 +310,8 @@ internal fun BatchJlcInboundScreen(
         }
     }
 
-    fun importCodes(read: suspend (Set<String>, String) -> List<BatchJlcRow>) {
+    fun importCodes(resolution: CodeImportResolution? = null,
+                    read: suspend (Set<String>, String) -> List<BatchJlcRow>) {
         if (!loaded || processing || committing || saving || loadFailed) return
         processing = true
         codeImportError = null
@@ -316,13 +321,21 @@ internal fun BatchJlcInboundScreen(
                 val locationIds = repository.loadStorageLocations().filterNot { it.deleted }.mapTo(mutableSetOf()) { it.id }
                 val rows = withContext(Dispatchers.IO) { read(locationIds, fallbackLocation) }
                 val receipts = repository.loadBatchJlcReceipts(draft.sessionId)
-                val (next, skipped) = BatchCodeImportParser.append(draft, rows, receipts)
-                val added = next.rows.size - draft.rows.size
+                val overlaps = BatchCodeImportParser.overlaps(draft, rows, receipts)
+                if (overlaps.isNotEmpty() && resolution == null) {
+                    pendingCodeRows = rows
+                    codeOverlaps = overlaps
+                    return@launch
+                }
+                val (next, skipped) = BatchCodeImportParser.append(draft, rows, receipts, resolution)
+                val added = rows.size - skipped
                 if (added > 0) {
                     save(next)
                     pendingSave?.join()
                     if (saveFailed) return@launch
                 }
+                pendingCodeRows = null
+                codeOverlaps = emptyList()
                 showCodeImport = false
                 message = context.getString(R.string.batch_codes_result, added, skipped)
                 if (added > 0) processRows(ProcessScope.Captured, generation)
@@ -587,7 +600,14 @@ internal fun BatchJlcInboundScreen(
         onLocationChange = { globalLocation = it }, busy = busy, error = codeImportError,
         onText = { value -> importCodes { ids, fallback -> BatchCodeImportParser.text(value, fallback, ids) } },
         onXlsx = { codesPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-        onDismiss = { showCodeImport = false },
+        onDismiss = {
+            if (pendingCodeRows != null) { pendingCodeRows = null; codeOverlaps = emptyList(); codeImportError = null }
+            else showCodeImport = false
+        },
+        overlaps = codeOverlaps,
+        onResolve = { resolution ->
+            pendingCodeRows?.let { rows -> importCodes(resolution) { _, _ -> rows } }
+        },
     )
     if (confirmClear) AlertDialog(
         onDismissRequest = { confirmClear = false }, title = { Text(stringResource(R.string.batch_clear_title)) },

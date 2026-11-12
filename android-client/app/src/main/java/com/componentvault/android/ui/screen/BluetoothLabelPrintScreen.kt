@@ -298,8 +298,8 @@ internal fun BluetoothLabelPrintScreen(
             val rememberedPaper = paperStore.last()
             val selectedPaper = initialPaper ?: rememberedPaper ?: if (initialSeed != null)
                 queue.paper.copy(rotationDegrees = 0) else queue.paper
-            if (initialPaper != null || rememberedPaper != null)
-                controller.savePrintOffset(LabelPrintOffset(selectedPaper.offsetXmm, selectedPaper.offsetYmm))
+            // Opening a page must not overwrite the selected printer's calibration.
+            // Only explicitly applying a paper preset writes its offsets (see applyPaper).
             widthText = selectedPaper.widthMm.toString()
             heightText = selectedPaper.heightMm.toString()
             rotationText = selectedPaper.rotationDegrees.toString()

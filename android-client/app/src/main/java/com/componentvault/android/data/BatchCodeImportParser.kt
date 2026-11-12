@@ -7,6 +7,11 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.math.BigDecimal
 import java.security.MessageDigest
+import java.util.UUID
+
+internal enum class CodeImportResolution { Replace, Append }
+
+internal data class CodeImportOverlap(val incoming: BatchJlcRow, val existing: List<BatchJlcRow>, val committed: Boolean)
 
 /** Only reads the input columns. Catalog lookup and inventory writes stay in the batch workflow. */
 internal object BatchCodeImportParser {
@@ -64,23 +69,49 @@ internal object BatchCodeImportParser {
                 catch (_: ArithmeticException) { error("${prefix}相同 C 编码与库位的合计数量溢出。") }
         }
         require(grouped.isNotEmpty()) { "没有可导入的 C 编码与数量。" }
-        // Identical imports in the same draft retain IDs, so reopening a file does not double inbound.
-        val canonical = grouped.entries.sortedWith(compareBy({ it.key.first }, { it.key.second })).joinToString("") {
-            "${it.key.first.length}:${it.key.first}${it.key.second.length}:${it.key.second}:${it.value};"
-        }
-        val batchId = hash(canonical)
+        // Editing another row must not change this row's identity.
         return grouped.map { (key, quantity) ->
-            BatchJlcRow(id = "codes-${hash("$batchId:${key.first}:${key.second}")}",
+            BatchJlcRow(id = "codes-${hash("${key.first.length}:${key.first}${key.second.length}:${key.second}:$quantity")}",
                 raw = "${key.first}\t$quantity\t${key.second}", sku = key.first,
                 quantityText = quantity.toString(), location = key.second)
         }
     }
 
-    fun append(draft: BatchJlcDraft, rows: List<BatchJlcRow>, receipts: Set<String>): Pair<BatchJlcDraft, Int> {
-        val known = draft.rows.mapTo(receipts.toMutableSet()) { it.id }
-        val added = rows.filter { known.add(it.id) }
-        require(draft.rows.size + added.size <= BatchJlcDraftCodec.MaxRows) { "批量草稿最多 500 条，请先处理现有记录。" }
-        return draft.copy(rows = draft.rows + added) to (rows.size - added.size)
+    private fun key(row: BatchJlcRow) = row.sku.trim().uppercase() to row.location.trim()
+
+    fun overlaps(draft: BatchJlcDraft, rows: List<BatchJlcRow>, receipts: Set<String>): List<CodeImportOverlap> {
+        val existing = draft.rows.groupBy(::key)
+        return rows.mapNotNull { incoming ->
+            existing[key(incoming)]?.let { matches ->
+                CodeImportOverlap(incoming, matches, matches.any { it.status == BatchJlcStatus.Committed || it.id in receipts })
+            }
+        }
+    }
+
+    fun append(draft: BatchJlcDraft, rows: List<BatchJlcRow>, receipts: Set<String>,
+               resolution: CodeImportResolution? = null): Pair<BatchJlcDraft, Int> {
+        val overlap = overlaps(draft, rows, receipts)
+        require(overlap.isEmpty() || resolution != null) { "导入内容与草稿重叠，请选择替换或追加。" }
+        require(resolution != CodeImportResolution.Replace || overlap.none { it.committed }) {
+            "重叠记录已入库，不能通过重新导入替换库存。"
+        }
+        val byKey = overlap.associateBy { key(it.incoming) }
+        val retained = if (resolution == CodeImportResolution.Replace)
+            draft.rows.filterNot { key(it) in byKey } else draft.rows
+        val known = retained.mapTo(receipts.toMutableSet()) { it.id }
+        val added = rows.mapNotNull { row ->
+            val matches = byKey[key(row)]
+            if (matches == null && row.id in receipts) return@mapNotNull null
+            val id = when {
+                matches != null && resolution == CodeImportResolution.Replace -> matches.existing.first().id
+                matches != null || row.id in known -> "codes-${UUID.randomUUID()}"
+                else -> row.id
+            }
+            require(known.add(id)) { "导入记录重复，请重新选择文件。" }
+            row.copy(id = id)
+        }
+        require(retained.size + added.size <= BatchJlcDraftCodec.MaxRows) { "批量草稿最多 500 条，请先处理现有记录。" }
+        return draft.copy(rows = retained + added) to (rows.size - added.size)
     }
 
     private fun hash(value: String) = MessageDigest.getInstance("SHA-256")

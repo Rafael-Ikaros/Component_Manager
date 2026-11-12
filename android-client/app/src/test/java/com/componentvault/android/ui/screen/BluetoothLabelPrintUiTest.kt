@@ -704,4 +704,64 @@ class BluetoothLabelPrintUiTest {
         assertEquals(expected, store.last())
         assertTrue(LabelPrintQueueStore(context).load().items.isEmpty())
     }
+
+    @Test
+    @Config(shadows = [PairedLabelPrinterShadow::class])
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun reopeningAndSwitchingPrintersNeverCopiesGlobalPaperOffsetsIntoDeviceCalibration() {
+        val m1 = "00:11:22:33:44:71" to "M1-6870"
+        val p1 = "00:11:22:33:44:72" to "P1-test"
+        pairTestPrinters(m1, p1)
+        val preferences = LabelPrinterPreferences(context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE))
+        preferences.save(listOf(
+            SavedLabelPrinter(m1.first, m1.second, LabelPrinterProfile.M1.id, LabelMediaType.Gap.id),
+            SavedLabelPrinter(p1.first, p1.second, LabelPrinterProfile.DetongerP1.id, LabelMediaType.Gap.id),
+        ), m1.first, LabelPrinterProfile.M1.id, LabelMediaType.Gap.id)
+        val m1Offset = LabelPrintOffset(0.5f, -0.5f)
+        val p1Offset = LabelPrintOffset(2f, 1f)
+        preferences.saveOffset(m1.first, m1Offset)
+        preferences.saveOffset(p1.first, p1Offset)
+        val papers = LabelPaperPresetStore(context)
+        papers.saveLast(M1TestPaperProfile(40f, 60f, 90, 99f, 99f))
+        papers.save("Explicit offset", M1TestPaperProfile(40f, 60f, 90, 1f, -1f))
+        val visible = mutableStateOf(true)
+        val seed = ComponentLabelSeed("CALIBRATION", "Resistor", "Passive", "0603", "A", 1, 0)
+        setLabelContent { MaterialTheme {
+            if (visible.value) BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {})
+        } }
+        fun expectOffset(offset: LabelPrintOffset) {
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithText(context.getString(R.string.label_confirmation_offset_summary,
+                    offset.xMm, offset.yMm)).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText(context.getString(R.string.label_ui_paper_summary,
+                "40.0", "60.0", "90"), substring = true).assertExists()
+            assertEquals(m1Offset, preferences.loadOffset(m1.first))
+            assertEquals(p1Offset, preferences.loadOffset(p1.first))
+        }
+        fun reopen() {
+            compose.runOnIdle { visible.value = false }
+            compose.waitForIdle()
+            compose.runOnIdle { visible.value = true }
+        }
+        fun selectDevice(name: String) {
+            compose.onNodeWithTag("label_print_device").performScrollTo().performClick()
+            compose.onNodeWithText(name).performScrollTo().performClick()
+            compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+        }
+        expectOffset(m1Offset)
+        selectDevice(p1.second)
+        expectOffset(p1Offset)
+        reopen()
+        expectOffset(p1Offset)
+        selectDevice(m1.second)
+        expectOffset(m1Offset)
+        reopen()
+        expectOffset(m1Offset)
+        compose.onNodeWithTag("label_print_paper").performScrollTo().performClick()
+        compose.onNodeWithText("Explicit offset").performScrollTo().performClick()
+        compose.onNodeWithTag("label_paper_apply").performClick()
+        compose.waitUntil(10_000) { preferences.loadOffset(m1.first) == LabelPrintOffset(1f, -1f) }
+        assertEquals(p1Offset, preferences.loadOffset(p1.first))
+    }
 }
