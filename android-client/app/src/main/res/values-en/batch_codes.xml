@@ -1,0 +1,18 @@
+<resources>
+    <string name="batch_codes_title">Batch C codes / XLSX import</string>
+    <string name="batch_codes_menu_hint">Paste C codes and quantities, or read C codes, quantities and location IDs from XLSX.</string>
+    <string name="batch_codes_hint">Enter one C code and quantity per line, separated by spaces, commas or tabs. Text uses the location below. Quantities for the same code and location are combined. Review before confirming inbound.</string>
+    <string name="batch_codes_input">C code and quantity (one pair per line)</string>
+    <string name="batch_codes_xlsx">Import from XLSX</string>
+    <string name="batch_codes_xlsx_hint">Reads the first visible worksheet: column 1 C code, column 2 quantity, column 3 existing location code (blank uses the selected location). Headers and blank rows are supported; up to 500 rows and 10 MiB. Quantities must be positive integers. Overlapping codes and locations require an explicit replace or append choice.</string>
+    <string name="batch_codes_parse">Add and parse</string>
+    <string name="batch_codes_result">Processed %1$d items; skipped %2$d already committed receipts.</string>
+    <string name="batch_codes_failed">Could not read the import. Check the file and its format.</string>
+    <string name="batch_codes_overlap_hint">These codes and locations already exist in this draft. Replace uses the incoming quantities instead of the overlapping draft rows; append keeps those rows and adds the full incoming quantities. Other rows are kept. Cancel makes no changes.</string>
+    <string name="batch_codes_overlap_row">%1$s · %2$s: existing %3$s → incoming %4$s</string>
+    <string name="batch_codes_overlap_committed">Some overlapping rows are already committed. Replacement is unavailable; appending adds more stock after review. To correct existing stock, cancel and use inventory adjustment.</string>
+    <string name="batch_codes_overlap_multiple">Multiple draft rows share this code and location, and their total differs from the import. Edit the original rows, or append only if you intend to add more stock.</string>
+    <string name="batch_codes_overlap_amount_review">Replacing the quantity keeps the original purchase total of CNY %1$s. Review the amount before confirming inbound stock.</string>
+    <string name="batch_codes_replace">Replace overlapping draft rows</string>
+    <string name="batch_codes_append">Append as additional quantities</string>
+</resources>

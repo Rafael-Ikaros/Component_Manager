@@ -3,9 +3,11 @@ package com.componentvault.android.data
 internal enum class LabelPrinterProfile(val id: String, val widthRange: ClosedFloatingPointRange<Float>, val heightRange: ClosedFloatingPointRange<Float>) {
     M1("m1", 20f..48f, 10f..100f),
     HmA300eCpcl("hm-a300e-cpcl", 25f..72f, 10f..300f),
-    GenericCpcl("cpcl-spp", 20f..72f, 10f..300f);
+    GenericCpcl("cpcl-spp", 20f..72f, 10f..300f),
+    DetongerP1("detonger-p1", 10f..48f, 10f..300f);
 
-    val usesCpcl get() = this != M1
+    val usesCpcl get() = this == HmA300eCpcl || this == GenericCpcl
+    val supportsContinuous get() = this != M1
     val configurable get() = if (this == HmA300eCpcl) GenericCpcl else this
 
     fun validate(paper: M1TestPaperProfile) {

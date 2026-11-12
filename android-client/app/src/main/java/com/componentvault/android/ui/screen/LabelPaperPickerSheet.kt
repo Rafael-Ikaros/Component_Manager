@@ -58,28 +58,35 @@ internal fun LabelPaperPickerSheet(
     val context = LocalContext.current
     val store = remember(context) { LabelPaperPresetStore(context) }
     var savedPapers by remember(store) { mutableStateOf(store.load()) }
-    val currentMedia = if (profile.usesCpcl) media else LabelMediaType.Gap
+    val currentMedia = if (profile.supportsContinuous) media else LabelMediaType.Gap
     var custom by rememberSaveable { mutableStateOf(false) }
     var widthText by rememberSaveable { mutableStateOf(paper.widthMm.paperNumber()) }
     var heightText by rememberSaveable { mutableStateOf(paper.heightMm.paperNumber()) }
     var mediaType by rememberSaveable { mutableStateOf(currentMedia) }
     var rotation by rememberSaveable { mutableStateOf(paper.rotationDegrees) }
+    var offsetX by rememberSaveable { mutableStateOf<String?>(null) }
+    var offsetY by rememberSaveable { mutableStateOf<String?>(null) }
     var presetName by rememberSaveable {
         mutableStateOf(savedPapers.firstOrNull { it.matches(paper.widthMm, paper.heightMm, currentMedia) }?.name.orEmpty())
     }
     val width = widthText.parsePaperNumber()
     val height = heightText.parsePaperNumber()
-    val sizeIsValid = width != null && height != null && width in profile.widthRange && height in profile.heightRange
-    val draft = remember(paper, width, height, rotation, profile) {
+    val sizeIsValid = width != null && height != null && width in M1TestPaperProfile.WidthRange && height in M1TestPaperProfile.HeightRange
+    val draft = remember(paper, width, height, rotation, offsetX, offsetY) {
         if (width == null || height == null) null else runCatching {
-            paper.copy(widthMm = width, heightMm = height, rotationDegrees = rotation).also(profile::validate)
+            paper.copy(widthMm = width, heightMm = height, rotationDegrees = rotation,
+                offsetXmm = offsetX?.replace(',', '.')?.toFloat() ?: paper.offsetXmm,
+                offsetYmm = offsetY?.replace(',', '.')?.toFloat() ?: paper.offsetYmm)
         }.getOrNull()
     }
     val compatibleSaved = savedPapers.filter {
-        it.widthMm in profile.widthRange && it.heightMm in profile.heightRange &&
-            (profile.usesCpcl || it.media == LabelMediaType.Gap)
+        profile.supportsContinuous || it.media == LabelMediaType.Gap
     }
-    val selectedSaved = compatibleSaved.firstOrNull { it.matches(width, height, mediaType) }
+    val selectedSaved = compatibleSaved.firstOrNull {
+        it.name == presetName && it.resolvePaper(paper.offsetXmm, paper.offsetYmm) == draft && it.media == mediaType
+    }
+    val canSave = draft != null && (savedPapers.size < LabelPaperPresetStore.MaxPresets ||
+        savedPapers.any { it.name == presetName.trim() })
 
     fun selectSize(widthMm: Float, heightMm: Float, type: LabelMediaType, name: String = "") {
         widthText = widthMm.paperNumber()
@@ -106,14 +113,18 @@ internal fun LabelPaperPickerSheet(
                     Button(
                         onClick = {
                             draft?.let {
-                                val preset = SavedLabelPaper(presetName.trim(), it.widthMm, it.heightMm, mediaType)
+                                val preset = SavedLabelPaper(
+                                    presetName.trim(), it.widthMm, it.heightMm, mediaType, it.rotationDegrees,
+                                    it.offsetXmm.takeIf { offsetX != null },
+                                    it.offsetYmm.takeIf { offsetY != null },
+                                )
                                 store.save(listOf(preset) + savedPapers.filterNot { saved ->
-                                    saved.matches(it.widthMm, it.heightMm, mediaType)
+                                    saved.name == preset.name
                                 })
                                 onApply(it, mediaType)
                             }
                         },
-                        enabled = draft != null,
+                        enabled = canSave,
                         modifier = Modifier.weight(1f).testTag("label_paper_save_apply"),
                     ) { Text(stringResource(R.string.label_paper_save_apply)) }
                 }
@@ -138,6 +149,7 @@ internal fun LabelPaperPickerSheet(
                 Modifier.fillMaxWidth().verticalScroll(scrollState).padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                Text(stringResource(R.string.label_paper_presets_hint), style = MaterialTheme.typography.bodySmall)
                 if (draft != null) Surface(
                     shape = MaterialTheme.shapes.medium,
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -164,6 +176,9 @@ internal fun LabelPaperPickerSheet(
                             onClick = {
                                 val current = compatibleSaved.firstOrNull { it.matches(paper.widthMm, paper.heightMm, currentMedia) }
                                 selectSize(paper.widthMm, paper.heightMm, currentMedia, current?.name.orEmpty())
+                                rotation = paper.rotationDegrees
+                                offsetX = null
+                                offsetY = null
                             },
                             label = { Text(paperDimensions(paper.widthMm, paper.heightMm)) },
                         )
@@ -174,7 +189,12 @@ internal fun LabelPaperPickerSheet(
                             compatibleSaved.forEach { saved ->
                                 FilterChip(
                                     selected = saved == selectedSaved,
-                                    onClick = { selectSize(saved.widthMm, saved.heightMm, saved.media, saved.name) },
+                                    onClick = {
+                                        selectSize(saved.widthMm, saved.heightMm, saved.media, saved.name)
+                                        rotation = saved.rotationDegrees
+                                        offsetX = saved.offsetXmm?.toString()
+                                        offsetY = saved.offsetYmm?.toString()
+                                    },
                                     label = { Text(saved.name.ifBlank { paperDimensions(saved.widthMm, saved.heightMm) }) },
                                 )
                             }
@@ -201,9 +221,7 @@ internal fun LabelPaperPickerSheet(
                     }
                 }
                 if (custom || !sizeIsValid) Text(
-                    stringResource(R.string.label_paper_limits, profile.widthRange.start.paperNumber(),
-                        profile.widthRange.endInclusive.paperNumber(), profile.heightRange.start.paperNumber(),
-                        profile.heightRange.endInclusive.paperNumber()),
+                    stringResource(R.string.label_editor_paper_range),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (sizeIsValid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 )
@@ -213,7 +231,7 @@ internal fun LabelPaperPickerSheet(
                 )
                 Text(stringResource(R.string.label_paper_media), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val options = if (profile.usesCpcl) LabelMediaType.entries else listOf(LabelMediaType.Gap)
+                    val options = if (profile.supportsContinuous) LabelMediaType.entries else listOf(LabelMediaType.Gap)
                     options.forEach { option ->
                         FilterChip(
                             selected = option == mediaType,
@@ -231,6 +249,18 @@ internal fun LabelPaperPickerSheet(
                     M1TestPaperProfile.Rotations.forEach { degrees ->
                         FilterChip(rotation == degrees, { rotation = degrees }, { Text("$degrees°") })
                     }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PaperField(
+                        offsetX ?: paper.offsetXmm.toString(), { offsetX = it },
+                        stringResource(R.string.bluetooth_label_print_offset_x),
+                        Modifier.weight(1f).testTag("label_paper_offset_x"),
+                    )
+                    PaperField(
+                        offsetY ?: paper.offsetYmm.toString(), { offsetY = it },
+                        stringResource(R.string.bluetooth_label_print_offset_y),
+                        Modifier.weight(1f).testTag("label_paper_offset_y"),
+                    )
                 }
                 if (custom) OutlinedTextField(
                     value = presetName,

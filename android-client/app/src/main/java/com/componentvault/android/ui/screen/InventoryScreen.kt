@@ -117,6 +117,7 @@ internal fun InventoryScreen(
     onImportComponent: () -> Unit,
     onGenerateLabel: (String) -> Unit,
     onOpenBluetoothPrint: () -> Unit = {},
+    onPrintSelectedComponents: ((List<String>) -> Unit)? = null,
     onEditComponent: (String) -> Unit,
     onRequestDeleteComponent: (String) -> Unit,
     onRecordMovement: (String) -> Unit,
@@ -139,6 +140,7 @@ internal fun InventoryScreen(
         onImportComponent = onImportComponent,
         onGenerateLabel = onGenerateLabel,
         onOpenBluetoothPrint = onOpenBluetoothPrint,
+        onPrintSelectedComponents = onPrintSelectedComponents,
         onEditComponent = onEditComponent,
         onRequestDeleteComponent = onRequestDeleteComponent,
         onRecordMovement = onRecordMovement,
@@ -165,6 +167,7 @@ internal fun InventoryContent(
     onImportComponent: () -> Unit,
     onGenerateLabel: (String) -> Unit,
     onOpenBluetoothPrint: () -> Unit = {},
+    onPrintSelectedComponents: ((List<String>) -> Unit)? = null,
     onEditComponent: (String) -> Unit,
     onRequestDeleteComponent: (String) -> Unit,
     onRecordMovement: (String) -> Unit,
@@ -234,6 +237,7 @@ internal fun InventoryContent(
                                 }
                             },
                             onOpenBluetoothPrint = onOpenBluetoothPrint,
+                            onPrintSelectedComponents = onPrintSelectedComponents,
                             onRequestDeleteComponent = onRequestDeleteComponent,
                             onBatchTransfer = onBatchTransfer,
                             onQuickMovement = onQuickMovement,
@@ -289,6 +293,7 @@ internal fun InventoryContent(
                 onOpenComponentDetail(componentId)
             },
             onOpenBluetoothPrint = onOpenBluetoothPrint,
+            onPrintSelectedComponents = onPrintSelectedComponents,
             onRequestDeleteComponent = onRequestDeleteComponent,
             onBatchTransfer = onBatchTransfer,
             onQuickMovement = onQuickMovement,
@@ -379,6 +384,7 @@ private fun InventoryListPane(
     onSortChange: (InventorySortOption) -> Unit,
     onSelectComponent: (String) -> Unit,
     onOpenBluetoothPrint: () -> Unit,
+    onPrintSelectedComponents: ((List<String>) -> Unit)?,
     onRequestDeleteComponent: (String) -> Unit,
     onBatchTransfer: BatchTransferAction?,
     onQuickMovement: QuickMovementAction?,
@@ -428,7 +434,7 @@ private fun InventoryListPane(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (onBatchTransfer != null && !selecting) {
+                    if ((onBatchTransfer != null || onPrintSelectedComponents != null) && !selecting) {
                         TextButton(onClick = { selecting = true }) {
                             Text(stringResource(R.string.inventory_ui_select))
                         }
@@ -464,10 +470,22 @@ private fun InventoryListPane(
                             style = MaterialTheme.typography.titleSmall,
                         )
                         TextButton(onClick = ::exitSelection) { Text(stringResource(R.string.action_cancel)) }
-                        FilledTonalButton(
+                        if (onBatchTransfer != null) FilledTonalButton(
                             enabled = selectedItems.isNotEmpty(),
                             onClick = { transferVisible = true },
                         ) { Text(stringResource(R.string.batch_transfer_select)) }
+                    }
+                    if (onPrintSelectedComponents != null) Row(
+                        Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TextButton(onClick = { selectedIds = uiState.list.items.map { it.id } }) {
+                            Text(stringResource(R.string.label_batch_select_results))
+                        }
+                        FilledTonalButton(
+                            enabled = selectedItems.isNotEmpty(),
+                            onClick = { onPrintSelectedComponents(selectedItems.map { it.id }) },
+                            modifier = Modifier.weight(1f).testTag("inventory_print_selected"),
+                        ) { Text(stringResource(R.string.label_batch_print_selected)) }
                     }
                 }
             }

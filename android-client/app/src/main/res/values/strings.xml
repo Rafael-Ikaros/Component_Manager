@@ -638,7 +638,7 @@
     <string name="bluetooth_label_print_rotation">Rotation (0, 90, 180, 270°)</string>
     <string name="bluetooth_label_print_offset_x">Horizontal offset (mm)</string>
     <string name="bluetooth_label_print_offset_y">Vertical offset (mm)</string>
-    <string name="bluetooth_label_print_paper_invalid">Enter valid paper dimensions, rotation, and offsets.</string>
+    <string name="bluetooth_label_print_paper_invalid">Use 10–300 mm for both dimensions, 0°, 90°, 180° or 270° rotation, and offsets from −300 to 300 mm.</string>
     <string name="bluetooth_label_print_paper_hint">Default 40 × 60 mm; the preview checks whether each selected label fits.</string>
     <string name="bluetooth_label_print_preview">Print preview</string>
     <string name="bluetooth_label_print_preview_unavailable">Select a component and valid paper settings to preview.</string>

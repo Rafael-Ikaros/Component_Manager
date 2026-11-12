@@ -47,6 +47,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.componentvault.android.R
 import com.componentvault.android.data.BatchJlcCommitPlanner
+import com.componentvault.android.data.BatchCodeImportParser
+import com.componentvault.android.data.CodeImportResolution
+import com.componentvault.android.data.CodeImportOverlap
 import com.componentvault.android.data.BatchJlcDraft
 import com.componentvault.android.data.BatchJlcDraftCodec
 import com.componentvault.android.data.BatchJlcDraftStore
@@ -85,6 +88,7 @@ internal fun BatchJlcInboundScreen(
     defaultLocation: String,
     onDismiss: () -> Unit,
     onCommitted: () -> Unit,
+    initialCodeImport: Boolean = false,
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -116,6 +120,10 @@ internal fun BatchJlcInboundScreen(
     var processedCount by remember { mutableStateOf(0) }
     var processTotal by remember { mutableStateOf(0) }
     var summaryExpanded by rememberSaveable { mutableStateOf(false) }
+    var showCodeImport by rememberSaveable { mutableStateOf(initialCodeImport) }
+    var codeImportError by remember { mutableStateOf<String?>(null) }
+    var pendingCodeRows by remember { mutableStateOf<List<BatchJlcRow>?>(null) }
+    var codeOverlaps by remember { mutableStateOf<List<CodeImportOverlap>>(emptyList()) }
     fun save(value: BatchJlcDraft) {
         draft = value
         val revision = saveRevision.incrementAndGet()
@@ -203,15 +211,14 @@ internal fun BatchJlcInboundScreen(
         }
     }
 
-    suspend fun processRows(processScope: ProcessScope, expectedGeneration: Int) {
+    suspend fun processRows(processScope: ProcessScope, expectedGeneration: Int, rowIds: Set<String>? = null) {
         processing = true
         try {
             val existing = repository.loadComponents().filterNot { it.deleted }.associateBy { it.sku.uppercase() }
             val metadataCache = mutableMapOf<String, ComponentOfficialMetadata?>()
             val lookupNotices = mutableMapOf<String, String>()
-            val target = draft.rows.filter {
-                it.status == if (processScope == ProcessScope.Captured) BatchJlcStatus.Captured else BatchJlcStatus.Pending
-            }
+            val targetStatus = if (processScope == ProcessScope.Captured) BatchJlcStatus.Captured else BatchJlcStatus.Pending
+            val target = draft.rows.filter { it.status == targetStatus && (rowIds == null || it.id in rowIds) }
             processTotal = target.size
             processedCount = 0
             for (original in target) {
@@ -287,7 +294,11 @@ internal fun BatchJlcInboundScreen(
                 ))
                 processedCount++
             }
-            page = if (draft.rows.any { it.status == BatchJlcStatus.Ready }) BatchPage.Review else BatchPage.Pending
+            page = when {
+                draft.rows.any { it.status == BatchJlcStatus.Ready } -> BatchPage.Review
+                rowIds != null && draft.rows.none { it.status == BatchJlcStatus.Pending } -> BatchPage.Capture
+                else -> BatchPage.Pending
+            }
             val pendingCount = draft.rows.count { it.status == BatchJlcStatus.Pending }
             lookupNotices.values.distinct().takeIf { it.isNotEmpty() }?.let { notices ->
                 message = notices.joinToString("\n")
@@ -302,6 +313,50 @@ internal fun BatchJlcInboundScreen(
         }
     }
 
+    fun importCodes(resolution: CodeImportResolution? = null,
+                    read: suspend (Set<String>, String) -> List<BatchJlcRow>) {
+        if (!loaded || processing || committing || saving || loadFailed) return
+        processing = true
+        codeImportError = null
+        val fallbackLocation = globalLocation.ifBlank { defaultLocation }
+        processJob = scope.launch {
+            try {
+                val locationIds = repository.loadStorageLocations().filterNot { it.deleted }.mapTo(mutableSetOf()) { it.id }
+                val rows = withContext(Dispatchers.IO) { read(locationIds, fallbackLocation) }
+                val receipts = repository.loadBatchJlcReceipts(draft.sessionId)
+                val overlaps = BatchCodeImportParser.overlaps(draft, rows, receipts)
+                if (overlaps.isNotEmpty() && resolution == null) {
+                    pendingCodeRows = rows
+                    codeOverlaps = overlaps
+                    return@launch
+                }
+                val (next, skipped) = BatchCodeImportParser.append(draft, rows, receipts, resolution)
+                val accepted = rows.size - skipped
+                val previousIds = draft.rows.mapTo(hashSetOf()) { it.id }
+                val newIds = next.rows.mapNotNullTo(hashSetOf()) { row -> row.id.takeUnless(previousIds::contains) }
+                if (next != draft) {
+                    save(next)
+                    pendingSave?.join()
+                    if (saveFailed) return@launch
+                }
+                pendingCodeRows = null
+                codeOverlaps = emptyList()
+                showCodeImport = false
+                message = context.getString(R.string.batch_codes_result, accepted, skipped)
+                if (accepted > 0) processRows(ProcessScope.Captured, generation, newIds)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                codeImportError = error.message ?: context.getString(R.string.batch_codes_failed)
+            } finally { processing = false }
+        }
+    }
+    val codesPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) importCodes { ids, fallback ->
+            context.contentResolver.openInputStream(uri)?.use { BatchCodeImportParser.xlsx(it, fallback, ids) }
+                ?: error(context.getString(R.string.batch_codes_failed))
+        }
+    }
     val busy = processing || committing || saving || loadFailed
     fun requestDismiss() {
         scope.launch {
@@ -472,6 +527,12 @@ internal fun BatchJlcInboundScreen(
             when (page) {
                 BatchPage.Capture -> {
                     item {
+                        OutlinedButton(onClick = { codeImportError = null; showCodeImport = true },
+                            enabled = loaded && !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.batch_codes_title))
+                        }
+                    }
+                    item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -539,6 +600,20 @@ internal fun BatchJlcInboundScreen(
             }
         }
     }
+    if (showCodeImport && loaded && !loadFailed) BatchCodeImportDialog(
+        location = globalLocation, locations = locations,
+        onLocationChange = { globalLocation = it }, busy = busy, error = codeImportError,
+        onText = { value -> importCodes { ids, fallback -> BatchCodeImportParser.text(value, fallback, ids) } },
+        onXlsx = { codesPicker.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+        onDismiss = {
+            if (pendingCodeRows != null) { pendingCodeRows = null; codeOverlaps = emptyList(); codeImportError = null }
+            else showCodeImport = false
+        },
+        overlaps = codeOverlaps,
+        onResolve = { resolution ->
+            pendingCodeRows?.let { rows -> importCodes(resolution) { _, _ -> rows } }
+        },
+    )
     if (confirmClear) AlertDialog(
         onDismissRequest = { confirmClear = false }, title = { Text(stringResource(R.string.batch_clear_title)) },
         text = { Text(stringResource(R.string.batch_clear_detail)) },

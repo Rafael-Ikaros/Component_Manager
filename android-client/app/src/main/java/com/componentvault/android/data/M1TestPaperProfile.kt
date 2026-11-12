@@ -2,7 +2,7 @@ package com.componentvault.android.data
 
 import android.content.SharedPreferences
 
-/** Local-only raster settings for the M1 diagnostic label. */
+/** Shared editor canvas. Physical printer limits are checked separately before queue creation. */
 internal data class M1TestPaperProfile(
     val widthMm: Float,
     val heightMm: Float,
@@ -37,9 +37,9 @@ internal data class M1TestPaperProfile(
     }
 
     companion object {
-        val WidthRange = 20f..72f
+        val WidthRange = 10f..300f
         val HeightRange = 10f..300f
-        val OffsetXRange = -72f..72f
+        val OffsetXRange = -300f..300f
         val OffsetYRange = -300f..300f
         val Rotations = setOf(0, 90, 180, 270)
 

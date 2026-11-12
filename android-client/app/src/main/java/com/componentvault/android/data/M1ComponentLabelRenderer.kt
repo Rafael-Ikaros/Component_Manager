@@ -299,5 +299,5 @@ internal object M1ComponentLabelRenderer {
         return if (end > 0) text.substring(0, end) + ellipsis else ""
     }
 
-    private fun dots(mm: Float): Int = (mm * Dpi / 25.4f).roundToInt()
+    internal fun dots(mm: Float): Int = (mm * Dpi / 25.4f).roundToInt()
 }

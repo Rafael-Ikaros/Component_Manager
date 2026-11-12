@@ -1,0 +1,13 @@
+<resources>
+    <string name="label_batch_select_results">Select all results</string>
+    <string name="label_batch_print_selected">Print selected labels</string>
+    <string name="label_paper_presets">My paper presets (up to 12)</string>
+    <string name="label_paper_presets_hint">Saves only size, rotation and X/Y offsets. Component label content comes from the current component.</string>
+    <string name="label_paper_preset_name">Preset name</string>
+    <string name="label_paper_preset_save">Save current size, rotation and offsets</string>
+    <string name="label_paper_preset_update">Update this preset</string>
+    <string name="label_paper_preset_delete">Delete</string>
+    <string name="label_editor_paper_range">Canvas: width and height 10–300 mm; rotation 0°, 90°, 180° or 270°; offsets −300–300 mm. Valid settings are remembered automatically.</string>
+    <string name="label_printer_paper_range">%1$s printable area: width %2$s–%3$s mm, feed height %4$s–%5$s mm. Adjust the paper or choose another printer before printing.</string>
+    <string name="label_p1_hint">P1 prints up to 48 mm wide. Pair it in Android settings and close other apps connected to the printer. Choose the loaded paper type.</string>
+</resources>

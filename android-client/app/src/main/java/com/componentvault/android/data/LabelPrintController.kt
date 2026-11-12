@@ -78,7 +78,7 @@ internal class LabelPrintController(context: Context) {
         if (!canSelectProfile(profile)) return
         if (selectedProfile == null && candidate?.address != selectedAddress) return
         selectedProfile = profile.configurable
-        if (!profile.usesCpcl) selectedMediaType = LabelMediaType.Gap.id
+        if (!profile.supportsContinuous) selectedMediaType = LabelMediaType.Gap.id
         if (candidate?.address == selectedAddress) rememberPrinter(candidate) else savePrinterSelection()
     }
     fun selectMedia(id: String) {
@@ -119,7 +119,7 @@ internal class LabelPrintController(context: Context) {
         selectedAddress = candidate.address
         printOffset = printerPreferences.loadOffset(selectedAddress)
         selectedProfile = profile
-        selectedMediaType = if (profile?.usesCpcl == true) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
+        selectedMediaType = if (profile?.supportsContinuous == true) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
         if (profile != null) rememberPrinter(candidate)
         return true
     }
@@ -330,6 +330,8 @@ internal class LabelPrintController(context: Context) {
                         val media = LabelMediaType.fromId(queue.mediaType)
                         when {
                             profile == LabelPrinterProfile.M1 -> transport.printM1Label(candidate, bitmap, queue.paper)
+                            profile == LabelPrinterProfile.DetongerP1 ->
+                                transport.printDetongerP1Label(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
                             profile == LabelPrinterProfile.HmA300eCpcl && transport.hprtSdkAvailable ->
                                 transport.printHmA300eLabel(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
                             else -> transport.printCpclLabel(candidate, bitmap, media)

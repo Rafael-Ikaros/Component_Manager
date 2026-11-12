@@ -103,12 +103,14 @@ fun ComponentVaultApp(
     var inventoryScanMessage by remember { mutableStateOf<String?>(null) }
     var inventoryBackupVisible by rememberSaveable { mutableStateOf(false) }
     var batchJlcVisible by rememberSaveable { mutableStateOf(false) }
+    var batchCodeImport by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var componentEditorInitialDraft by rememberSaveable(stateSaver = ComponentDraftSaver) { mutableStateOf<ComponentDraft?>(null) }
     var componentEditorImportCandidate by rememberSaveable(stateSaver = ComponentImportCandidateSaver) { mutableStateOf<ComponentImportCandidate?>(null) }
     var labelPrintSeed by rememberSaveable(stateSaver = LabelSeedSaver) { mutableStateOf<ComponentLabelSeed?>(null) }
     var labelPrintVisible by rememberSaveable { mutableStateOf(false) }
+    var labelPrintComponentIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var labelToolPickerVisible by rememberSaveable { mutableStateOf(false) }
     var labelToolTemplate by rememberSaveable { mutableStateOf(LabelToolTemplate.Component) }
     var labelPrintFromToolPicker by rememberSaveable { mutableStateOf(false) }
@@ -489,6 +491,7 @@ fun ComponentVaultApp(
                 defaultLocation=uiState.appPreferences.suggestedImportLocation,
                 onDismiss={batchJlcVisible=false},
                 onCommitted=viewModel::onBatchJlcCommitted,
+                initialCodeImport = batchCodeImport,
             )
 
             labelToolPickerVisible -> LabelToolTemplatePicker(
@@ -505,6 +508,7 @@ fun ComponentVaultApp(
             labelPrintVisible -> BluetoothLabelPrintScreen(
                 components = uiState.availableComponents,
                 initialSeed = labelPrintSeed,
+                initialComponentIds = labelPrintComponentIds,
                 initialToolTemplate = if (labelPrintSeed != null) LabelToolTemplate.Component else labelToolTemplate,
                 initialFreeTitle = locationLabelTargetId?.let { id ->
                     uiState.inventory.storageLocations.firstOrNull { it.id == id }?.let { location ->
@@ -515,6 +519,7 @@ fun ComponentVaultApp(
                 onDismiss = {
                     labelPrintVisible = false
                     labelPrintSeed = null
+                    labelPrintComponentIds = emptyList()
                     if (locationLabelTargetId != null) storageLocationsVisible = true
                     locationLabelTargetId = null
                     if (labelPrintFromToolPicker) labelToolPickerVisible = true
@@ -590,6 +595,14 @@ fun ComponentVaultApp(
                             labelPrintSeed = null
                             labelPrintFromToolPicker = false
                             labelToolPickerVisible = true
+                        },
+                        onPrintSelectedComponents = { ids ->
+                            locationLabelTargetId = null
+                            labelPrintSeed = null
+                            labelPrintComponentIds = ids
+                            labelToolTemplate = LabelToolTemplate.Component
+                            labelPrintFromToolPicker = false
+                            labelPrintVisible = true
                         },
                         onEditComponent = { componentId ->
                             viewModel.selectComponent(componentId)
@@ -777,6 +790,12 @@ fun ComponentVaultApp(
                 },
                 onBatchJlc = {
                     showAddEntrySheet = false
+                    batchCodeImport = false
+                    batchJlcVisible = true
+                },
+                onBatchCodes = {
+                    showAddEntrySheet = false
+                    batchCodeImport = true
                     batchJlcVisible = true
                 },
             )
@@ -838,6 +857,7 @@ internal fun AddComponentEntrySheet(
     onImportComponent: () -> Unit,
     onImportBom: () -> Unit,
     onBatchJlc: () -> Unit,
+    onBatchCodes: () -> Unit = onBatchJlc,
 ) {
     BackHandler(onBack = onDismiss)
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -849,6 +869,7 @@ internal fun AddComponentEntrySheet(
             )
             ImportMenuRow(R.string.import_menu_single, R.string.import_menu_single_hint, onImportComponent)
             ImportMenuRow(R.string.import_menu_batch, R.string.import_menu_batch_hint, onBatchJlc)
+            ImportMenuRow(R.string.batch_codes_title, R.string.batch_codes_menu_hint, onBatchCodes)
             ImportMenuRow(R.string.import_menu_bom, R.string.import_menu_bom_hint, onImportBom)
         }
     }

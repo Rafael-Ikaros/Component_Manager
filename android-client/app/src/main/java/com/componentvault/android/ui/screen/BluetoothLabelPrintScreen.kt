@@ -130,6 +130,7 @@ internal fun BluetoothLabelPrintScreen(
     initialPaper: M1TestPaperProfile? = null,
     initialFreeTitle: String? = null,
     initialFreeQrPayload: String? = null,
+    initialComponentIds: List<String> = emptyList(),
     onDismiss: () -> Unit,
 ) {
     val freeMode = initialToolTemplate !in setOf(
@@ -148,6 +149,7 @@ internal fun BluetoothLabelPrintScreen(
     val clipboard = LocalClipboardManager.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember(context) { LabelPrintController(context) }
+    val paperStore = remember(context) { com.componentvault.android.data.LabelPaperPresetStore(context) }
     val choices = remember(components, initialSeed, freeMode) {
         if (freeMode) emptyList<PrintableComponent>() else buildList {
             if (initialSeed != null) add(PrintableComponent("initial:${initialSeed.sku}", initialSeed))
@@ -155,8 +157,8 @@ internal fun BluetoothLabelPrintScreen(
                 .forEach { add(PrintableComponent(it.id, it.toLabelSeed())) }
         }
     }
-    val initiallySelected = remember(choices, initialSeed) {
-        if (initialSeed == null) null else "initial:${initialSeed.sku}"
+    val initiallySelected = remember(choices, initialSeed, initialComponentIds) {
+        choices.filter { it.id in initialComponentIds || it.id == "initial:${initialSeed?.sku}" }.map { it.id }
     }
     val selected = rememberSaveable(initiallySelected, saver = mapSaver(
         save = { it.toMap() },
@@ -164,7 +166,7 @@ internal fun BluetoothLabelPrintScreen(
             saved.forEach { (key, value) -> put(key, value as Boolean) }
         } },
     )) {
-        mutableStateMapOf<String, Boolean>().apply { initiallySelected?.let { put(it, true) } }
+        mutableStateMapOf<String, Boolean>().apply { initiallySelected.forEach { put(it, true) } }
     }
     val copies = rememberSaveable(saver = mapSaver(
         save = { it.toMap() },
@@ -204,7 +206,7 @@ internal fun BluetoothLabelPrintScreen(
     var localMessage by remember { mutableStateOf<String?>(null) }
     var confirmStop by remember { mutableStateOf(false) }
     var leaveAfterStop by remember { mutableStateOf(false) }
-    val startsInConfirmation = initialSeed != null && !freeMode
+    val startsInConfirmation = (initialSeed != null || initialComponentIds.isNotEmpty()) && !freeMode
     var showPrintView by rememberSaveable(startsInConfirmation) { mutableStateOf(startsInConfirmation) }
     var editingFromConfirmation by rememberSaveable { mutableStateOf(false) }
     var hasShownQueue by rememberSaveable { mutableStateOf(false) }
@@ -293,8 +295,11 @@ internal fun BluetoothLabelPrintScreen(
     }
     LaunchedEffect(controller.loaded, hasQueue) {
         if (controller.loaded && !hasQueue && !restoredPaper) {
-            val selectedPaper = initialPaper ?: if (initialSeed != null)
+            val rememberedPaper = paperStore.last()
+            val selectedPaper = initialPaper ?: rememberedPaper ?: if (initialSeed != null)
                 queue.paper.copy(rotationDegrees = 0) else queue.paper
+            // Opening a page must not overwrite the selected printer's calibration.
+            // Only explicitly applying a paper preset writes its offsets (see applyPaper).
             widthText = selectedPaper.widthMm.toString()
             heightText = selectedPaper.heightMm.toString()
             rotationText = selectedPaper.rotationDegrees.toString()
@@ -302,6 +307,9 @@ internal fun BluetoothLabelPrintScreen(
         }
     }
     val editable = !hasQueue && controller.loaded && restoredPaper && !controller.running && !controller.working
+    LaunchedEffect(paper, editable) {
+        if (editable && paper != null) paperStore.saveLast(paper)
+    }
     val previewQueueItem = if (hasQueue) queue.items.firstOrNull { it.id == previewQueueItemId }
         ?: queue.items.firstOrNull() else null
     val previewFreeLabel = previewQueueItem?.freeLabel ?: if (!hasQueue) draftFreeLabel else null
@@ -423,6 +431,7 @@ internal fun BluetoothLabelPrintScreen(
         widthText = value.widthMm.toString()
         heightText = value.heightMm.toString()
         rotationText = value.rotationDegrees.toString()
+        controller.savePrintOffset(LabelPrintOffset(value.offsetXmm, value.offsetYmm))
         controller.selectMedia(media.id)
     }
 
@@ -436,7 +445,7 @@ internal fun BluetoothLabelPrintScreen(
         else draftSelections.sumOf { it.second }
     val media = when {
         hasQueue -> LabelMediaType.fromId(queue.mediaType)
-        activeProfile.usesCpcl -> LabelMediaType.fromId(controller.selectedMediaType)
+        activeProfile.supportsContinuous -> LabelMediaType.fromId(controller.selectedMediaType)
         else -> LabelMediaType.Gap
     }
     val mediaName = stringResource(if (media == LabelMediaType.Gap) R.string.label_media_gap else R.string.label_media_continuous)
@@ -624,7 +633,11 @@ internal fun BluetoothLabelPrintScreen(
                 if (controller.loaded && !controller.working && !canCreate) {
                     val problem = when {
                         needsProtocol -> stringResource(R.string.label_flow_choose_protocol)
-                        !compatiblePaper -> stringResource(R.string.bluetooth_label_print_paper_invalid)
+                        paper == null -> stringResource(R.string.bluetooth_label_print_paper_invalid)
+                        !compatiblePaper -> stringResource(R.string.label_printer_paper_range,
+                            labelPrinterProtocolName(activeProfile), activeProfile.widthRange.start.toString(),
+                            activeProfile.widthRange.endInclusive.toString(), activeProfile.heightRange.start.toString(),
+                            activeProfile.heightRange.endInclusive.toString())
                         previewError != null -> previewError
                         blankQr -> stringResource(R.string.label_ui_enter_qr)
                         draftFreeLabel != null && !validFree || draftFreeLabel == null && !validSelection ->
@@ -642,7 +655,7 @@ internal fun BluetoothLabelPrintScreen(
                     ) { localMessage = null; sheetPanel = "devices" }
                     LabelSettingsRow(
                         stringResource(R.string.label_ui_paper),
-                        paper?.let(::paperSummary)?.let { if (activeProfile.usesCpcl) "$it · $mediaName" else it },
+                        paper?.let(::paperSummary)?.let { if (activeProfile.supportsContinuous) "$it · $mediaName" else it },
                         testTag = "label_print_paper", enabled = editable,
                     ) { sheetPanel = "paper" }
                     LabelSettingsRow(
@@ -881,7 +894,7 @@ internal fun BluetoothLabelPrintScreen(
                         if (needsProtocol) Text(stringResource(R.string.label_flow_choose_protocol))
                         Row(Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(LabelPrinterProfile.M1, LabelPrinterProfile.GenericCpcl).forEach { profile ->
+                            listOf(LabelPrinterProfile.M1, LabelPrinterProfile.GenericCpcl, LabelPrinterProfile.DetongerP1).forEach { profile ->
                                 FilterChip(
                                     selected = controller.selectedProfile == profile,
                                     onClick = { controller.selectProfile(profile, selectedPairedPrinter) },
@@ -892,6 +905,7 @@ internal fun BluetoothLabelPrintScreen(
                             }
                         }
                         if (controller.selectedProfile?.usesCpcl == true) Text(stringResource(R.string.label_hm_experimental))
+                        if (controller.selectedProfile == LabelPrinterProfile.DetongerP1) Text(stringResource(R.string.label_p1_hint))
                     }
                     OutlinedButton(onClick = ::refreshDevices) {
                         Text(stringResource(R.string.bluetooth_label_print_refresh_devices))
@@ -1169,7 +1183,11 @@ private fun printErrorText(code: String, context: android.content.Context): Stri
 
 @Composable
 private fun labelPrinterProtocolName(profile: LabelPrinterProfile): String =
-    if (profile.usesCpcl) stringResource(R.string.label_cpcl_generic) else "M1"
+    when {
+        profile == LabelPrinterProfile.DetongerP1 -> "德佟 P1"
+        profile.usesCpcl -> stringResource(R.string.label_cpcl_generic)
+        else -> "M1"
+    }
 
 @Composable
 private fun LabelPrinterRow(

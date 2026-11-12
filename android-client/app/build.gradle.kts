@@ -114,6 +114,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(files("libs/LPAPI-2026-10-21-R.jar"))
     hprtCpclJars?.let { implementation(files(it)) }
     val composeBom = platform("androidx.compose:compose-bom:2025.02.00")
 
