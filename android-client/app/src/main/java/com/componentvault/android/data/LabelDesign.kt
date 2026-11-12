@@ -83,7 +83,8 @@ internal data class LabelDesign(val elements: List<LabelElement>) {
                     ComponentLabelRenderer.buildTextLabelContent(seed, textTemplate), left, top, w, h)))
             }
             val horizontal = w >= h * 1.2f
-            val reserve = if (horizontal) 4.5f else 3f
+            // On short stock, three stacked text rows need at least 1.5 mm each.
+            val reserve = 4.5f
             val side = min(if (horizontal) h else w, if (horizontal) w - reserve - gap else h - reserve - gap)
             require(side > 0f) { "纸张不足以同时放置文字和二维码。" }
             val qrX = if (horizontal) left + w - side else left + (w - side) / 2f

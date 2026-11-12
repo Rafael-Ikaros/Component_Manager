@@ -61,6 +61,24 @@ class M1ComponentLabelRendererTest {
         } finally { bitmap.recycle() }
     }
 
+    @Test fun defaultComponentLabelFits40By30PaperWithoutRotating() {
+        val component = seed.copy(sku = "C2913196", name = "ESP32-S3FN8", packageName = "QFN")
+        val template = ComponentLabelTemplate.default
+        val textTemplate = ComponentTextLabelTemplate.default
+        for (rotation in listOf(0, 90)) {
+            for (offset in listOf(LabelPrintOffset.Default.xMm, 2f)) {
+                val paper = M1TestPaperProfile(40f, 30f, rotation, offset)
+                val design = LabelDesign.default(component, template, textTemplate, paper)
+                val bitmap = M1ComponentLabelRenderer.render(component, template, textTemplate, paper, design)
+                try {
+                    assertEquals(320, bitmap.width)
+                    assertEquals(240, bitmap.height)
+                    assertEquals(ComponentLabelCodec.buildQrPayload(component, template)!!.rawValue, decode(bitmap))
+                } finally { bitmap.recycle() }
+            }
+        }
+    }
+
     @Test fun horizontalOffsetTranslatesInkExactlyWithoutResizingAndPaperEdgesRemainWhite() {
         val template = ComponentLabelTemplate.Qr10x40
         val original = M1ComponentLabelRenderer.render(seed, template, ComponentTextLabelTemplate.default,
