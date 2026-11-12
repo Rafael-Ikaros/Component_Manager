@@ -13,13 +13,14 @@ import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Renders one complete M1 paper canvas. The caller owns and recycles the returned bitmap. */
+/** Renders a shared 203 dpi raster for preview, export, and Bluetooth printing. */
 internal object M1ComponentLabelRenderer {
     private const val Dpi = 203
     private const val EdgeInsetDots = 8f // Approximately 1 mm at 203 dpi; not a printed frame.
     private const val GapDots = 6f
     private const val MinQrModuleDots = 2
-    private const val MinTextDots = 8f
+    private const val LegacyMaxTextDots = 16
+    private const val PrintInkThreshold = 160_000
 
     fun render(
         seed: ComponentLabelSeed?,
@@ -69,22 +70,13 @@ internal object M1ComponentLabelRenderer {
                 null
             }
             canvas.restore()
-            // Offset is a literal paper-axis translation, not a layout resize. Reject clipped ink
-            // rather than silently changing QR module size or dropping part of the label.
+            // Check the dots that will be printed before translating the image on the paper axes.
+            applyPrintInk(bitmap, offsetX, offsetY)
             if (offsetX != 0 || offsetY != 0) {
                 qrBounds?.let {
                     require(it.left + offsetX >= 0 && it.top + offsetY >= 0 &&
                         it.right + offsetX <= width && it.bottom + offsetY <= height) {
                         "偏移后二维码静区不完整，请减小偏移。"
-                    }
-                }
-                val pixels = IntArray(width * height)
-                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-                for (y in 0 until height) for (x in 0 until width) {
-                    if (pixels[y * width + x] != Color.WHITE) {
-                        require(x + offsetX in 0 until width && y + offsetY in 0 until height) {
-                            "偏移后会裁掉标签内容，请减小偏移或调整纸张尺寸。"
-                        }
                     }
                 }
                 val shifted = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -183,8 +175,8 @@ internal object M1ComponentLabelRenderer {
                     else -> box
                 }
                 try {
-                    drawLines(canvas, textBox,
-                        element.text.split(Regex("\\r\\n|\\r|\\n| \\| ")), allowEllipsis = false)
+                    LabelTextRenderer.draw(canvas, textBox,
+                        element.text.split(Regex("\\r\\n|\\r|\\n| \\| ")), font = element.font)
                 } finally {
                     canvas.restore()
                 }
@@ -249,54 +241,47 @@ internal object M1ComponentLabelRenderer {
                 }
             }
         }
-        drawLines(
+        LabelTextRenderer.draw(
             canvas,
             textBounds,
             listOf(seed.name.ifBlank { seed.model.orEmpty().ifBlank { seed.sku } }, seed.sku,
                 "${seed.packageName}  QTY ${seed.quantity}"),
-            allowEllipsis = true,
+            ellipsize = true,
+            maxTextDots = LegacyMaxTextDots,
         )
         return RectF(qrLeft.toFloat(), qrTop.toFloat(), (qrLeft + side).toFloat(), (qrTop + side).toFloat())
     }
 
     private fun drawTextOnly(canvas: Canvas, bounds: RectF, content: String) {
         require(content.isNotBlank()) { "文字标签没有可打印内容。" }
-        drawLines(canvas, bounds, content.split(" | "), allowEllipsis = false)
+        LabelTextRenderer.draw(canvas, bounds, content.split(" | "), maxTextDots = LegacyMaxTextDots)
     }
 
-    private fun drawLines(canvas: Canvas, bounds: RectF, lines: List<String>, allowEllipsis: Boolean) {
-        val visible = lines.filter(String::isNotBlank)
-        require(visible.isNotEmpty()) { "标签没有可打印内容。" }
-        val maxSize = min(16f, (bounds.height() / visible.size) * 0.74f)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; style = Paint.Style.FILL }
-        var size = maxSize
-        if (!allowEllipsis) {
-            while (size >= MinTextDots) {
-                paint.textSize = size
-                if (visible.all { paint.measureText(it) <= bounds.width() }) break
-                size -= 0.5f
+    private fun applyPrintInk(bitmap: Bitmap, offsetX: Int, offsetY: Int) {
+        val width = bitmap.width
+        val height = bitmap.height
+        val row = IntArray(width)
+        // Preserve more of the anti-aliased stroke coverage when converting to one-bit ink.
+        // QR modules and their quiet zones are already black or white and stay unchanged.
+        for (y in 0 until height) {
+            bitmap.getPixels(row, 0, width, 0, y, width, 1)
+            var changed = false
+            for (x in row.indices) {
+                val color = row[x]
+                if (color == Color.WHITE) continue
+                val ink = if (color == Color.BLACK || Color.red(color) * 299 +
+                    Color.green(color) * 587 + Color.blue(color) * 114 < PrintInkThreshold
+                ) Color.BLACK else Color.WHITE
+                require(ink == Color.WHITE || (x + offsetX in 0 until width && y + offsetY in 0 until height)) {
+                    "偏移后会裁掉标签内容，请减小偏移或调整纸张尺寸。"
+                }
+                if (ink != color) {
+                    row[x] = ink
+                    changed = true
+                }
             }
+            if (changed) bitmap.setPixels(row, 0, width, 0, y, width, 1)
         }
-        require(size >= MinTextDots) { "文字内容无法完整放入当前纸张，请增大纸张或缩短文字。" }
-        paint.textSize = size
-        val lineHeight = size * 1.24f
-        val totalHeight = lineHeight * visible.size
-        require(totalHeight <= bounds.height()) { "纸张高度不足以容纳标签文字。" }
-        var baseline = bounds.centerY() - totalHeight / 2f - paint.fontMetrics.ascent
-        visible.forEach { text ->
-            val shown = if (allowEllipsis) fitWithEllipsis(text, paint, bounds.width()) else text
-            require(shown.isNotEmpty()) { "纸张宽度不足以容纳标签文字。" }
-            canvas.drawText(shown, bounds.left, baseline, paint)
-            baseline += lineHeight
-        }
-    }
-
-    private fun fitWithEllipsis(text: String, paint: Paint, width: Float): String {
-        if (paint.measureText(text) <= width) return text
-        val ellipsis = "…"
-        var end = text.length
-        while (end > 0 && paint.measureText(text.substring(0, end) + ellipsis) > width) end--
-        return if (end > 0) text.substring(0, end) + ellipsis else ""
     }
 
     internal fun dots(mm: Float): Int = (mm * Dpi / 25.4f).roundToInt()

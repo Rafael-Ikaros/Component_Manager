@@ -46,6 +46,7 @@ import com.componentvault.android.data.LabelPrinterProfile
 import com.componentvault.android.data.LabelDesign
 import com.componentvault.android.data.LabelElement
 import com.componentvault.android.data.LabelElementType
+import com.componentvault.android.data.LabelFont
 import com.componentvault.android.data.M1TestPaperProfile
 import com.componentvault.android.data.LabelPrintQueue
 import com.componentvault.android.data.LabelPrintOffset
@@ -365,6 +366,49 @@ class BluetoothLabelPrintUiTest {
         compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
         waitForPrintablePreview()
         LabelPrintQueueStore(context).clear()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun textElementsKeepTheirOwnFontInThePrintQueue() {
+        val store = LabelPrintQueueStore(context)
+        store.clear()
+        val seed = ComponentLabelSeed("C1101", "R 100", "Passive", "0603", "A", 10, 1)
+        try {
+            setLabelContent {
+                MaterialTheme {
+                    BluetoothLabelPrintScreen(emptyList(), seed,
+                        initialPaper = M1TestPaperProfile(40f, 60f), onDismiss = {})
+                }
+            }
+            openEditor()
+            compose.onNodeWithTag("label_element_name").performClick()
+            compose.onNodeWithText(context.getString(R.string.label_ui_content)).performClick()
+
+            val selector = compose.onNodeWithTag("label_font_selector")
+            selector.performScrollTo().performClick()
+            compose.onNodeWithTag("label_font_${LabelFont.Bold.id}").performClick()
+            compose.onNodeWithTag("label_select_sku").performScrollTo().performClick()
+            selector.performScrollTo().performClick()
+            compose.onNodeWithTag("label_font_${LabelFont.Monospace.id}").performClick()
+            compose.onNodeWithTag("label_select_name").performScrollTo().performClick()
+            selector.assertTextContains(context.getString(R.string.label_editor_font_selection,
+                context.getString(R.string.label_font_bold)))
+            compose.onNodeWithTag("label_select_qr").performScrollTo().performClick()
+            selector.assertDoesNotExist()
+
+            compose.onNodeWithTag("label_content_done").performClick()
+            compose.onNodeWithContentDescription(context.getString(R.string.action_back)).performClick()
+            waitForPrintableConfirmation()
+            compose.onNodeWithTag("label_print_submit").performClick()
+            compose.waitUntil(10_000) { store.load().items.isNotEmpty() }
+            val elements = requireNotNull(store.load().items.single().design).elements.associateBy { it.id }
+            assertEquals(LabelFont.Bold, elements.getValue("name").font)
+            assertEquals(LabelFont.Monospace, elements.getValue("sku").font)
+            assertEquals(LabelFont.Default, elements.getValue("qr").font)
+        } finally {
+            store.clear()
+        }
     }
 
     @Test

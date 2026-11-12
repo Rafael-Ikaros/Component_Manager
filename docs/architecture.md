@@ -220,10 +220,13 @@ alignment and a single normal label feed. No vendor binary or JNI is used.
 Older no-feed/short-feed trials are historical diagnostic evidence, not the
 default user flow. Paper size, rotation and offsets are local raster options;
 the app does not write firmware paper-type or calibration settings.
-`M1ComponentLabelRenderer` uses
-the existing QR payload codec and text field rules with integer QR modules at
-203 dpi; this paper raster is used for both preview and transmission. Paper
-dimensions, rotation and offsets are local rendering options, not firmware writes.
+`M1ComponentLabelRenderer` creates a 203 dpi black-and-white raster shared by
+preview, export, and Bluetooth printing. `LabelTextRenderer` measures each text
+element using its selected font and fits it to the element on the printer's dot
+grid. The queue stores an optional font ID on each text element. Older elements
+use the default sans-serif font. QR codes retain their existing payload, integer
+module sizes, and quiet zones. Paper dimensions, rotation and offsets are local
+rendering options.
 Actual labels have no outer frame. Offsets translate the raster on the paper axes
 without resizing QR modules; positive horizontal values move ink right. Physical
 validation on one M1 / Android 15 / 40×60 mm gap stock confirmed scannable labels

@@ -588,6 +588,12 @@
     <string name="label_editor_preview_hint">点选元素后可编辑，也可在纸张内拖动；下方输入框可精确定位。</string>
     <string name="label_editor_element">选中元素</string>
     <string name="label_editor_text">显示文字</string>
+    <string name="label_editor_font_selection">字体 · %1$s</string>
+    <string name="label_font_sans">无衬线</string>
+    <string name="label_font_bold">无衬线粗体</string>
+    <string name="label_font_condensed">窄体</string>
+    <string name="label_font_monospace">等宽</string>
+    <string name="label_font_serif">衬线</string>
     <string name="label_editor_x">左边距（mm）</string>
     <string name="label_editor_y">上边距（mm）</string>
     <string name="label_editor_width">宽度（mm）</string>

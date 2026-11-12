@@ -159,7 +159,11 @@ internal object LabelPrintQueueCodec {
         design.elements.forEach { element ->
             put(JSONObject().put("id", element.id).put("type", element.type.name)
                 .put("text", element.text).put("xMm", element.xMm).put("yMm", element.yMm)
-                .put("widthMm", element.widthMm).put("heightMm", element.heightMm))
+                .put("widthMm", element.widthMm).put("heightMm", element.heightMm).apply {
+                    if (element.type == LabelElementType.Text && element.font != LabelFont.Default) {
+                        put("font", element.font.id)
+                    }
+                })
         }
     })
 
@@ -168,14 +172,17 @@ internal object LabelPrintQueueCodec {
         require(array.length() <= 16) { "标签元素过多。" }
         return LabelDesign((0 until array.length()).map { index ->
             val element = array.getJSONObject(index)
+            val type = LabelElementType.valueOf(element.getString("type"))
             LabelElement(
                 id = element.getString("id"),
-                type = LabelElementType.valueOf(element.getString("type")),
+                type = type,
                 text = element.getString("text"),
                 xMm = element.getDouble("xMm").toFloat(),
                 yMm = element.getDouble("yMm").toFloat(),
                 widthMm = element.getDouble("widthMm").toFloat(),
                 heightMm = element.getDouble("heightMm").toFloat(),
+                font = if (type == LabelElementType.Text) LabelFont.fromId(element.optString("font"))
+                    else LabelFont.Default,
             )
         })
     }

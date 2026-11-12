@@ -15,6 +15,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -138,6 +139,45 @@ class M1ComponentLabelRendererTest {
         } finally { bitmap.recycle() }
     }
 
+    @Test fun allFontsRenderBlackAndWhiteWithoutChangingTheInventoryQr() {
+        val paper = M1TestPaperProfile(40f, 60f, 90, 0.5f, -0.5f)
+        val template = ComponentLabelTemplate.Qr10x40
+        val textTemplate = ComponentTextLabelTemplate.default
+        val component = seed.copy(name = "贴片 R0603")
+        val design = LabelDesign.default(component, template, textTemplate, paper)
+        val expectedQr = ComponentLabelCodec.buildQrPayload(component, template)!!.rawValue
+        val rasters = LabelFont.entries.map { font ->
+            val bitmap = M1ComponentLabelRenderer.render(component, template, textTemplate, paper,
+                design.withFont("name", font))
+            try {
+                assertEquals(expectedQr, decode(bitmap))
+                pixels(bitmap).also { dots -> assertTrue(dots.all { it == Color.BLACK || it == Color.WHITE }) }
+            } finally { bitmap.recycle() }
+        }
+        assertFalse(rasters[LabelFont.Default.ordinal].contentEquals(rasters[LabelFont.Bold.ordinal]))
+        assertFalse(rasters[LabelFont.Monospace.ordinal].contentEquals(rasters[LabelFont.Serif.ordinal]))
+    }
+
+    @Test fun freeTextGrowsWithTheBoxHeightBeyondSixteenDots() {
+        val paper = M1TestPaperProfile(40f, 30f)
+        fun inkHeight(heightMm: Float): Int {
+            val design = LabelDesign(listOf(LabelElement("text", LabelElementType.Text, "A01", 4f, 4f,
+                30f, heightMm, LabelFont.Bold)))
+            val bitmap = M1ComponentLabelRenderer.render(null, ComponentLabelTemplate.default,
+                ComponentTextLabelTemplate.default, paper, design, FreeLabel("A01", FreeLabelTemplate.Text))
+            try {
+                val dots = pixels(bitmap)
+                val first = dots.indexOf(Color.BLACK) / bitmap.width
+                val last = dots.lastIndexOf(Color.BLACK) / bitmap.width
+                assertTrue(dots.any { it == Color.BLACK })
+                return last - first + 1
+            } finally { bitmap.recycle() }
+        }
+        val small = inkHeight(3f)
+        val large = inkHeight(16f)
+        assertTrue(large > maxOf(small, 16))
+    }
+
     @Test fun freeQrUsesEditablePayloadWithoutAnInventorySeed() {
         val paper = M1TestPaperProfile(40f, 60f)
         val payload = "https://example.test/shelf/A1"
@@ -210,10 +250,14 @@ class M1ComponentLabelRendererTest {
         } finally { bitmap.recycle() }
     }
 
-    private fun decode(bitmap: Bitmap): String {
+    private fun pixels(bitmap: Bitmap): IntArray {
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        return QRCodeReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(bitmap.width, bitmap.height, pixels))),
+        return pixels
+    }
+
+    private fun decode(bitmap: Bitmap): String {
+        return QRCodeReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(bitmap.width, bitmap.height, pixels(bitmap)))),
             mapOf(DecodeHintType.TRY_HARDER to true, DecodeHintType.CHARACTER_SET to "UTF-8")).text
     }
 }

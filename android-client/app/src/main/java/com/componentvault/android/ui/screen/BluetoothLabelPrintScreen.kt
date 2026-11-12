@@ -30,11 +30,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,6 +91,7 @@ import com.componentvault.android.data.FreeLabelTemplate
 import com.componentvault.android.data.LabelDesign
 import com.componentvault.android.data.LabelElement
 import com.componentvault.android.data.LabelElementType
+import com.componentvault.android.data.LabelFont
 import com.componentvault.android.data.LabelPrintItemState
 import com.componentvault.android.data.M1ComponentLabelRenderer
 import com.componentvault.android.data.LabelPrinterProfile
@@ -792,6 +796,9 @@ internal fun BluetoothLabelPrintScreen(
                             { activeDesign?.let { design -> updateDesign(design.withText(selectedElement.id, it)) } },
                             label = { Text(stringResource(R.string.label_editor_text)) },
                             modifier = Modifier.fillMaxWidth(), enabled = editable, maxLines = 3)
+                        LabelFontSelector(selectedElement.font, editable) { font ->
+                            activeDesign?.let { updateDesign(it.withFont(selectedElement.id, font)) }
+                        }
                     } else if (previewFreeLabel != null) {
                         OutlinedTextField(selectedElement.text,
                             { activeDesign?.let { design -> updateDesign(design.withQrPayload(selectedElement.id, it)) } },
@@ -1321,6 +1328,42 @@ private fun LabelDesign.withElement(replacement: LabelElement): LabelDesign =
     copy(elements = elements.map { if (it.id == replacement.id) replacement else it })
 
 @Composable
+private fun LabelFontSelector(font: LabelFont, enabled: Boolean, onFontSelected: (LabelFont) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            enabled = enabled,
+            modifier = Modifier.testTag("label_font_selector"),
+        ) {
+            Text(stringResource(R.string.label_editor_font_selection, stringResource(font.nameResource)))
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
+            LabelFont.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(option.nameResource)) },
+                    onClick = {
+                        expanded = false
+                        onFontSelected(option)
+                    },
+                    modifier = Modifier.testTag("label_font_${option.id}"),
+                )
+            }
+        }
+    }
+}
+
+private val LabelFont.nameResource: Int
+    get() = when (this) {
+        LabelFont.Default -> R.string.label_font_sans
+        LabelFont.Bold -> R.string.label_font_bold
+        LabelFont.Condensed -> R.string.label_font_condensed
+        LabelFont.Monospace -> R.string.label_font_monospace
+        LabelFont.Serif -> R.string.label_font_serif
+    }
+
+@Composable
 private fun LabelElementNumberField(
     fieldId: String,
     label: String,
@@ -1368,6 +1411,7 @@ private fun readLabelDrafts(encoded: String): Map<String, LabelDesign> = runCatc
                     yMm = item.getDouble("y").toFloat(),
                     widthMm = item.getDouble("width").toFloat(),
                     heightMm = item.getDouble("height").toFloat(),
+                    font = LabelFont.fromId(item.optString("font")),
                 )
             }
             put(sku, LabelDesign(elements))
@@ -1387,6 +1431,7 @@ private fun writeLabelDrafts(drafts: Map<String, LabelDesign>): String = JSONObj
                     put("y", element.yMm.toDouble())
                     put("width", element.widthMm.toDouble())
                     put("height", element.heightMm.toDouble())
+                    if (element.font != LabelFont.Default) put("font", element.font.id)
                 })
             }
         })

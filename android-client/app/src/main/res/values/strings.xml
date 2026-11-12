@@ -606,6 +606,12 @@
     <string name="label_editor_preview_hint">Tap an element to edit it, or drag it within the paper. Use the fields below for precise positioning.</string>
     <string name="label_editor_element">Selected element</string>
     <string name="label_editor_text">Display text</string>
+    <string name="label_editor_font_selection">Font · %1$s</string>
+    <string name="label_font_sans">Sans serif</string>
+    <string name="label_font_bold">Bold sans serif</string>
+    <string name="label_font_condensed">Condensed</string>
+    <string name="label_font_monospace">Monospace</string>
+    <string name="label_font_serif">Serif</string>
     <string name="label_editor_x">Left (mm)</string>
     <string name="label_editor_y">Top (mm)</string>
     <string name="label_editor_width">Width (mm)</string>

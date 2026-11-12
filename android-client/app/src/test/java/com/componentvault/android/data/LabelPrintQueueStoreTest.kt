@@ -106,6 +106,26 @@ class LabelPrintQueueStoreTest {
     }
 
     @Test
+    fun textFontsRoundTripAndMissingOrUnknownFontsFallBackToDefault() {
+        val paper = M1TestPaperProfile(40f, 60f)
+        val original = LabelDesign.default(seed, ComponentLabelTemplate.Qr30x40,
+            ComponentTextLabelTemplate.default, paper)
+        val design = original.withFont("name", LabelFont.Bold).withFont("sku", LabelFont.Monospace)
+        assertEquals(design, design.withFont("qr", LabelFont.Serif))
+        val queue = LabelPrintQueue.create(listOf(seed to 1), paper = paper, designs = mapOf(seed.sku to design))
+        val encoded = JSONObject(LabelPrintQueueCodec.encode(queue))
+        assertEquals(queue, LabelPrintQueueCodec.decode(encoded.toString()))
+
+        val elements = encoded.getJSONArray("items").getJSONObject(0).getJSONObject("design").getJSONArray("elements")
+        val byId = (0 until elements.length()).map(elements::getJSONObject).associateBy { it.getString("id") }
+        assertEquals("bold", byId.getValue("name").getString("font"))
+        byId.getValue("name").remove("font")
+        byId.getValue("sku").put("font", "future-font")
+        byId.getValue("qr").put("font", "serif")
+        assertEquals(original, LabelPrintQueueCodec.decode(encoded.toString()).items.single().design)
+    }
+
+    @Test
     fun freeLabelRoundTripsWithoutInventingAnInventorySeed() {
         val paper = M1TestPaperProfile(40f, 60f)
         val design = LabelDesign.free(FreeLabelTemplate.Qr, paper).withQrPayload("qr", "https://example.test/part")

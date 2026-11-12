@@ -8,6 +8,18 @@ import kotlin.math.min
 /** Editable boxes in physical paper coordinates, before the printer's paper offset. */
 internal enum class LabelElementType { Text, Qr }
 
+internal enum class LabelFont(val id: String) {
+    Default("default"),
+    Bold("bold"),
+    Condensed("condensed"),
+    Monospace("monospace"),
+    Serif("serif");
+
+    companion object {
+        fun fromId(id: String?): LabelFont = entries.firstOrNull { it.id == id } ?: Default
+    }
+}
+
 internal data class LabelElement(
     val id: String,
     val type: LabelElementType,
@@ -16,11 +28,16 @@ internal data class LabelElement(
     val yMm: Float,
     val widthMm: Float,
     val heightMm: Float,
+    val font: LabelFont = LabelFont.Default,
 )
 
 internal data class LabelDesign(val elements: List<LabelElement>) {
     fun withText(id: String, text: String): LabelDesign = copy(elements = elements.map {
         if (it.id == id && it.type == LabelElementType.Text) it.copy(text = text) else it
+    })
+
+    fun withFont(id: String, font: LabelFont): LabelDesign = copy(elements = elements.map {
+        if (it.id == id && it.type == LabelElementType.Text) it.copy(font = font) else it
     })
 
     fun withQrPayload(id: String, payload: String): LabelDesign = copy(elements = elements.map {
