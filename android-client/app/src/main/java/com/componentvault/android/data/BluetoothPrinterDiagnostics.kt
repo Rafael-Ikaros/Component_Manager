@@ -118,6 +118,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     @Volatile private var generation = 0
     private val sppOwnershipLock = Any()
     private val m1Connections = ReusableResourceSlot<M1Connection> { it.close() }
+    private val cpclConnections = ReusableResourceSlot<M1Connection> { it.close() }
     private var m1IdleCloseTask: Runnable? = null
     private val hprtPort: HprtCpclPort? by lazy { createHprtCpclPort(this.context) }
     private var hprtSession: HprtCpclSession? = null
@@ -328,6 +329,77 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     fun printM1Label(candidate: PrinterDeviceCandidate, bitmap: Bitmap, paper: M1TestPaperProfile) =
         printM1Bitmap(candidate, bitmap, paper, M1FeedMode.Label, "m1_component_label")
 
+    fun printCpclLabel(candidate: PrinterDeviceCandidate, bitmap: Bitmap, media: LabelMediaType) {
+        prepareM1Operation(candidate.address, cpcl = true)
+        printResult = M1TestPrintResult.None
+        canContinueBatch = false
+        report = "transport=cpcl_spp\nmedia=${media.id}\n" +
+            "bitmap_width_dots=${bitmap.width}\nbitmap_height_dots=${bitmap.height}\n"
+        if (!candidate.paired || candidate.type !in setOf(
+                BluetoothDevice.DEVICE_TYPE_CLASSIC, BluetoothDevice.DEVICE_TYPE_DUAL,
+            )
+        ) {
+            finish(PrinterProbeStatus.Unsupported, "error=cpcl_unsupported_device")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        try {
+            if (adapter?.isEnabled != true) {
+                finish(PrinterProbeStatus.BluetoothOff, "error=bluetooth_off")
+                printResult = M1TestPrintResult.Rejected
+                return
+            }
+            val job = CpclRasterJob.encode(bitmap, media)
+            status = PrinterProbeStatus.Connecting
+            val session = SppSession(generation, candidate.address, isPrint = true, cpcl = true)
+            sppSession = session
+            Thread({ runCpclJob(candidate, job, session) }, "cpcl-spp-print").start()
+        } catch (_: SecurityException) {
+            finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
+            printResult = M1TestPrintResult.Rejected
+        } catch (_: RuntimeException) {
+            finish(PrinterProbeStatus.ConnectionFailed, "error=cpcl_prepare_failed")
+            printResult = M1TestPrintResult.Rejected
+        }
+    }
+
+    private fun runCpclJob(candidate: PrinterDeviceCandidate, job: ByteArray, session: SppSession) {
+        var keepConnection = false
+        try {
+            val connection = acquireM1Connection(candidate, session) ?: return
+            postSpp(session) { status = PrinterProbeStatus.Printing; report += "stage=sending\n" }
+            scheduleSppDeadline(session, PRINT_STAGE_TIMEOUT_MS, "cpcl_write")
+            if (!writePrintPart(connection.output, job, session, flushChunks = false)) return
+            connection.output.flush()
+            session.framesSent++
+            cancelSppDeadline(session)
+            keepConnection = true
+            postSpp(session) {
+                synchronized(sppOwnershipLock) { sppSession = null }
+                appendPrintProgress(session)
+                report += "print_confirmation=physical_review\nprint_result=sent_unconfirmed\n"
+                status = PrinterProbeStatus.Complete
+                printResult = M1TestPrintResult.SentUnconfirmed
+            }
+        } catch (_: SecurityException) {
+            postSpp(session) {
+                appendPrintProgress(session)
+                finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
+                printResult = failedPrintResult(session.bytesAttempted)
+            }
+        } catch (_: Exception) {
+            postSpp(session) {
+                appendPrintProgress(session)
+                finish(PrinterProbeStatus.ConnectionFailed, "error=cpcl_transport_failed")
+                printResult = failedPrintResult(session.bytesAttempted)
+            }
+        } finally {
+            cancelSppDeadline(session)
+            session.sockets.closeCurrent()
+            if (!keepConnection) session.connection?.let(cpclConnections::closeIfOwned)
+        }
+    }
+
     /** A successful SDK write leaves the label pending physical verification. */
     suspend fun printDetongerP1Label(candidate: PrinterDeviceCandidate, bitmap: Bitmap,
                                     paper: M1TestPaperProfile, continuous: Boolean) {
@@ -528,7 +600,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         }
     }
 
-    private fun prepareM1Operation(address: String) {
+    private fun prepareM1Operation(address: String, cpcl: Boolean = false) {
         releaseHprtSession()
         stopScan()
         timeoutTask?.let(handler::removeCallbacks)
@@ -543,8 +615,11 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
             m1IdleCloseTask = null
             sppSession.also {
                 sppSession = null
-                it?.connection?.let(m1Connections::closeIfOwned)
-                if (m1Connections.get(address) == null) m1Connections.closeCurrent()
+                it?.connection?.let { active ->
+                    (if (it.cpcl) cpclConnections else m1Connections).closeIfOwned(active)
+                }
+                if (cpcl || m1Connections.get(address) == null) m1Connections.closeCurrent()
+                if (!cpcl || cpclConnections.get(address) == null) cpclConnections.closeCurrent()
             }
         }
         previous?.let(::cancelSppDeadline)
@@ -564,8 +639,9 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         candidate: PrinterDeviceCandidate,
         session: SppSession,
     ): M1Connection? {
+        val connections = if (session.cpcl) cpclConnections else m1Connections
         synchronized(sppOwnershipLock) {
-            val retained = m1Connections.getIfCurrent(candidate.address) { isCurrentSpp(session) }
+            val retained = connections.getIfCurrent(candidate.address) { isCurrentSpp(session) }
             if (retained == null && !isCurrentSpp(session)) return null
             retained?.let {
                 if (retained.socket.isConnected && isCurrentSpp(session)) {
@@ -576,7 +652,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
                     }
                     return retained
                 }
-                m1Connections.closeIfOwned(retained)
+                connections.closeIfOwned(retained)
             }
         }
 
@@ -592,7 +668,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         val connection = M1Connection(socket, socket.inputStream, socket.outputStream)
         synchronized(sppOwnershipLock) {
             session.sockets.releaseCurrent()
-            if (!m1Connections.installIfCurrent(candidate.address, connection) { isCurrentSpp(session) }) {
+            if (!connections.installIfCurrent(candidate.address, connection) { isCurrentSpp(session) }) {
                 return null
             }
             session.connection = connection
@@ -806,7 +882,12 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         }
     }
 
-    private fun writePrintPart(output: java.io.OutputStream, bytes: ByteArray, session: SppSession): Boolean {
+    private fun writePrintPart(
+        output: java.io.OutputStream,
+        bytes: ByteArray,
+        session: SppSession,
+        flushChunks: Boolean = true,
+    ): Boolean {
         if (!isCurrentSpp(session)) return false
         session.writeStarted = true
         session.bytesAttempted += bytes.size
@@ -814,7 +895,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
         while (offset < bytes.size && isCurrentSpp(session)) {
             val count = minOf(PRINT_WRITE_CHUNK_BYTES, bytes.size - offset)
             output.write(bytes, offset, count)
-            output.flush()
+            if (flushChunks) output.flush()
             offset += count
             session.bytesSent += count
         }
@@ -1023,6 +1104,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
             sppSession.also {
                 sppSession = null
                 m1Connections.closeCurrent()
+                cpclConnections.closeCurrent()
             }
         }
         stopScan()
@@ -1068,6 +1150,7 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
             val generation: Int,
             val address: String,
             val isPrint: Boolean = false,
+            val cpcl: Boolean = false,
         ) {
             val sockets = CancelableResourceSlot<BluetoothSocket> { socket -> runCatching { socket.close() } }
             val queryReplyDemultiplexer = M1QueryReplyDemultiplexer()

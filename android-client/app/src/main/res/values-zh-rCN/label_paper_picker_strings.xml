@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_paper_picker_title">纸张选择</string>
+    <string name="label_paper_common_tab">常用</string>
+    <string name="label_paper_custom_tab">自定义</string>
+    <string name="label_paper_current">当前纸张</string>
+    <string name="label_paper_dimension_order">宽度 × 走纸长度</string>
+    <string name="label_paper_rotation">旋转</string>
+    <string name="label_paper_use_once">仅使用</string>
+    <string name="label_paper_save_apply">保存并使用</string>
+</resources>

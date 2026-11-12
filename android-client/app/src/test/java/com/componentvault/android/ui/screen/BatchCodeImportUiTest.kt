@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -36,6 +37,7 @@ class BatchCodeImportUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val context: Application get() = RuntimeEnvironment.getApplication()
     private lateinit var repository: InventoryRepository
+    private var committed = false
 
     @Before fun setup() = runBlocking {
         InventoryDatabaseHelper(context).let { helper ->
@@ -52,32 +54,51 @@ class BatchCodeImportUiTest {
         compose.setContent {
             MaterialTheme {
                 BatchJlcInboundScreen(AppPreferences(), SyncConfiguration("test", "", "", false, "", ""),
-                    "A", onDismiss = {}, onCommitted = {}, initialCodeImport = true)
+                    "A", onDismiss = {}, onCommitted = { committed = true }, initialCodeImport = true)
             }
         }
         compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.batch_codes_parse))).fetchSemanticsNodes().isNotEmpty() }
     }
 
+    private fun parse() {
+        // The dialog can render before the asynchronous draft load has finished.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(context.getString(R.string.batch_codes_parse)) and isEnabled())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(context.getString(R.string.batch_codes_parse)).performClick()
+    }
+
     @Test fun parsedCodesUseExistingMetadataAndOnlyCommitAfterReview() {
         open()
         compose.onNodeWithTag("batch_codes_input").performScrollTo().performTextReplacement("C70565 2\nC70565 3")
-        compose.onNodeWithText(context.getString(R.string.batch_codes_parse)).performClick()
+        parse()
         val store = BatchJlcDraftStore(context)
-        compose.waitUntil(15_000) { store.load().rows.singleOrNull()?.status == BatchJlcStatus.Ready }
+        // Observe the UI's completed save instead of repeatedly opening the file during its atomic rename.
+        compose.waitUntil(15_000) {
+            compose.onAllNodes(hasText(context.getString(R.string.batch_commit)) and isEnabled())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         val row = store.load().rows.single()
+        assertEquals(BatchJlcStatus.Ready, row.status)
         assertEquals("5", row.quantityText)
         assertEquals("Existing part", row.name)
         assertEquals("A", row.location)
         assertEquals(10, runBlocking { repository.loadComponents().single().quantity })
         compose.onNodeWithText(context.getString(R.string.batch_commit)).performClick()
-        compose.waitUntil(10_000) { store.load().rows.singleOrNull()?.status == BatchJlcStatus.Committed }
+        compose.waitUntil(10_000) { committed }
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(context.getString(R.string.batch_tab_review, 0)) and isEnabled())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(BatchJlcStatus.Committed, store.load().rows.single().status)
         assertEquals(15, runBlocking { repository.loadComponents().single().quantity })
     }
 
     @Test fun invalidSecondLineLeavesDraftAndInventoryUnchanged() {
         open()
         compose.onNodeWithTag("batch_codes_input").performScrollTo().performTextReplacement("C70565 2\nC70565 0")
-        compose.onNodeWithText(context.getString(R.string.batch_codes_parse)).performClick()
+        parse()
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("第 2 行：", substring = true)).fetchSemanticsNodes().isNotEmpty() }
         assertTrue(BatchJlcDraftStore(context).load().rows.isEmpty())
         assertEquals(10, runBlocking { repository.loadComponents().single().quantity })

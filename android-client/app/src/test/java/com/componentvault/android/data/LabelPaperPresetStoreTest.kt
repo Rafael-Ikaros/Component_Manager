@@ -58,4 +58,36 @@ class LabelPaperPresetStoreTest {
         assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(Float.NaN, 60f) }
         assertFailsWith<IllegalArgumentException> { M1TestPaperProfile(40f, Float.POSITIVE_INFINITY) }
     }
+
+    @Test fun earlierP1PresetsMigrateOnceWithRotationAndOffsets() {
+        val context = RuntimeEnvironment.getApplication()
+        val legacy = context.getSharedPreferences("label_paper_settings", Context.MODE_PRIVATE)
+        legacy.edit().putString("paper_presets", """[{"name":"P1", "width":40,"height":30,"rotation":90,"offsetX":2,"offsetY":-1}]""")
+            .putString("last_paper", """{"width":40,"height":30,"rotation":90,"offsetX":2,"offsetY":-1}""").commit()
+        val upstream = context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE)
+        LabelPaperPresetStore(upstream).save(listOf(
+            SavedLabelPaper("", 30f, 20f, LabelMediaType.Gap),
+            SavedLabelPaper("", 40f, 30f, LabelMediaType.Gap),
+        ))
+        val store = LabelPaperPresetStore(context)
+        val expected = M1TestPaperProfile(40f, 30f, 90, 2f, -1f)
+        assertEquals(expected, store.last())
+        assertEquals(expected, store.load().single { it.name == "P1" }.paper)
+        assertEquals(3, store.load().size)
+        store.delete("P1")
+        assertEquals(listOf(30f, 40f), LabelPaperPresetStore(context).load().map { it.widthMm })
+    }
+
+    @Test fun upstreamSizeOnlyPresetsStillLoadAndSameSizeCanHaveDifferentAlignment() {
+        preferences.edit().putString("saved_label_papers",
+            """[{"name":"old", "width_mm":40,"height_mm":30,"media":"gap"}]""").commit()
+        val store = LabelPaperPresetStore(preferences)
+        assertEquals(M1TestPaperProfile(40f, 30f), store.load().single().paper)
+        store.save("rotated", M1TestPaperProfile(40f, 30f, 90, 2f, -1f))
+        assertEquals(2, store.load().size)
+        assertEquals(90, store.load().last().rotationDegrees)
+        assertEquals(false, LabelPrinterProfile.DetongerP1.usesCpcl)
+        assertEquals(true, LabelPrinterProfile.DetongerP1.supportsContinuous)
+        assertEquals(LabelPrinterProfile.DetongerP1, LabelPrinterProfile.DetongerP1.configurable)
+    }
 }

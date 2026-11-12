@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_paper_saved">Saved sizes</string>
+    <string name="label_paper_dimensions">%1$s × %2$s mm</string>
+    <string name="label_paper_remove_saved">Remove selected saved size</string>
+    <string name="label_paper_media">Paper type</string>
+    <string name="label_paper_limits">Printer supports widths of %1$s–%2$s mm and lengths of %3$s–%4$s mm.</string>
+    <string name="label_paper_alignment">Print position</string>
+    <string name="label_paper_alignment_hint">Negative horizontal values move the label left. The vertical offset follows the paper feed.</string>
+    <string name="label_paper_alignment_invalid">Enter valid offsets in millimeters.</string>
+    <string name="label_paper_save_size">Save this paper size</string>
+    <string name="label_paper_name">Name (optional)</string>
+    <string name="label_paper_save">Save size</string>
+    <string name="label_paper_apply">Use this paper</string>
+</resources>

@@ -26,14 +26,8 @@
     <string name="label_ui_no_component">Choose a component to preview the label</string>
     <string name="label_ui_print_blocked">Complete the label and check the preview before creating the print queue.</string>
     <string name="label_ui_export">Export</string>
-    <string name="label_ui_choose_template_hint">Choose what the label should contain.</string>
-    <string name="label_ui_choose_paper">Choose label size</string>
-    <string name="label_ui_choose_paper_hint">Match the size to the roll loaded in the printer. You can adjust it again in the editor.</string>
     <string name="label_ui_common_sizes">Common sizes (mm)</string>
     <string name="label_ui_custom_size">Custom size (mm)</string>
-    <string name="label_ui_paper_range">Enter a width of 20–48 mm and a height of 10–100 mm.</string>
-    <string name="label_ui_open_editor">Edit and preview</string>
-    <string name="label_ui_m1_size_boundary">40 × 60 mm gap stock is verified on M1. Other sizes require matching physical stock and a preview check; software size alone does not configure the printer.</string>
     <string name="label_ui_change_paper_title">Change label size?</string>
     <string name="label_ui_change_paper_warning">This will reset the edited layout to fit the new size. Your inventory data is unchanged.</string>
 </resources>

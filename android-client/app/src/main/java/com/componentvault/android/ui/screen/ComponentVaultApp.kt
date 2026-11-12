@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import com.componentvault.android.data.ComponentImportParser
 import com.componentvault.android.data.LabelPrintQueueCodec
 import com.componentvault.android.data.LocationQrCodec
-import com.componentvault.android.data.M1TestPaperProfile
 import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.ComponentImportCandidate
@@ -114,7 +113,6 @@ fun ComponentVaultApp(
     var labelPrintComponentIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var labelToolPickerVisible by rememberSaveable { mutableStateOf(false) }
     var labelToolTemplate by rememberSaveable { mutableStateOf(LabelToolTemplate.Component) }
-    var labelToolPaper by remember { mutableStateOf<M1TestPaperProfile?>(null) }
     var labelPrintFromToolPicker by rememberSaveable { mutableStateOf(false) }
     var locationLabelTargetId by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -497,10 +495,9 @@ fun ComponentVaultApp(
             )
 
             labelToolPickerVisible -> LabelToolTemplatePicker(
-                onSelect = { template, paper ->
+                onSelect = { template ->
                     locationLabelTargetId = null
                     labelToolTemplate = template
-                    labelToolPaper = paper
                     labelPrintFromToolPicker = true
                     labelToolPickerVisible = false
                     labelPrintVisible = true
@@ -513,7 +510,6 @@ fun ComponentVaultApp(
                 initialSeed = labelPrintSeed,
                 initialComponentIds = labelPrintComponentIds,
                 initialToolTemplate = if (labelPrintSeed != null) LabelToolTemplate.Component else labelToolTemplate,
-                initialPaper = if (labelPrintFromToolPicker) labelToolPaper else null,
                 initialFreeTitle = locationLabelTargetId?.let { id ->
                     uiState.inventory.storageLocations.firstOrNull { it.id == id }?.let { location ->
                         context.getString(R.string.location_qr_label_description, location.name, location.id)

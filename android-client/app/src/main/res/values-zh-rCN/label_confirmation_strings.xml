@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_confirmation_title">打印确认</string>
+    <string name="label_confirmation_edit">编辑标签</string>
+    <string name="label_confirmation_batch">批量选择元件</string>
+    <string name="label_confirmation_offset_summary">横向 %1$.1f 毫米 · 纵向 %2$.1f 毫米</string>
+    <string name="label_confirmation_fewer_copies">减少一份</string>
+    <string name="label_confirmation_more_copies">增加一份</string>
+    <string name="label_confirmation_calibration_hint">校准内容在实物纸张上的位置。横向负值向左，纵向负值向上。</string>
+    <string name="label_confirmation_default_offset">恢复默认</string>
+    <string name="label_confirmation_apply_offset">应用校准</string>
+    <string name="label_confirmation_invalid_offset">横向偏移须在 ±72 毫米内，纵向偏移须在 ±300 毫米内。</string>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_flow_queue_title">Print queue</string>
+    <string name="label_flow_settings_title">Print settings</string>
+    <string name="label_flow_templates">Template</string>
+    <string name="label_flow_print_now">Print</string>
+    <string name="label_flow_pick_printer">Select a paired printer</string>
+    <string name="label_flow_printer_details">Printer details</string>
+    <string name="label_flow_print_confirmed">Print confirmed</string>
+    <string name="label_flow_saved_printers">Saved printers</string>
+    <string name="label_flow_other_printers">Other paired devices</string>
+    <string name="label_flow_printer_unavailable">Unavailable</string>
+    <string name="label_flow_printer_incompatible">Different print protocol</string>
+    <string name="label_flow_choose_protocol">Choose a print protocol</string>
+    <string name="label_flow_forget_printer">Forget</string>
+</resources>

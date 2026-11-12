@@ -158,6 +158,27 @@ class M1ComponentLabelRendererTest {
         }
     }
 
+    @Test fun newTemplatesLeaveRoomForDefaultCalibrationInEveryRotation() {
+        val template = ComponentLabelTemplate.Qr30x40
+        val textTemplate = ComponentTextLabelTemplate.default
+        for (rotation in M1TestPaperProfile.Rotations) {
+            val paper = M1TestPaperProfile(40f, 60f, rotation, LabelPrintOffset.Default.xMm)
+            val design = LabelDesign.default(seed, template, textTemplate, paper)
+            assertEquals(design, LabelDesign.default(seed, template, textTemplate, paper.copy(offsetXmm = 0f)))
+            val stock = M1ComponentLabelRenderer.render(seed, template, textTemplate, paper, design)
+            try {
+                assertEquals(ComponentLabelCodec.buildQrPayload(seed, template)!!.rawValue, decode(stock))
+            } finally { stock.recycle() }
+
+            val free = LabelDesign.free(FreeLabelTemplate.Qr, paper)
+                .withText("text", "A1")
+                .withQrPayload("qr", "Shelf A1")
+            val freeBitmap = M1ComponentLabelRenderer.render(null, template, textTemplate, paper, free,
+                FreeLabel("Shelf A1", FreeLabelTemplate.Qr))
+            try { assertEquals("Shelf A1", decode(freeBitmap)) } finally { freeBitmap.recycle() }
+        }
+    }
+
     @Test fun editableMultilineTextDoesNotChangeQrPayload() {
         val compactSeed = seed.copy(name = "R")
         val paper = M1TestPaperProfile(40f, 60f)

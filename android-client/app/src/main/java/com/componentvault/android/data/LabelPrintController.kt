@@ -22,6 +22,7 @@ internal class LabelPrintController(context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val store = LabelPrintQueueStore(context.applicationContext)
     private val preferences = context.applicationContext.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE)
+    private val printerPreferences = LabelPrinterPreferences(preferences)
     val transport = BluetoothPrinterDiagnostics(context.applicationContext)
     var queue by mutableStateOf(LabelPrintQueue())
         private set
@@ -37,31 +38,125 @@ internal class LabelPrintController(context: Context) {
         private set
     var selectedAddress by mutableStateOf(preferences.getString("device_address", "").orEmpty())
         private set
-    var selectedProfileId by mutableStateOf(preferences.getString("printer_profile", "m1").orEmpty().let {
-        runCatching { LabelPrinterProfile.fromId(it).id }.getOrDefault("m1")
-    })
+    var printOffset by mutableStateOf(printerPreferences.loadOffset(selectedAddress))
+        private set
+    var savedPrinters by mutableStateOf(printerPreferences.load())
+        private set
+    var selectedProfile by mutableStateOf(
+        if (selectedAddress.isBlank()) null else {
+            val savedId = savedPrinters.firstOrNull { it.address == selectedAddress }?.profileId
+                ?: preferences.getString("printer_profile", null)
+            // A device saved before protocol selection was introduced used the M1 driver.
+            if (savedId == null) LabelPrinterProfile.M1
+            else runCatching { LabelPrinterProfile.fromId(savedId).configurable }.getOrNull()
+        },
+    )
         private set
     var selectedMediaType by mutableStateOf(preferences.getString("media_type", "gap").orEmpty().let {
         runCatching { LabelMediaType.fromId(it).id }.getOrDefault("gap")
     })
         private set
-    fun selectProfile(id: String) {
-        if (running || working || closed || queue.items.isNotEmpty()) return
-        selectedProfileId = LabelPrinterProfile.fromId(id).id
-        preferences.edit().putString("printer_profile", id).apply()
+    val profileForNewQueue: LabelPrinterProfile?
+        get() = if (selectedAddress.isBlank()) LabelPrinterProfile.GenericCpcl else selectedProfile
+
+    val canReplaceCompletedQueue: Boolean
+        get() = queue.items.isNotEmpty() && queue.items.all {
+            it.state == LabelPrintItemState.Sent || it.state == LabelPrintItemState.Skipped
+        }
+
+    private val queuedProfile: LabelPrinterProfile?
+        get() = if (queue.items.isEmpty() || canReplaceCompletedQueue) null
+            else LabelPrinterProfile.fromId(queue.printerProfileId)
+
+    fun canSelectProfile(profile: LabelPrinterProfile): Boolean {
+        if (running || working || closed || selectedAddress.isBlank()) return false
+        val required = queuedProfile ?: return true
+        return selectedProfile == null && required.configurable == profile.configurable
+    }
+
+    fun selectProfile(profile: LabelPrinterProfile, candidate: PrinterDeviceCandidate?) {
+        if (!canSelectProfile(profile)) return
+        if (selectedProfile == null && candidate?.address != selectedAddress) return
+        selectedProfile = profile.configurable
+        if (!profile.supportsContinuous) selectedMediaType = LabelMediaType.Gap.id
+        if (candidate?.address == selectedAddress) rememberPrinter(candidate) else savePrinterSelection()
     }
     fun selectMedia(id: String) {
-        if (running || working || closed || queue.items.isNotEmpty()) return
+        if (running || working || closed || queuedProfile != null) return
         selectedMediaType = LabelMediaType.fromId(id).id
-        preferences.edit().putString("media_type", id).apply()
+        savePrinterSelection()
+    }
+
+    fun savePrintOffset(offset: LabelPrintOffset) {
+        if (running || working || closed || queuedProfile != null) return
+        printerPreferences.saveOffset(selectedAddress, offset)
+        printOffset = offset
     }
     private var stopRequested = false
     private var closed = false
+    private var printerForNewQueue: PrinterDeviceCandidate? = null
 
-    fun selectDevice(address: String) {
-        if (running || working || closed) return
-        selectedAddress = address
-        preferences.edit().putString("device_address", address).apply()
+    private fun profileFor(candidate: PrinterDeviceCandidate): LabelPrinterProfile? =
+        savedPrinters.firstOrNull { it.address == candidate.address }?.let { LabelPrinterProfile.fromId(it.profileId) }
+            ?: selectedProfile.takeIf { candidate.address == selectedAddress }
+            ?: LabelPrinterProfile.defaultForDeviceName(candidate.name)
+
+    fun canSelectDevice(candidate: PrinterDeviceCandidate): Boolean {
+        if (running || working || closed) return false
+        val required = queuedProfile ?: return true
+        val profile = profileFor(candidate) ?: return true
+        return required.configurable == profile.configurable
+    }
+
+    fun canStartWithDevice(candidate: PrinterDeviceCandidate): Boolean =
+        canSelectDevice(candidate) && profileFor(candidate) != null
+
+    fun selectDevice(candidate: PrinterDeviceCandidate): Boolean {
+        if (!canSelectDevice(candidate)) return false
+        val stored = savedPrinters.firstOrNull { it.address == candidate.address }
+        val profile = profileFor(candidate)
+        val media = if (candidate.address == selectedAddress) selectedMediaType else stored?.mediaType
+        selectedAddress = candidate.address
+        printOffset = printerPreferences.loadOffset(selectedAddress)
+        selectedProfile = profile
+        selectedMediaType = if (profile?.supportsContinuous == true) media ?: LabelMediaType.Gap.id else LabelMediaType.Gap.id
+        if (profile != null) rememberPrinter(candidate)
+        return true
+    }
+
+    fun restoreSavedPrinter(candidate: PrinterDeviceCandidate) {
+        if (candidate.address == selectedAddress && savedPrinters.none { it.address == selectedAddress }) {
+            selectedProfile = profileFor(candidate) ?: return
+            rememberPrinter(candidate)
+        }
+    }
+
+    fun forgetPrinter(address: String) {
+        if (running || working || closed || (address == selectedAddress && queuedProfile != null)) return
+        savedPrinters = savedPrinters.filterNot { it.address == address }
+        if (selectedAddress == address) {
+            selectedAddress = ""
+            printOffset = printerPreferences.loadOffset(selectedAddress)
+            selectedProfile = null
+            selectedMediaType = LabelMediaType.Gap.id
+        }
+        printerPreferences.forget(address, savedPrinters)
+    }
+
+    private fun rememberPrinter(candidate: PrinterDeviceCandidate) {
+        val profile = selectedProfile ?: return
+        val printer = SavedLabelPrinter(candidate.address, candidate.name.orEmpty(), profile.id, selectedMediaType)
+        savedPrinters = listOf(printer) + savedPrinters.filterNot { it.address == candidate.address }
+        savePrinterSelection()
+    }
+
+    private fun savePrinterSelection() {
+        val profile = selectedProfile ?: if (selectedAddress.isBlank()) LabelPrinterProfile.GenericCpcl else return
+        savedPrinters = savedPrinters.map {
+            if (it.address == selectedAddress) it.copy(profileId = profile.id, mediaType = selectedMediaType)
+            else it
+        }
+        printerPreferences.save(savedPrinters, selectedAddress, profile.id, selectedMediaType)
     }
 
     fun load() {
@@ -87,35 +182,46 @@ internal class LabelPrintController(context: Context) {
         textTemplateId: String,
         paper: M1TestPaperProfile,
         designs: Map<String, LabelDesign> = emptyMap(),
+        printWith: PrinterDeviceCandidate? = null,
     ) {
         if (!loaded || working || running || closed) return
-        if (queue.items.isNotEmpty()) {
+        if (queue.items.isNotEmpty() && !canReplaceCompletedQueue) {
             error = "queue_review_required"
             return
         }
+        val profile = profileForNewQueue
+        if (profile == null) {
+            error = "printer_profile_required"
+            return
+        }
         val next = try {
-            LabelPrintQueue.create(selections, templateId, textTemplateId, paper, designs, selectedProfileId, selectedMediaType)
+            LabelPrintQueue.create(selections, templateId, textTemplateId, paper, designs, profile.id, selectedMediaType)
         } catch (_: IllegalArgumentException) {
             error = "queue_invalid_selection"
             return
         }
-        mutate { persist(next) }
+        mutate(printWith) { persist(next) }
     }
 
     fun createFree(freeLabel: FreeLabel, copies: Int, paper: M1TestPaperProfile,
-                   design: LabelDesign) {
+                   design: LabelDesign, printWith: PrinterDeviceCandidate? = null) {
         if (!loaded || working || running || closed) return
         if (queue.items.isNotEmpty()) {
             error = "queue_review_required"
             return
         }
+        val profile = profileForNewQueue
+        if (profile == null) {
+            error = "printer_profile_required"
+            return
+        }
         val next = try {
-            LabelPrintQueue.createFree(freeLabel, copies, paper, design, selectedProfileId, selectedMediaType)
+            LabelPrintQueue.createFree(freeLabel, copies, paper, design, profile.id, selectedMediaType)
         } catch (_: IllegalArgumentException) {
             error = "queue_invalid_selection"
             return
         }
-        mutate { persist(next) }
+        mutate(printWith) { persist(next) }
     }
 
     fun clear() {
@@ -123,7 +229,7 @@ internal class LabelPrintController(context: Context) {
         mutate {
             // Clear label snapshots but retain the last explicitly chosen paper and templates.
             persist(queue.copy(items = emptyList()))
-            releaseFinishedHprtQueue()
+            releaseFinishedCpclQueue()
             loaded = true
         }
     }
@@ -135,28 +241,33 @@ internal class LabelPrintController(context: Context) {
         if (state !in setOf(LabelPrintItemState.Pending, LabelPrintItemState.Sent, LabelPrintItemState.Skipped)) return
         mutate {
             persist(queue.update(id, state))
-            releaseFinishedHprtQueue()
+            releaseFinishedCpclQueue()
         }
     }
 
-    private fun releaseFinishedHprtQueue() {
-        if (queue.printerProfileId == LabelPrinterProfile.HmA300eCpcl.id &&
+    private fun releaseFinishedCpclQueue() {
+        if (LabelPrinterProfile.fromId(queue.printerProfileId).usesCpcl &&
             queue.items.all { it.state == LabelPrintItemState.Sent || it.state == LabelPrintItemState.Skipped }
         ) transport.stop()
     }
 
-    private fun mutate(block: suspend () -> Unit) {
+    private fun mutate(printWith: PrinterDeviceCandidate? = null, block: suspend () -> Unit) {
+        printerForNewQueue = printWith
         working = true
         error = null
         scope.launch {
-            try {
+            val printer = try {
                 block()
+                printerForNewQueue
             } catch (exception: Exception) {
                 if (exception is CancellationException) throw exception
                 error = "queue_save_failed"
+                null
             } finally {
+                printerForNewQueue = null
                 working = false
             }
+            printer?.let(::start)
         }
     }
 
@@ -168,8 +279,8 @@ internal class LabelPrintController(context: Context) {
 
     fun start(candidate: PrinterDeviceCandidate) {
         if (!loaded || working || running || closed || transport.busy) return
-        if (queue.printerProfileId == LabelPrinterProfile.HmA300eCpcl.id && !transport.hprtSdkAvailable) {
-            error = "printer_hprt_sdk_missing"
+        if (!canStartWithDevice(candidate)) {
+            error = if (profileFor(candidate) == null) "printer_profile_required" else "printer_profile_mismatch"
             return
         }
         if (queue.items.any { it.state in setOf(LabelPrintItemState.Uncertain, LabelPrintItemState.Failed, LabelPrintItemState.Sending) }) {
@@ -215,12 +326,15 @@ internal class LabelPrintController(context: Context) {
                             sendingId = null
                             break
                         }
-                        when (LabelPrinterProfile.fromId(queue.printerProfileId)) {
-                            LabelPrinterProfile.M1 -> transport.printM1Label(candidate, bitmap, queue.paper)
-                            LabelPrinterProfile.HmA300eCpcl -> transport.printHmA300eLabel(candidate, bitmap, queue.paper,
-                                queue.mediaType == LabelMediaType.Continuous.id)
-                            LabelPrinterProfile.DetongerP1 -> transport.printDetongerP1Label(candidate, bitmap, queue.paper,
-                                queue.mediaType == LabelMediaType.Continuous.id)
+                        val profile = LabelPrinterProfile.fromId(queue.printerProfileId)
+                        val media = LabelMediaType.fromId(queue.mediaType)
+                        when {
+                            profile == LabelPrinterProfile.M1 -> transport.printM1Label(candidate, bitmap, queue.paper)
+                            profile == LabelPrinterProfile.DetongerP1 ->
+                                transport.printDetongerP1Label(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
+                            profile == LabelPrinterProfile.HmA300eCpcl && transport.hprtSdkAvailable ->
+                                transport.printHmA300eLabel(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
+                            else -> transport.printCpclLabel(candidate, bitmap, media)
                         }
                     } finally {
                         bitmap.recycle()
@@ -264,6 +378,7 @@ internal class LabelPrintController(context: Context) {
     }
 
     fun stop() {
+        printerForNewQueue = null
         stopRequested = true
         transport.stop()
     }

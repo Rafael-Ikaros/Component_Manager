@@ -2,14 +2,19 @@
 
 ## 标签打印机 profile
 
-Android 在现有打印页选择 `m1` 或实验性 `hm-a300e-cpcl`，不增加另一套编辑器。
+Android 元件详情直接进入打印确认页，标签工具按模板进入画布编辑器。确认页、编辑器和纸张选择页共享草稿。首次选择设备时，
+已识别的 M1 默认使用 `m1`，HM-A300E（含 `HM-A300-…` 蓝牙名称）默认使用 `cpcl-spp`。
+其它设备在手动选择协议后才可发送。应用按蓝牙地址记住设备的协议、纸型和打印偏移。新设备的水平偏移为 −2.5 mm，垂直偏移为 0 mm。
 队列v4保存 printerProfileId 和 mediaType（gap／continuous），v1–v3按M1解释；
-已有队列不能切换指令集，未知profile或纸型拒绝加载。清除打印任务不修改库存。
+有待处理项的队列锁定协议，恢复时继续使用原纸张、偏移和设计。全部处理完后，从元件详情提交新任务时原子替换队列。清除打印任务不修改库存。
 
 共用纸张容器可容纳72 mm宽、300 mm高，机型边界单独验证：M1仍为20–48 mm、10–100 mm，
-HM 首版可打印 25–72 mm、10–300 mm。HM 使用可选的汉印 CPCL SDK 执行蓝牙握手、空闲状态查询和标签提交。
-SDK 端口与命令缓冲串行使用，当前打印页面可在核对后复用连接。打印调用后的失败与成功写入均进入待核对状态。
-构建方法、SDK 依据与验收步骤见[型号指南](hm-a300e.md)。
+通用 CPCL 为 20–72 mm、10–300 mm。旧 HM 队列保留原 25–72 mm、10–300 mm 限制。用户在 Android 本机保存常用
+纸张的名称、尺寸和纸型。队列保存实际使用的尺寸、旋转、偏移和设计快照。
+
+公开 APK 通过经典蓝牙 RFCOMM 发送单张 CPCL `CG` 栅格，间隙纸作业包含 `FORM`。同一队列
+核对期间保留连接，结束后关闭。完成发送或部分写入的 CPCL 作业由用户核对实物再继续。
+旧 HM 队列在显式带汉印 SDK 的本地构建中可沿用原发送路径。机型支持和验收记录见[型号指南](hm-a300e.md)。
 
 ## 实际采购成本
 
@@ -59,7 +64,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 
 应用品牌母版位于 `docs/design/branding/component-vault-logo-ikaros.png`。`tools/branding/generate_icons.py` 使用 Pillow 生成现有路径的派生资源；Android 使用应用自有 mipmap 与自适应前景/白色背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。
 
-> 标签界面：Android 的单元件标签与批量打印统一进入 `BluetoothLabelPrintScreen`，原独立预览页及诊断弹窗已移除。可编辑 `LabelDesign` 与原元件 `ComponentLabelSeed` 分开保存；前者决定显示文字和纸面位置，后者决定二维码身份。队列 v3 按张保存设计快照和元件/自由标签来源，兼容读取旧 v1/v2 元件队列。自由标签没有库存身份，元件二维码仍从 ComponentLabelSeed 生成。预览、导出和打印共用 M1 纸面渲染器，底层分帧与走纸协议保持不变。开发版功能以对应 Release 说明为准。
+> Android 的单元件标签与批量打印统一进入 `BluetoothLabelPrintScreen`。可编辑 `LabelDesign` 与元件 `ComponentLabelSeed` 分开保存，分别决定纸面布局和元件二维码身份。自由标签没有库存身份。预览、导出和打印共用纸面渲染器，M1 继续使用原有图像分帧和走纸协议。
 
 ## 客户端库存编辑与恢复
 
@@ -98,7 +103,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - Android 添加菜单共用“添加元件”入口，扫码/商城查询表单提供手动填写操作，复用完整元件编辑器；不再暴露独立手动录入与 Component Hub 迁移菜单。旧迁移解析、已有文件和 Windows 路径未改动。
 - 库存筛选、结果操作、多选区与元件行共用一个LazyColumn；键盘展开或短窗口时可把头部滚出以完整查看元件，不固定占满列表高度。搜索值仍来自原ViewModel，滚回顶部可继续调整筛选，不增加库存提交入口。
 - 平板库存行和详情呈现独立在 `InventoryTabletParts.kt`，复用原左滑动作和业务回调；Expanded 窗口在扣除导航、页边距后的净宽达到836dp时显示420dp列表与详情，否则沿同一 Adaptive navigator 单窗格切换，Medium走独立详情路线。主界面及各主导航目的地使用 SaveableStateHolder 保留列表/设置上下文。设置净宽达到700dp时采用240dp分组导航及最大640dp表单，较窄时逐页进入；输入草稿与分组滚动使用 Compose 保存状态，不自动保存业务配置或触发同步。
-- 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。项目用料/迁移预览的说明、行和末尾操作共用一个 LazyColumn，标签模板尺寸页由底部操作栏避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。
+- 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。项目用料/迁移预览的说明、行和末尾操作共用一个 LazyColumn，标签纸张面板的确认按钮避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。
 - `InventoryWorkbookService` 管理备份预览、恢复和恢复失败时的图片清理；`BomReleaseCommitter` 和 `ComponentHubImporter` 管理各自提交。`InventorySqlOps` 只提供接受现有连接的分配/队列辅助，不另开事务。数据库文件、schema v5、升级备份和历史数据格式保持不变。
 
 Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享库存状态。完整编辑器在应用根节点使用同一组合位置，紧凑全屏与宽屏对话框切换不另建草稿状态。完整编辑器的文字、数量、库位以及导入来源使用 Compose 保存状态；待提交扫码批次通过 `SavedStateHandle` 保存用户输入，重建时重新读取当前库存，恢复到复核状态，不自动执行库存写入。取消或成功后清理草稿，提交失败保留供修正。已采纳的本地图片随编辑会话恢复；明确取消（包括系统返回）才删除会话新建图片，保存成功保留采用的图片。系统保存状态恢复不等同于长期草稿备份，不保证强制停止或设备重启恢复；提交期间中断应先核对记录，避免手动重复入库/出库。

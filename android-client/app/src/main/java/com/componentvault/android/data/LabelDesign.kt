@@ -1,6 +1,7 @@
 package com.componentvault.android.data
 
 import com.componentvault.android.model.ComponentLabelSeed
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -53,18 +54,15 @@ internal data class LabelDesign(val elements: List<LabelElement>) {
 
     companion object {
         fun free(template: FreeLabelTemplate, paper: M1TestPaperProfile): LabelDesign {
-            val width = paper.widthMm
-            val height = paper.heightMm
-            val contentWidth = width - 2f
-            val contentHeight = height - 2f
-            val text = LabelElement("text", LabelElementType.Text, "", 1f, 1f,
-                contentWidth, contentHeight)
+            val area = TemplateArea(paper)
+            val qrSide = if (template == FreeLabelTemplate.Qr) min(area.width, area.height * 0.68f) else 0f
+            val textHeight = if (qrSide > 0f) area.height - qrSide - 0.8f else area.height
+            val text = area.box("text", LabelElementType.Text, "", area.left, area.top, area.width, textHeight)
             if (template != FreeLabelTemplate.Qr) return LabelDesign(listOf(text))
-            val qrSide = min(contentWidth, contentHeight * 0.68f)
             return LabelDesign(listOf(
-                text.copy(heightMm = contentHeight - qrSide - 0.8f),
-                LabelElement("qr", LabelElementType.Qr, "", 1f + (contentWidth - qrSide) / 2f,
-                    height - 1f - qrSide, qrSide, qrSide),
+                text,
+                area.box("qr", LabelElementType.Qr, "", area.left + (area.width - qrSide) / 2f,
+                    area.top + area.height - qrSide, qrSide, qrSide),
             ))
         }
 
@@ -74,27 +72,14 @@ internal data class LabelDesign(val elements: List<LabelElement>) {
             textTemplate: ComponentTextLabelTemplate,
             paper: M1TestPaperProfile,
         ): LabelDesign {
-            val turn = paper.rotationDegrees == 90 || paper.rotationDegrees == 270
-            val logicalW = if (turn) paper.heightMm else paper.widthMm
-            val logicalH = if (turn) paper.widthMm else paper.heightMm
-            val margin = 1f
+            val area = TemplateArea(paper)
             val gap = 0.8f
-            val left = margin
-            val top = margin
-            val w = logicalW - 2 * margin
-            val h = logicalH - 2 * margin
-            fun box(id: String, type: LabelElementType, text: String,
-                    x: Float, y: Float, width: Float, height: Float): LabelElement {
-                val (paperX, paperY, paperW, paperH) = when (paper.rotationDegrees) {
-                    90 -> listOf(paper.widthMm - y - height, x, height, width)
-                    180 -> listOf(paper.widthMm - x - width, paper.heightMm - y - height, width, height)
-                    270 -> listOf(y, paper.heightMm - x - width, height, width)
-                    else -> listOf(x, y, width, height)
-                }
-                return LabelElement(id, type, text, paperX, paperY, paperW, paperH)
-            }
+            val left = area.left
+            val top = area.top
+            val w = area.width
+            val h = area.height
             if (!template.isQrLabel) {
-                return LabelDesign(listOf(box("text", LabelElementType.Text,
+                return LabelDesign(listOf(area.box("text", LabelElementType.Text,
                     ComponentLabelRenderer.buildTextLabelContent(seed, textTemplate), left, top, w, h)))
             }
             val horizontal = w >= h * 1.2f
@@ -114,8 +99,27 @@ internal data class LabelDesign(val elements: List<LabelElement>) {
             )
             val rowH = textH / lines.size
             return LabelDesign(lines.mapIndexed { index, (id, value) ->
-                box(id, LabelElementType.Text, value, textX, textY + index * rowH, textW, rowH)
-            } + box("qr", LabelElementType.Qr, "", qrX, qrY, side, side))
+                area.box(id, LabelElementType.Text, value, textX, textY + index * rowH, textW, rowH)
+            } + area.box("qr", LabelElementType.Qr, "", qrX, qrY, side, side))
         }
+    }
+}
+
+private class TemplateArea(private val paper: M1TestPaperProfile) {
+    private val quarterTurn = paper.rotationDegrees == 90 || paper.rotationDegrees == 270
+    // Reserve room for the default horizontal calibration along the physical print head.
+    // Keep template geometry independent of the current offset so adjustment only translates ink.
+    private val horizontalInset = 1f + abs(LabelPrintOffset.Default.xMm)
+    val left = if (quarterTurn) 1f else horizontalInset
+    val top = if (quarterTurn) horizontalInset else 1f
+    val width = (if (quarterTurn) paper.heightMm else paper.widthMm) - 2 * left
+    val height = (if (quarterTurn) paper.widthMm else paper.heightMm) - 2 * top
+
+    fun box(id: String, type: LabelElementType, text: String,
+            x: Float, y: Float, width: Float, height: Float): LabelElement = when (paper.rotationDegrees) {
+        90 -> LabelElement(id, type, text, paper.widthMm - y - height, x, height, width)
+        180 -> LabelElement(id, type, text, paper.widthMm - x - width, paper.heightMm - y - height, width, height)
+        270 -> LabelElement(id, type, text, y, paper.heightMm - x - width, height, width)
+        else -> LabelElement(id, type, text, x, y, width, height)
     }
 }

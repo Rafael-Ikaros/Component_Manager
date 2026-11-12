@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_paper_picker_title">Choose paper</string>
+    <string name="label_paper_common_tab">Common</string>
+    <string name="label_paper_custom_tab">Custom</string>
+    <string name="label_paper_current">Current paper</string>
+    <string name="label_paper_dimension_order">Width × feed length</string>
+    <string name="label_paper_rotation">Rotation</string>
+    <string name="label_paper_use_once">Use once</string>
+    <string name="label_paper_save_apply">Save and use</string>
+</resources>

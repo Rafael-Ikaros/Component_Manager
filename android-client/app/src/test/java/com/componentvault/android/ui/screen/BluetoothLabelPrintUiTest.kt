@@ -1,8 +1,10 @@
 package com.componentvault.android.ui.screen
 
+import android.Manifest
 import android.app.Application
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.performSemanticsAction
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
@@ -13,44 +15,74 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import com.componentvault.android.R
 import com.componentvault.android.data.LabelPrintItemState
+import com.componentvault.android.data.LabelMediaType
+import com.componentvault.android.data.LabelPaperPresetStore
+import com.componentvault.android.data.LabelPrinterProfile
 import com.componentvault.android.data.LabelDesign
 import com.componentvault.android.data.LabelElement
 import com.componentvault.android.data.LabelElementType
 import com.componentvault.android.data.M1TestPaperProfile
 import com.componentvault.android.data.LabelPrintQueue
+import com.componentvault.android.data.LabelPrintOffset
 import com.componentvault.android.data.LabelPrintQueueStore
-import com.componentvault.android.data.createHprtCpclPort
+import com.componentvault.android.data.LabelPrinterPreferences
+import com.componentvault.android.data.SavedLabelPaper
+import com.componentvault.android.data.SavedLabelPrinter
 import com.componentvault.android.model.ComponentLabelSeed
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadow.api.Shadow
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+
+// Robolectric's BluetoothDevice shadow references BluetoothAddress, which is absent on API 28.
+@Implements(BluetoothDevice::class)
+class PairedLabelPrinterShadow {
+    var advertisedName = ""
+
+    @Implementation
+    protected fun getName() = advertisedName
+
+    @Implementation
+    protected fun getType() = BluetoothDevice.DEVICE_TYPE_CLASSIC
+
+    @Implementation
+    protected fun getBondState() = BluetoothDevice.BOND_BONDED
+}
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
@@ -64,40 +96,149 @@ class BluetoothLabelPrintUiTest {
         }
     }
 
+    private fun openEditor() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("label_print_edit") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("label_print_edit").performScrollTo().performClick()
+    }
+
+    private fun waitForPrintableConfirmation() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("label_print_submit") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun waitForPrintablePreview() {
         compose.onNodeWithTag("label_print_open").performClick()
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(
-                hasText(context.getString(R.string.bluetooth_label_print_create)) and isEnabled(),
-            ).fetchSemanticsNodes().isNotEmpty()
+        waitForPrintableConfirmation()
+        openEditor()
+    }
+
+    private fun pairTestPrinters(vararg printers: Pair<String, String>) {
+        shadowOf(context).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val adapter = context.getSystemService(BluetoothManager::class.java).adapter
+        shadowOf(adapter).setEnabled(true)
+        shadowOf(adapter).setBondedDevices(printers.map { (address, name) ->
+            adapter.getRemoteDevice(address).also {
+                Shadow.extract<PairedLabelPrinterShadow>(it).advertisedName = name
+            }
+        }.toSet())
+    }
+
+    @Test
+    @Config(shadows = [PairedLabelPrinterShadow::class])
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun knownPrintersSelectTheirProtocolAndOtherDevicesRequireAChoice() {
+        LabelPrintQueueStore(context).clear()
+        val m1 = "00:11:22:33:44:01" to "M1-6870"
+        val hm = "00:11:22:33:44:02" to "HM-A300-8EDA"
+        val other = "00:11:22:33:44:03" to "HM-A300ER-8EDA"
+        val p1 = "00:11:22:33:44:05" to "P1"
+        pairTestPrinters(m1, hm, other, p1)
+        val preferences = LabelPrinterPreferences(context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE))
+        val seed = ComponentLabelSeed("TEST-CPCL", "Resistor", "Passive", "0603", "A", 1, 0)
+        setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+        waitForPrintableConfirmation()
+        compose.onNodeWithTag("label_print_device").performScrollTo().performClick()
+        val m1Chip = compose.onNodeWithTag("label_print_protocol_m1")
+        val cpclChip = compose.onNodeWithTag("label_print_protocol_cpcl-spp")
+        fun chooseDevice(name: String) = compose.onNodeWithText(name).performScrollTo().performClick()
+        fun closePicker() = compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+        chooseDevice(m1.second)
+        m1Chip.assertIsSelected()
+        chooseDevice(hm.second)
+        cpclChip.assertIsSelected()
+        chooseDevice(other.second)
+        m1Chip.assertIsNotSelected().assertIsEnabled()
+        cpclChip.assertIsNotSelected().assertIsEnabled()
+        closePicker()
+        compose.onNodeWithTag("label_print_submit").assertIsNotEnabled()
+        compose.onNodeWithTag("label_print_device").performScrollTo().performClick()
+        m1Chip.performSemanticsAction(SemanticsActions.OnClick) { click -> assertTrue(click()) }
+        m1Chip.assertIsSelected()
+        compose.runOnIdle {
+            assertEquals("m1", preferences.load().single { it.address == other.first }.profileId)
         }
-        compose.onNodeWithText(context.getString(R.string.label_ui_edit)).performClick()
+        chooseDevice(hm.second)
+        cpclChip.assertIsSelected()
+        chooseDevice(other.second)
+        m1Chip.assertIsSelected()
+        chooseDevice(p1.second)
+        val p1Chip = compose.onNodeWithTag("label_print_protocol_detonger-p1")
+        p1Chip.performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { click -> assertTrue(click()) }
+        p1Chip.assertIsSelected()
+        chooseDevice(hm.second)
+        cpclChip.assertIsSelected()
+        chooseDevice(p1.second)
+        p1Chip.assertIsSelected()
+        closePicker()
+        compose.runOnIdle {
+            assertEquals(
+                mapOf(m1.first to "m1", hm.first to "cpcl-spp", other.first to "m1", p1.first to "detonger-p1"),
+                preferences.load().associate { it.address to it.profileId },
+            )
+        }
+    }
+
+    @Test
+    @Config(shadows = [PairedLabelPrinterShadow::class])
+    fun restoredCpclQueueCanUseNewDeviceAfterManualCompatibleChoice() {
+        val seed = ComponentLabelSeed("TEST-QUEUE", "Resistor", "Passive", "0603", "A", 1, 0)
+        val store = LabelPrintQueueStore(context)
+        val queue = LabelPrintQueue.create(listOf(seed to 1), printerProfileId = LabelPrinterProfile.HmA300eCpcl.id)
+        store.save(queue)
+        try {
+            pairTestPrinters("00:11:22:33:44:04" to "Label printer")
+            setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("print_queue_start").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText(context.getString(R.string.label_flow_printer_details)).performClick()
+            compose.onNodeWithText("Label printer").performScrollTo().performClick()
+            compose.onNodeWithTag("label_print_protocol_m1").assertIsNotEnabled()
+            val cpclChip = compose.onNodeWithTag("label_print_protocol_cpcl-spp")
+            cpclChip.assertIsNotSelected().assertIsEnabled()
+            cpclChip.performScrollTo().performClick()
+            compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+            compose.onNodeWithTag("print_queue_start").assertIsEnabled()
+            compose.runOnIdle { assertEquals(queue, store.load()) }
+        } finally {
+            store.clear()
+        }
     }
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun hmA300eWithoutSdkShowsTheReasonByTheDisabledQueueButton() {
-        assumeTrue(createHprtCpclPort(context) == null)
+    fun previouslySavedCpclPrinterShowsOneGenericProtocolAndCanBeForgotten() {
         LabelPrintQueueStore(context).clear()
+        val preferences = LabelPrinterPreferences(context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE))
+        val address = "00:11:22:33:44:55"
+        preferences.save(
+            listOf(SavedLabelPrinter(address, "Saved label printer",
+                LabelPrinterProfile.HmA300eCpcl.id, LabelMediaType.Gap.id)),
+            address, LabelPrinterProfile.HmA300eCpcl.id, LabelMediaType.Gap.id,
+        )
         val seed = ComponentLabelSeed("C393939", "TYPE-C16PIN", "Connector", "SMD", "A", 10, 1)
         setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag("label_print_open") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithTag("label_print_open").performClick()
+        waitForPrintableConfirmation()
         val createLabel = context.getString(R.string.bluetooth_label_print_create)
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasText(createLabel) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("HM-A300E CPCL").performScrollTo().performClick()
-        compose.onNodeWithText(createLabel).assertIsNotEnabled()
-        compose.onNodeWithText(context.getString(R.string.label_hm_sdk_missing)).assertIsDisplayed()
-        compose.onNodeWithText(context.getString(R.string.label_ui_print_blocked)).assertDoesNotExist()
-        compose.onNodeWithText("M1").performScrollTo().performClick()
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasText(createLabel) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithText(context.getString(R.string.label_hm_sdk_missing)).assertDoesNotExist()
+
+        compose.onNodeWithTag("label_print_device").performScrollTo().performClick()
+        compose.onNodeWithText("Saved label printer").assertExists()
+        assertTrue(compose.onAllNodesWithText(
+            context.getString(R.string.label_flow_printer_unavailable), substring = true,
+        ).fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithText(context.getString(R.string.label_cpcl_generic)).assertIsSelected()
+        compose.onNodeWithText("HM-A300E CPCL").assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.label_flow_forget_printer)).performScrollTo().performClick()
+        compose.onNodeWithText("Saved label printer", substring = true).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+        compose.onNodeWithText(createLabel).assertIsEnabled()
+        compose.runOnIdle { assertTrue(preferences.load().isEmpty()) }
     }
 
     @Test
@@ -130,12 +271,13 @@ class BluetoothLabelPrintUiTest {
         setLabelContent {
             MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) }
         }
+        openEditor()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("print_label_preview").fetchSemanticsNodes().isNotEmpty() }
         for (height in listOf("61", "60", "62", "60")) {
-            compose.onNodeWithText(context.getString(R.string.label_ui_paper)).performClick()
-            compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_height))
-                .performScrollTo().performTextReplacement(height)
-            compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+            compose.onNodeWithTag("label_editor_paper").performClick()
+            compose.onNodeWithTag("label_paper_custom_tab").performClick()
+            compose.onNodeWithTag("label_paper_height").performScrollTo().performTextReplacement(height)
+            compose.onNodeWithTag("label_paper_apply").performClick()
             waitForPrintablePreview()
             compose.onNodeWithTag("print_label_preview").assertIsDisplayed()
             // Robolectric has no device PixelCopy callback. Draw through the same
@@ -162,6 +304,7 @@ class BluetoothLabelPrintUiTest {
         LabelPrintQueueStore(context).clear()
         val seed = ComponentLabelSeed("EDIT-1", "Editable part", "Connector", "SMD", "A", 10, 1)
         setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+        openEditor()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("label_element_name").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("label_element_name").performClick()
         compose.onNodeWithText(context.getString(R.string.label_ui_content)).performClick()
@@ -170,16 +313,16 @@ class BluetoothLabelPrintUiTest {
         compose.onNodeWithTag("label_content_done").assertIsDisplayed().performClick()
         compose.onNodeWithText(context.getString(R.string.label_ui_position)).performClick()
         compose.onNodeWithText(context.getString(R.string.label_ui_advanced)).performClick()
-        compose.onNodeWithText(context.getString(R.string.label_editor_x))
-            .performScrollTo().performTextReplacement("999")
+        val x = compose.onNodeWithText(context.getString(R.string.label_editor_x)).performScrollTo()
+        val originalX = x.fetchSemanticsNode().config[SemanticsProperties.EditableText].text
+        x.performTextReplacement("999")
         compose.waitForIdle()
         compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
         compose.onNodeWithTag("label_print_open").performClick()
         compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_create)).assertIsNotEnabled()
-        compose.onNodeWithText(context.getString(R.string.label_ui_edit)).performClick()
+        openEditor()
         compose.onNodeWithText(context.getString(R.string.label_ui_position)).performClick()
-        compose.onNodeWithText(context.getString(R.string.label_editor_x))
-            .performScrollTo().performTextReplacement("1")
+        x.performScrollTo().performTextReplacement(originalX)
         compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
         waitForPrintablePreview()
         LabelPrintQueueStore(context).clear()
@@ -205,6 +348,11 @@ class BluetoothLabelPrintUiTest {
             .performScrollTo().performTextReplacement("https://example.test/qr")
         compose.onNodeWithTag("label_content_done").assertIsDisplayed().performClick()
         waitForPrintablePreview()
+        val back = compose.onNodeWithContentDescription(context.getString(R.string.action_back))
+        back.performClick()
+        waitForPrintableConfirmation()
+        back.performClick()
+        compose.onNodeWithTag("label_element_qr").assertIsDisplayed()
         LabelPrintQueueStore(context).clear()
     }
 
@@ -247,11 +395,13 @@ class BluetoothLabelPrintUiTest {
         LabelPrintQueueStore(context).clear()
         val seed = ComponentLabelSeed("EDIT-2", "Connector", "Connector", "SMD", "A", 10, 1)
         setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+        openEditor()
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("label_element_name").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("label_element_name").performClick()
         compose.onNodeWithText(context.getString(R.string.label_ui_position)).performClick()
         compose.onNodeWithText(context.getString(R.string.label_ui_advanced)).performClick()
-        val x = compose.onNodeWithText(context.getString(R.string.label_editor_x))
+        val x = compose.onNodeWithText(context.getString(R.string.label_editor_x)).performScrollTo()
+        val originalX = x.fetchSemanticsNode().config[SemanticsProperties.EditableText].text
         val y = compose.onNodeWithText(context.getString(R.string.label_editor_y))
         x.performScrollTo().performTextReplacement("")
         y.performScrollTo().performTextReplacement("")
@@ -259,9 +409,11 @@ class BluetoothLabelPrintUiTest {
         compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
         compose.onNodeWithTag("label_print_open").performClick()
         compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_create)).assertIsNotEnabled()
-        compose.onNodeWithText(context.getString(R.string.label_ui_edit)).performClick()
+        openEditor()
         compose.onNodeWithText(context.getString(R.string.label_ui_position)).performClick()
-        compose.onNodeWithText(context.getString(R.string.label_editor_x)).performScrollTo().performTextReplacement("1")
+        x.performScrollTo()
+        assertEquals("", x.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        x.performTextReplacement(originalX)
         compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
         waitForPrintablePreview()
         LabelPrintQueueStore(context).clear()
@@ -280,7 +432,7 @@ class BluetoothLabelPrintUiTest {
                 minStock = 1,
             ) to 1
         }
-        val original = LabelPrintQueue.create(selection)
+        val original = LabelPrintQueue.create(selection, printerProfileId = LabelPrinterProfile.GenericCpcl.id)
         val last = original.items.last()
         LabelPrintQueueStore(context).save(original.update(last.id, LabelPrintItemState.Uncertain, "print_check_label"))
         val visible = mutableStateOf(true)
@@ -293,15 +445,14 @@ class BluetoothLabelPrintUiTest {
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("print_queue_list").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithTag("print_queue_list").performScrollTo()
         compose.onNodeWithTag("print_queue_list").performScrollToNode(hasTestTag("print_queue_item_${last.id}"))
         compose.onNodeWithTag("print_queue_item_${last.id}").assertIsDisplayed()
-        compose.onNodeWithTag("print_queue_start").assertIsDisplayed()
+        compose.onNodeWithTag("print_queue_start").assertIsDisplayed().assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_review)).performClick()
         compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_retry)).assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_mark_printed)).performClick()
         compose.waitUntil(10_000) {
-            compose.onAllNodesWithText(context.getString(R.string.bluetooth_label_print_state_sent), substring = true)
+            compose.onAllNodesWithText(context.getString(R.string.label_flow_print_confirmed), substring = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
         compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
@@ -310,21 +461,15 @@ class BluetoothLabelPrintUiTest {
         LabelPrintQueueStore(context).clear()
     }
     @Test
-    fun labelToolChoosesTemplateThenPaperBeforeOpeningExistingEditor() {
-        var selected: Pair<LabelToolTemplate, M1TestPaperProfile>? = null
+    fun labelToolOpensSelectedTemplateDirectly() {
+        var selected: LabelToolTemplate? = null
         setLabelContent {
             MaterialTheme {
-                LabelToolTemplatePicker(onSelect = { template, paper -> selected = template to paper }, onBack = {})
+                LabelToolTemplatePicker(onSelect = { selected = it }, onBack = {})
             }
         }
         compose.onNodeWithText(context.getString(R.string.label_tool_text)).performClick()
-        compose.onNodeWithText(context.getString(R.string.label_ui_choose_paper)).assertIsDisplayed()
-        compose.onNodeWithText("30 × 20").performClick()
-        compose.onNodeWithText(context.getString(R.string.label_ui_open_editor)).performClick()
-        compose.runOnIdle {
-            assertTrue(selected?.first == LabelToolTemplate.Text)
-            assertTrue(selected?.second == M1TestPaperProfile(30f, 20f))
-        }
+        compose.runOnIdle { assertEquals(LabelToolTemplate.Text, selected) }
     }
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -337,120 +482,61 @@ class BluetoothLabelPrintUiTest {
                 MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed,
                     initialPaper = M1TestPaperProfile(40f, 60f), onDismiss = {}) }
             }
-            compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("label_element_name").fetchSemanticsNodes().isNotEmpty()
-            }
-            compose.waitUntil(10_000) {
-                compose.onAllNodes(hasTestTag("label_print_open") and isEnabled())
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-            compose.waitForIdle()
-            compose.waitUntil(10_000) {
-                compose.onAllNodesWithText(context.getString(R.string.label_ui_paper_summary,
-                    "40.0", "60.0", "0")).fetchSemanticsNodes().isNotEmpty()
-            }
-            // The saved 48 mm / -100 mm offsets would clip the raster and block queue creation.
-            waitForPrintablePreview()
+            waitForPrintableConfirmation()
+            compose.onNodeWithText(context.getString(R.string.label_ui_paper_summary,
+                "40.0", "60.0", "0"), substring = true).assertExists()
+            // The old queue's 48 mm / -100 mm offsets must not clip a new label.
+            compose.onNodeWithTag("label_print_submit").assertIsEnabled()
         } finally {
             LabelPrintQueueStore(context).clear()
-        }
-    }
-    @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun newComponentLabelKeepsSavedRotationPaperAndCalibration() {
-        val savedPaper = M1TestPaperProfile(40f, 60f, 90, 0.5f, -0.25f)
-        val store = LabelPrintQueueStore(context)
-        store.save(LabelPrintQueue(paper = savedPaper))
-        val seed = ComponentLabelSeed("ROT-COMPONENT", "Resistor", "Passive", "0603", "A", 1, 0)
-        try {
-            setLabelContent {
-                MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) }
-            }
-            compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("label_element_name").fetchSemanticsNodes().isNotEmpty()
-            }
-            compose.onNodeWithText(context.getString(R.string.label_ui_paper_summary,
-                "40.0", "60.0", "90")).assertExists()
-            waitForPrintablePreview()
-            compose.onNodeWithTag("label_print_open").performClick()
-            compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_create)).performClick()
-            compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("print_queue_list").fetchSemanticsNodes().isNotEmpty()
-            }
-            val expectedPaper = savedPaper
-            compose.waitUntil(10_000) { store.load().paper == expectedPaper }
-            compose.runOnIdle {
-                assertEquals(expectedPaper, store.load().paper)
-            }
-        } finally {
-            store.clear()
-        }
-    }
-    @Test
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun paperPresetUsesCurrentComponentContentAndAllCalibrationValues() {
-        val settings = context.getSharedPreferences("label_paper_settings", android.content.Context.MODE_PRIVATE)
-        settings.edit().clear().commit()
-        val paper = M1TestPaperProfile(40f, 60f, 90, 0.5f, -0.25f)
-        com.componentvault.android.data.LabelPaperPresetStore(settings).save("P1 paper", paper)
-        val store = LabelPrintQueueStore(context)
-        store.clear()
-        val seed = ComponentLabelSeed("CURRENT-COMPONENT", "Current resistor", "Passive", "0603", "A", 1, 0)
-        try {
-            setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
-            compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("label_element_name").fetchSemanticsNodes().isNotEmpty()
-            }
-            compose.onNodeWithText(context.getString(R.string.label_ui_paper)).performClick()
-            compose.onNodeWithText("P1 paper · 40.0 × 60.0 · 90°").performScrollTo()
-                .performSemanticsAction(SemanticsActions.OnClick) { it() }
-            compose.waitForIdle()
-            compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
-            waitForPrintablePreview()
-            compose.onNodeWithTag("label_print_open").performClick()
-            compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_create)).performClick()
-            compose.waitUntil(10_000) { store.load().items.isNotEmpty() }
-            val queue = store.load()
-            assertEquals(paper, queue.paper)
-            assertEquals(seed, queue.items.single().seed)
-            assertEquals("Current resistor", queue.items.single().design!!.elements.first { it.id == "name" }.text)
-        } finally {
-            store.clear()
-            settings.edit().clear().commit()
         }
     }
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun inventorySelectionCreatesOneLabelPerCurrentComponent() {
-        val first = com.componentvault.android.model.ComponentRecord("one", "C100", "Resistor", "Passive",
-            "0603", "A", "", 100, 1, "", false)
-        val second = first.copy(id = "two", sku = "C200", name = "Capacitor", quantity = 200)
-        val deleted = first.copy(id = "deleted", sku = "C300", deleted = true)
+    fun componentStartsInConfirmationWithDirectCopiesAndSeparateCalibration() {
         val store = LabelPrintQueueStore(context)
-        store.clear()
+        val seed = ComponentLabelSeed("ROT-COMPONENT", "Resistor", "Passive", "0603", "A", 1, 0)
+        val previous = LabelPrintQueue.create(
+            listOf(seed.copy(sku = "OLD-LABEL") to 1), paper = M1TestPaperProfile(40f, 60f, 90, 0.5f, -0.25f),
+        )
+        store.save(previous.update(previous.items.single().id, LabelPrintItemState.Sent))
         try {
             setLabelContent {
-                MaterialTheme {
-                    BluetoothLabelPrintScreen(listOf(first, second, deleted), null,
-                        initialPaper = M1TestPaperProfile(40f, 60f),
-                        initialComponentIds = listOf("one", "two", "deleted", "missing"), onDismiss = {})
-                }
+                MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) }
             }
+            waitForPrintableConfirmation()
+            compose.onNodeWithTag("label_print_open").assertDoesNotExist()
+            compose.onNodeWithText(context.getString(R.string.label_ui_paper_summary,
+                "40.0", "60.0", "0"), substring = true).assertExists()
+
+            compose.onNodeWithTag("label_print_copies").performScrollTo().performClick()
+            compose.onNodeWithTag("label_copies_decrease").assertIsNotEnabled()
+            compose.onNodeWithTag("label_copies_increase").performClick()
+            compose.onNodeWithTag("label_copies_value").assertTextContains("2")
+            compose.onNodeWithText(context.getString(R.string.label_ui_close)).performScrollTo().performClick()
+
+            openEditor()
+            compose.onNodeWithTag("label_element_name").assertExists()
+            compose.onNodeWithContentDescription(context.getString(R.string.action_back)).performClick()
+            compose.onNodeWithTag("label_print_calibration").performScrollTo().performClick()
+            compose.onNodeWithTag("label_calibration_x").performScrollTo()
+                .assertTextContains(LabelPrintOffset.Default.xMm.toString()).performTextReplacement("0")
+            compose.onNodeWithTag("label_calibration_apply").performScrollTo().performClick()
+
+            waitForPrintableConfirmation()
+            compose.onNodeWithTag("label_print_submit").performClick()
             compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("label_element_name").fetchSemanticsNodes().isNotEmpty()
+                compose.onAllNodesWithTag("print_queue_list").fetchSemanticsNodes().isNotEmpty()
             }
-            waitForPrintablePreview()
-            compose.onNodeWithTag("label_print_open").performClick()
-            compose.onNodeWithText(context.getString(R.string.bluetooth_label_print_create)).performClick()
-            compose.waitUntil(10_000) { store.load().items.size == 2 }
-            val items = store.load().items
-            assertEquals(listOf("C100", "C200"), items.map { it.seed!!.sku })
-            assertEquals(listOf("Resistor", "Capacitor"), items.map {
-                it.design!!.elements.first { element -> element.id == "name" }.text
-            })
-            assertTrue(items.all { it.copyNumber == 1 && it.copies == 1 })
-        } finally { store.clear() }
+            compose.runOnIdle {
+                val queue = store.load()
+                assertEquals(M1TestPaperProfile(40f, 60f), queue.paper)
+                assertEquals(listOf(seed.sku, seed.sku), queue.items.map { it.seed?.sku })
+            }
+        } finally {
+            store.clear()
+        }
     }
 
     @Test
@@ -501,6 +587,7 @@ class BluetoothLabelPrintUiTest {
                 initialToolTemplate = LabelToolTemplate.ComponentText,
                 initialPaper = M1TestPaperProfile(40f, 30f), onDismiss = {}) }
         }
+        openEditor()
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("label_element_text").fetchSemanticsNodes().isNotEmpty()
         }
@@ -509,59 +596,112 @@ class BluetoothLabelPrintUiTest {
         LabelPrintQueueStore(context).clear()
     }
     @Test
-    fun customPaperRequiresSupportedCanvasRangeBeforeEditing() {
+    fun customPaperRequiresSupportedCanvasRangeBeforeApplying() {
         var selectedPaper: M1TestPaperProfile? = null
+        val presets = LabelPaperPresetStore(context)
         setLabelContent {
             MaterialTheme {
-                LabelToolTemplatePicker(onSelect = { _, paper -> selectedPaper = paper }, onBack = {})
+                LabelPaperPickerSheet(
+                    paper = M1TestPaperProfile(40f, 60f),
+                    media = LabelMediaType.Gap,
+                    profile = LabelPrinterProfile.GenericCpcl,
+                    onApply = { value, _ -> selectedPaper = value },
+                    onDismiss = {},
+                )
             }
         }
-        compose.onNodeWithText(context.getString(R.string.label_tool_qr))
-            .performScrollTo().assertIsDisplayed().performClick()
-        compose.onNodeWithText(context.getString(R.string.label_ui_choose_paper)).assertIsDisplayed()
-        compose.onNodeWithTag("label_paper_width")
-            .performScrollTo().performTextReplacement("60")
-        compose.onNodeWithText(context.getString(R.string.label_ui_open_editor)).assertIsEnabled()
-        compose.onNodeWithTag("label_paper_width")
-            .performScrollTo().performTextReplacement("73")
-        compose.onNodeWithText(context.getString(R.string.label_ui_open_editor)).assertIsEnabled()
-        compose.onNodeWithTag("label_paper_width")
-            .performScrollTo().performTextReplacement("301")
-        compose.onNodeWithText(context.getString(R.string.label_ui_open_editor)).assertIsNotEnabled()
-        compose.onNodeWithTag("label_paper_width")
-            .performScrollTo().performTextReplacement("35")
-        compose.onNodeWithTag("label_paper_height")
-            .performScrollTo().performTextReplacement("25")
-        compose.onNodeWithText(context.getString(R.string.label_ui_open_editor)).performClick()
-        compose.runOnIdle { assertTrue(selectedPaper == M1TestPaperProfile(35f, 25f)) }
+        compose.onNodeWithTag("label_paper_custom_tab").performClick()
+        val width = compose.onNodeWithTag("label_paper_width")
+        val apply = compose.onNodeWithTag("label_paper_apply")
+        width.performScrollTo().performTextReplacement("60")
+        apply.assertIsEnabled()
+        width.performScrollTo().performTextReplacement("73")
+        apply.assertIsEnabled()
+        width.performScrollTo().performTextReplacement("301")
+        apply.assertIsNotEnabled()
+        width.performScrollTo().performTextReplacement("35")
+        compose.onNodeWithTag("label_paper_height").performScrollTo().performTextReplacement("25")
+        apply.performClick()
+        compose.runOnIdle {
+            assertEquals(M1TestPaperProfile(35f, 25f), selectedPaper)
+            assertTrue(presets.load().isEmpty())
+        }
+        compose.onNodeWithTag("label_paper_name").performScrollTo().performTextReplacement("Shelf labels")
+        compose.onNodeWithTag("label_paper_save_apply").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(SavedLabelPaper("Shelf labels", 35f, 25f, LabelMediaType.Gap)), presets.load())
+        }
     }
 
     @Test
-    fun editingRotationIsSavedWithoutCreatingAQueue() {
-        val visible = mutableStateOf(true)
-        val seed = ComponentLabelSeed("ROT-DRAFT", "Resistor", "Passive", "0603", "A", 1, 0)
-        val settings = context.getSharedPreferences("label_paper_settings", 0)
-        val store = com.componentvault.android.data.LabelPaperPresetStore(settings)
-        LabelPrintQueueStore(context).clear()
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun paperPresetUsesCurrentComponentAndRestoresRotationAndBothOffsets() {
+        val presets = LabelPaperPresetStore(context)
+        val paper = M1TestPaperProfile(40f, 60f, 90, 0.5f, -0.25f)
+        presets.save("P1 paper", paper)
+        val seed = ComponentLabelSeed("CURRENT", "Current resistor", "Passive", "0603", "A", 1, 0)
+        val queue = LabelPrintQueueStore(context)
+        setLabelContent { MaterialTheme { BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) } }
+        waitForPrintableConfirmation()
+        compose.onNodeWithTag("label_print_paper").performScrollTo().performClick()
+        compose.onNodeWithText("P1 paper").performScrollTo().performClick()
+        compose.onNodeWithTag("label_paper_apply").performClick()
+        waitForPrintableConfirmation()
+        compose.onNodeWithTag("label_print_submit").performClick()
+        compose.waitUntil(10_000) { queue.load().items.isNotEmpty() }
+        assertEquals(paper, queue.load().paper)
+        assertEquals(seed, queue.load().items.single().seed)
+        assertEquals("Current resistor", queue.load().items.single().design!!.elements.first { it.id == "name" }.text)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun inventorySelectionCreatesOneLabelForEachCurrentComponent() {
+        val first = com.componentvault.android.model.ComponentRecord("one", "C100", "Resistor", "Passive",
+            "0603", "A", "", 100, 1, "", false)
+        val second = first.copy(id = "two", sku = "C200", name = "Capacitor", quantity = 200)
+        val deleted = first.copy(id = "deleted", sku = "C300", deleted = true)
+        val store = LabelPrintQueueStore(context)
         setLabelContent {
-            MaterialTheme {
-                if (visible.value) BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {})
-            }
+            MaterialTheme { BluetoothLabelPrintScreen(listOf(first, second, deleted), null,
+                initialPaper = M1TestPaperProfile(40f, 60f),
+                initialComponentIds = listOf("one", "two", "deleted", "missing"), onDismiss = {}) }
         }
-        compose.waitUntil(10_000) { store.last() != null }
-        compose.onNodeWithText(context.getString(R.string.label_ui_paper)).performClick()
-        compose.onNodeWithText(context.getString(R.string.label_editor_calibration)).performScrollTo().performClick()
-        compose.onNodeWithText("270°").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { it() }
-        compose.waitForIdle()
-        compose.runOnIdle { assertEquals(270, store.last()?.rotationDegrees, settings.all.toString()) }
-        compose.waitUntil(10_000) { store.last()?.rotationDegrees == 270 }
-        compose.runOnIdle { visible.value = false }
-        compose.waitForIdle()
-        compose.runOnIdle { visible.value = true }
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithText(context.getString(R.string.label_ui_paper_summary,
-                "40.0", "60.0", "270")).fetchSemanticsNodes().isNotEmpty()
+        waitForPrintableConfirmation()
+        compose.onNodeWithTag("label_print_submit").performClick()
+        compose.waitUntil(10_000) { store.load().items.size == 2 }
+        val items = store.load().items
+        assertEquals(listOf("C100", "C200"), items.map { it.seed!!.sku })
+        assertEquals(listOf("Resistor", "Capacitor"), items.map {
+            it.design!!.elements.first { element -> element.id == "name" }.text
+        })
+        assertTrue(items.all { it.copyNumber == 1 && it.copies == 1 })
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun applyingPaperPersistsAlignmentWithoutPrintingAndRestoresOnReopen() {
+        val shown = mutableStateOf(true)
+        val seed = ComponentLabelSeed("DRAFT", "Resistor", "Passive", "0603", "A", 1, 0)
+        val store = LabelPaperPresetStore(context)
+        setLabelContent {
+            MaterialTheme { if (shown.value) BluetoothLabelPrintScreen(emptyList(), seed, onDismiss = {}) }
         }
+        waitForPrintableConfirmation()
+        compose.onNodeWithTag("label_print_paper").performScrollTo().performClick()
+        compose.onNodeWithText("270°").performScrollTo().performClick()
+        compose.onNodeWithTag("label_paper_offset_x").performScrollTo().performTextReplacement("1")
+        compose.onNodeWithTag("label_paper_offset_y").performScrollTo().performTextReplacement("-1")
+        compose.onNodeWithTag("label_paper_apply").performClick()
+        val expected = M1TestPaperProfile(40f, 60f, 270, 1f, -1f)
+        compose.waitUntil(10_000) { store.last() == expected }
+        compose.runOnIdle { shown.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { shown.value = true }
+        waitForPrintableConfirmation()
+        compose.onNodeWithText(context.getString(R.string.label_ui_paper_summary,
+            "40.0", "60.0", "270"), substring = true).assertExists()
+        assertEquals(expected, store.last())
         assertTrue(LabelPrintQueueStore(context).load().items.isEmpty())
     }
 }
