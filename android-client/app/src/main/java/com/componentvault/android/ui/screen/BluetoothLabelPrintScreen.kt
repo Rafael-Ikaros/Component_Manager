@@ -709,7 +709,7 @@ internal fun BluetoothLabelPrintScreen(
                             Column(Modifier.weight(1f)) {
                                 Text(item.freeLabel?.title ?: item.seed?.name.orEmpty())
                                 Text("${item.seed?.sku ?: stringResource(R.string.label_tool_free)} · " +
-                                    "${item.copyNumber}/${item.copies} · ${labelStateText(item.state, activeProfile.usesCpcl, context)}",
+                                    "${item.copyNumber}/${item.copies} · ${labelStateText(item.state, activeProfile.requiresPhysicalReview, context)}",
                                     style = MaterialTheme.typography.bodySmall)
                                 if (item.detail.isNotBlank() && item.detail != "print_check_label") {
                                     Text(printErrorText(item.detail, context), style = MaterialTheme.typography.bodySmall)
@@ -894,7 +894,7 @@ internal fun BluetoothLabelPrintScreen(
                         if (needsProtocol) Text(stringResource(R.string.label_flow_choose_protocol))
                         Row(Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(LabelPrinterProfile.M1, LabelPrinterProfile.GenericCpcl, LabelPrinterProfile.DetongerP1).forEach { profile ->
+                            LabelPrinterProfile.selectable.forEach { profile ->
                                 FilterChip(
                                     selected = controller.selectedProfile == profile,
                                     onClick = { controller.selectProfile(profile, selectedPairedPrinter) },
@@ -904,8 +904,12 @@ internal fun BluetoothLabelPrintScreen(
                                 )
                             }
                         }
-                        if (controller.selectedProfile?.usesCpcl == true) Text(stringResource(R.string.label_hm_experimental))
-                        if (controller.selectedProfile == LabelPrinterProfile.DetongerP1) Text(stringResource(R.string.label_p1_hint))
+                        when (controller.selectedProfile?.configurable) {
+                            LabelPrinterProfile.DetongerP1 -> Text(stringResource(R.string.label_p1_hint))
+                            LabelPrinterProfile.SupvanT50Pro -> Text(stringResource(R.string.label_supvan_test_hint))
+                            LabelPrinterProfile.GenericCpcl -> Text(stringResource(R.string.label_hm_experimental))
+                            else -> Unit
+                        }
                     }
                     OutlinedButton(onClick = ::refreshDevices) {
                         Text(stringResource(R.string.bluetooth_label_print_refresh_devices))
@@ -1175,6 +1179,7 @@ private fun printErrorText(code: String, context: android.content.Context): Stri
     "printer_permission_required" -> R.string.bluetooth_label_print_permission
     "printer_not_m1" -> R.string.bluetooth_label_print_error_not_m1
     "printer_profile_mismatch" -> R.string.label_flow_printer_incompatible
+    "printer_supvan_print_area" -> R.string.label_supvan_print_area
     "printer_profile_required" -> R.string.label_flow_choose_protocol
     "printer_no_response" -> R.string.bluetooth_label_print_error_no_response
     "printer_hprt_sdk_missing" -> R.string.label_hm_sdk_missing
@@ -1182,12 +1187,12 @@ private fun printErrorText(code: String, context: android.content.Context): Stri
 })
 
 @Composable
-private fun labelPrinterProtocolName(profile: LabelPrinterProfile): String =
-    when {
-        profile == LabelPrinterProfile.DetongerP1 -> "德佟 P1"
-        profile.usesCpcl -> stringResource(R.string.label_cpcl_generic)
-        else -> "M1"
-    }
+private fun labelPrinterProtocolName(profile: LabelPrinterProfile): String = when (profile.configurable) {
+    LabelPrinterProfile.M1 -> "M1"
+    LabelPrinterProfile.DetongerP1 -> "德佟 P1"
+    LabelPrinterProfile.SupvanT50Pro -> "SUPVAN T50 Pro"
+    else -> stringResource(R.string.label_cpcl_generic)
+}
 
 @Composable
 private fun LabelPrinterRow(

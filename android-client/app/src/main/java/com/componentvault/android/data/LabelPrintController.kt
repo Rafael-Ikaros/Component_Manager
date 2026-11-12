@@ -332,6 +332,7 @@ internal class LabelPrintController(context: Context) {
                             profile == LabelPrinterProfile.M1 -> transport.printM1Label(candidate, bitmap, queue.paper)
                             profile == LabelPrinterProfile.DetongerP1 ->
                                 transport.printDetongerP1Label(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
+                            profile == LabelPrinterProfile.SupvanT50Pro -> transport.printSupvanLabel(candidate, bitmap)
                             profile == LabelPrinterProfile.HmA300eCpcl && transport.hprtSdkAvailable ->
                                 transport.printHmA300eLabel(candidate, bitmap, queue.paper, media == LabelMediaType.Continuous)
                             else -> transport.printCpclLabel(candidate, bitmap, media)
@@ -411,6 +412,8 @@ private fun printerProblem(report: String): String = when {
     "status_bit=locate_failed" in report -> "printer_locate_failed"
     "error=bluetooth_off" in report -> "printer_bluetooth_off"
     "error=permission_required" in report -> "printer_permission_required"
+    "error=supvan_print_area" in report -> "printer_supvan_print_area"
+    "error=supvan_reply_timeout" in report -> "printer_no_response"
     "error=unsupported_device" in report || "error=model_unrecognized_response" in report -> "printer_not_m1"
     "error=model_no_response" in report -> "printer_no_response"
     "error=hprt_sdk_missing" in report -> "printer_hprt_sdk_missing"

@@ -1,5 +1,7 @@
 ﻿<resources>
     <string name="app_name">元件仓库</string>
+    <string name="label_supvan_test_hint">T50 Pro 试验打印。请装入尺寸一致的模切标签纸，每张发送后核对实物。</string>
+    <string name="label_supvan_print_area">请将标签内容放在居中的 48 mm 打印区域内，并留出上下边距。</string>
     <string name="importer_create_location">新建仓位</string>
     <string name="importer_select_location">选择已有仓位</string>
     <string name="importer_location_name">仓位名称</string>

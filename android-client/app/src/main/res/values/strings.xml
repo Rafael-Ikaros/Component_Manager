@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">元件仓库</string>
+    <string name="label_supvan_test_hint">Experimental T50 Pro printing. Load matching die-cut labels and verify each printed label before continuing.</string>
+    <string name="label_supvan_print_area">Keep the label contents within the centered 48 mm print area and clear of the top and bottom edges.</string>
     <string name="importer_create_location">Create storage location</string>
     <string name="importer_select_location">Select an existing location</string>
     <string name="importer_location_name">Location name</string>
