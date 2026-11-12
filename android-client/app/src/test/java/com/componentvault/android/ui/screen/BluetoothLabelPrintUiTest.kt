@@ -542,20 +542,24 @@ class BluetoothLabelPrintUiTest {
     @Test
     fun emptySavedQueueWithoutNewLabelIntentKeepsRotation() {
         val store = LabelPrintQueueStore(context)
+        LabelPaperPresetStore(context) // Complete migration before clearing the more recent paper selection.
+        val paperPreferences = context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE)
+        paperPreferences.edit().remove("last_paper").commit()
         store.save(LabelPrintQueue(paper = M1TestPaperProfile(40f, 60f, 90)))
         try {
             setLabelContent {
                 MaterialTheme { BluetoothLabelPrintScreen(emptyList(), null, onDismiss = {}) }
             }
             compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("label_print_open").fetchSemanticsNodes().isNotEmpty()
+                compose.onAllNodes(hasTestTag("label_editor_paper") and isEnabled())
+                    .fetchSemanticsNodes().isNotEmpty()
             }
-            compose.waitUntil(10_000) {
-                compose.onAllNodesWithText(context.getString(R.string.label_ui_paper_summary,
-                    "40.0", "60.0", "90")).fetchSemanticsNodes().isNotEmpty()
-            }
+            compose.onNodeWithTag("label_editor_paper").assertTextContains(
+                context.getString(R.string.label_ui_paper_summary, "40.0", "60.0", "90"),
+            )
         } finally {
             store.clear()
+            paperPreferences.edit().remove("last_paper").commit()
         }
     }
     @Test
