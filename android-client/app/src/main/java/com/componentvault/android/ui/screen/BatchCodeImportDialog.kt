@@ -50,8 +50,13 @@ internal fun BatchCodeImportDialog(
                         Text(stringResource(R.string.batch_codes_overlap_row, overlap.incoming.sku,
                             overlap.incoming.location, overlap.existing.joinToString(" + ") { it.quantityText },
                             overlap.incoming.quantityText))
+                        if (overlap.quantityChanges) overlap.existing.singleOrNull()?.purchaseAmount?.let { amount ->
+                            Text(stringResource(R.string.batch_codes_overlap_amount_review, amount),
+                                style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     if (overlaps.any { it.committed }) Text(stringResource(R.string.batch_codes_overlap_committed))
+                    if (overlaps.any { it.ambiguousReplacement }) Text(stringResource(R.string.batch_codes_overlap_multiple))
                 } else {
                     Text(stringResource(R.string.batch_codes_hint))
                     if (!busy) ImportLocationPicker(location, onLocationChange, locations)
@@ -70,7 +75,8 @@ internal fun BatchCodeImportDialog(
         confirmButton = {
             if (overlaps.isNotEmpty()) Column {
                 TextButton(onClick = { onResolve(CodeImportResolution.Replace) },
-                    enabled = !busy && overlaps.none { it.committed }, modifier = Modifier.testTag("batch_codes_replace")) {
+                    enabled = !busy && overlaps.none { it.committed || it.ambiguousReplacement },
+                    modifier = Modifier.testTag("batch_codes_replace")) {
                     Text(stringResource(R.string.batch_codes_replace))
                 }
                 TextButton(onClick = { onResolve(CodeImportResolution.Append) }, enabled = !busy,

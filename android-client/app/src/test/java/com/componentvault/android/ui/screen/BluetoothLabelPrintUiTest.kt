@@ -634,6 +634,33 @@ class BluetoothLabelPrintUiTest {
     }
 
     @Test
+    fun legacySizeOnlyPresetInheritsCalibrationAndExplicitZeroOverridesIt() {
+        val presets = LabelPaperPresetStore(context)
+        presets.save(listOf(
+            SavedLabelPaper("Legacy size", 40f, 30f, LabelMediaType.Gap),
+            SavedLabelPaper("Zero X", 40f, 30f, LabelMediaType.Gap, offsetXmm = 0f),
+        ))
+        val current = M1TestPaperProfile(40f, 60f, offsetXmm = -2.5f, offsetYmm = 1f)
+        var selectedPaper: M1TestPaperProfile? = null
+        setLabelContent { MaterialTheme {
+            LabelPaperPickerSheet(
+                paper = current, media = LabelMediaType.Gap, profile = LabelPrinterProfile.GenericCpcl,
+                onApply = { paper, _ -> selectedPaper = paper }, onDismiss = {},
+            )
+        } }
+        compose.onNodeWithText("Legacy size").performScrollTo().performClick()
+        compose.onNodeWithTag("label_paper_save_apply").performClick()
+        compose.runOnIdle {
+            assertEquals(current.copy(heightMm = 30f), selectedPaper)
+            assertEquals(null, presets.load().single { it.name == "Legacy size" }.offsetXmm)
+            assertEquals(null, presets.load().single { it.name == "Legacy size" }.offsetYmm)
+        }
+        compose.onNodeWithText("Zero X").performScrollTo().performClick()
+        compose.onNodeWithTag("label_paper_apply").performClick()
+        compose.runOnIdle { assertEquals(current.copy(heightMm = 30f, offsetXmm = 0f), selectedPaper) }
+    }
+
+    @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun paperPresetUsesCurrentComponentAndRestoresRotationAndBothOffsets() {
         val presets = LabelPaperPresetStore(context)

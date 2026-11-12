@@ -85,7 +85,11 @@ class BatchCodeImportParserTest {
         """).inputStream(), "", locations)
         assertEquals(original.first().id, text.first().id)
         // Also cover drafts written by the old whole-batch identity scheme.
-        val legacy = original.mapIndexed { index, row -> row.copy(id = "legacy-$index", status = BatchJlcStatus.Ready) }
+        val legacy = original.mapIndexed { index, row ->
+            row.copy(id = "legacy-$index", status = BatchJlcStatus.Ready, selected = index != 0,
+                name = "Manual name $index", category = "Manual category", packageName = "Manual package",
+                description = "Manual notes", purchaseAmount = "12.34")
+        }
         val untouched = original.first().copy(id = "other-location", location = "LOC-B")
         val draft = BatchJlcDraft(rows = legacy + untouched)
         for (incoming in listOf(text, xlsx)) {
@@ -96,11 +100,30 @@ class BatchCodeImportParserTest {
             assertEquals(3, replaced.rows.size)
             assertEquals(untouched, replaced.rows.single { it.location == "LOC-B" })
             assertEquals(legacy.map { it.id }, replaced.rows.filter { it.location == "LOC-A" }.map { it.id })
+            assertEquals(listOf(legacy.first(), legacy.last().copy(quantityText = "4"), untouched), replaced.rows)
             val (appended, _) = BatchCodeImportParser.append(draft, incoming, emptySet(), CodeImportResolution.Append)
             assertEquals(mapOf("C123" to 4, "C456" to 7), appended.rows.filter { it.location == "LOC-A" }
                 .groupBy { it.sku }.mapValues { (_, rows) -> rows.sumOf { it.quantityText.toInt() } })
             assertEquals(appended.rows.size, appended.rows.map { it.id }.distinct().size)
         }
+    }
+
+    @Test fun replacementKeepsDistinctDraftRowsWhenTheirTotalIsUnchanged() {
+        val original = BatchCodeImportParser.text("C123 2", "LOC-A", locations).single()
+        val draft = BatchJlcDraft(rows = listOf(
+            original.copy(purchaseAmount = "1.20", name = "First", selected = false),
+            original.copy(id = "second", purchaseAmount = "3.40", name = "Second", quantityText = "3"),
+        ))
+        val sameTotal = BatchCodeImportParser.text("C123 5", "LOC-A", locations)
+        assertEquals(draft to 0, BatchCodeImportParser.append(draft, sameTotal, emptySet(), CodeImportResolution.Replace))
+        val newTotal = BatchCodeImportParser.text("C123 6", "LOC-A", locations)
+        assertTrue(BatchCodeImportParser.overlaps(draft, newTotal, emptySet()).single().ambiguousReplacement)
+        assertFailsWith<IllegalArgumentException> {
+            BatchCodeImportParser.append(draft, newTotal, emptySet(), CodeImportResolution.Replace)
+        }
+        val (appended, _) = BatchCodeImportParser.append(draft, newTotal, emptySet(), CodeImportResolution.Append)
+        assertEquals(draft.rows, appended.rows.dropLast(1))
+        assertEquals("6", appended.rows.last().quantityText)
     }
 
     @Test fun committedOverlapsCannotBeReplacedButExplicitAppendHasFreshReceipts() {

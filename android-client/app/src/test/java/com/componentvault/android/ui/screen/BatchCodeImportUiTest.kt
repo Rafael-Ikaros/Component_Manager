@@ -113,7 +113,12 @@ class BatchCodeImportUiTest {
                 sku = sku, name = sku, category = "IC", packageName = "SMD", location = "A",
                 description = "", quantity = 10, minStock = 1)).isSuccess)
         }
-        val original = BatchJlcDraft(rows = BatchCodeImportParser.text("C123 2\nC456 3", "A", setOf("A")))
+        val original = BatchJlcDraft(rows = BatchCodeImportParser.text("C123 2\nC456 3", "A", setOf("A"))
+            .mapIndexed { index, row ->
+                row.copy(status = BatchJlcStatus.Ready, selected = index != 0, name = "Manual name $index",
+                    category = "Manual category", packageName = "Manual package",
+                    purchaseAmount = if (index == 0) "12.34" else "23.45")
+            })
         BatchJlcDraftStore(context).save(original)
         open()
         compose.onNodeWithTag("batch_codes_input").performScrollTo().performTextReplacement("C123 2\nC456 4")
@@ -121,6 +126,7 @@ class BatchCodeImportUiTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.batch_codes_replace))).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(context.getString(R.string.batch_codes_overlap_row, "C123", "A", "2", "2")).assertExists()
         compose.onNodeWithText(context.getString(R.string.batch_codes_overlap_row, "C456", "A", "3", "4")).assertExists()
+        compose.onNodeWithText(context.getString(R.string.batch_codes_overlap_amount_review, "23.45")).assertExists()
         assertEquals(original, BatchJlcDraftStore(context).load())
         return original
     }
@@ -132,12 +138,13 @@ class BatchCodeImportUiTest {
     }
 
     @Test fun correctedReimportDoesNotChangeDraftBeforeChoiceAndReplaceUsesNewQuantities() {
-        openCorrectedImport()
+        val original = openCorrectedImport()
         compose.onNodeWithTag("batch_codes_replace").performClick()
         waitForReviewedImport()
         val rows = BatchJlcDraftStore(context).load().rows
         assertEquals(listOf("2", "4"), rows.map { it.quantityText })
         assertEquals(listOf("C123", "C456"), rows.map { it.sku })
+        assertEquals(listOf(original.rows.first(), original.rows.last().copy(quantityText = "4")), rows)
         assertTrue(runBlocking { repository.loadComponents() }.all { it.quantity == 10 })
     }
 

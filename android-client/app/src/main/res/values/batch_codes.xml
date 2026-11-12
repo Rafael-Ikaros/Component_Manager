@@ -11,6 +11,8 @@
     <string name="batch_codes_overlap_hint">以下编码和库位已在当前草稿中。替换会用本次数量取代对应草稿行；追加会保留原行，再增加本次全部数量。其他行保留不变。取消不会修改草稿。</string>
     <string name="batch_codes_overlap_row">%1$s · %2$s：原数量 %3$s → 本次数量 %4$s</string>
     <string name="batch_codes_overlap_committed">部分重叠记录已入库，不能替换。选择追加并确认入库会增加库存；如需更正原库存，请取消并使用库存调整。</string>
+    <string name="batch_codes_overlap_multiple">同一编码和库位已有多条草稿，本次合计数量不同，无法直接替换。请编辑原行，或在确实需要增加库存时选择追加。</string>
+    <string name="batch_codes_overlap_amount_review">替换数量后，原实际采购总额（CNY）%1$s 会保留。请在确认入库前复核金额。</string>
     <string name="batch_codes_replace">替换重叠草稿行</string>
     <string name="batch_codes_append">作为新增数量追加</string>
 </resources>

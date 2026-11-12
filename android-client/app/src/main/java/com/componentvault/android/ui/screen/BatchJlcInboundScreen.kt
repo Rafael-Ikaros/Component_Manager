@@ -211,15 +211,14 @@ internal fun BatchJlcInboundScreen(
         }
     }
 
-    suspend fun processRows(processScope: ProcessScope, expectedGeneration: Int) {
+    suspend fun processRows(processScope: ProcessScope, expectedGeneration: Int, rowIds: Set<String>? = null) {
         processing = true
         try {
             val existing = repository.loadComponents().filterNot { it.deleted }.associateBy { it.sku.uppercase() }
             val metadataCache = mutableMapOf<String, ComponentOfficialMetadata?>()
             val lookupNotices = mutableMapOf<String, String>()
-            val target = draft.rows.filter {
-                it.status == if (processScope == ProcessScope.Captured) BatchJlcStatus.Captured else BatchJlcStatus.Pending
-            }
+            val targetStatus = if (processScope == ProcessScope.Captured) BatchJlcStatus.Captured else BatchJlcStatus.Pending
+            val target = draft.rows.filter { it.status == targetStatus && (rowIds == null || it.id in rowIds) }
             processTotal = target.size
             processedCount = 0
             for (original in target) {
@@ -295,7 +294,11 @@ internal fun BatchJlcInboundScreen(
                 ))
                 processedCount++
             }
-            page = if (draft.rows.any { it.status == BatchJlcStatus.Ready }) BatchPage.Review else BatchPage.Pending
+            page = when {
+                draft.rows.any { it.status == BatchJlcStatus.Ready } -> BatchPage.Review
+                rowIds != null && draft.rows.none { it.status == BatchJlcStatus.Pending } -> BatchPage.Capture
+                else -> BatchPage.Pending
+            }
             val pendingCount = draft.rows.count { it.status == BatchJlcStatus.Pending }
             lookupNotices.values.distinct().takeIf { it.isNotEmpty() }?.let { notices ->
                 message = notices.joinToString("\n")
@@ -328,8 +331,10 @@ internal fun BatchJlcInboundScreen(
                     return@launch
                 }
                 val (next, skipped) = BatchCodeImportParser.append(draft, rows, receipts, resolution)
-                val added = rows.size - skipped
-                if (added > 0) {
+                val accepted = rows.size - skipped
+                val previousIds = draft.rows.mapTo(hashSetOf()) { it.id }
+                val newIds = next.rows.mapNotNullTo(hashSetOf()) { row -> row.id.takeUnless(previousIds::contains) }
+                if (next != draft) {
                     save(next)
                     pendingSave?.join()
                     if (saveFailed) return@launch
@@ -337,8 +342,8 @@ internal fun BatchJlcInboundScreen(
                 pendingCodeRows = null
                 codeOverlaps = emptyList()
                 showCodeImport = false
-                message = context.getString(R.string.batch_codes_result, added, skipped)
-                if (added > 0) processRows(ProcessScope.Captured, generation)
+                message = context.getString(R.string.batch_codes_result, accepted, skipped)
+                if (accepted > 0) processRows(ProcessScope.Captured, generation, newIds)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

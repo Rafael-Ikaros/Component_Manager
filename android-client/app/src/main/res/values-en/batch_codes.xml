@@ -11,6 +11,8 @@
     <string name="batch_codes_overlap_hint">These codes and locations already exist in this draft. Replace uses the incoming quantities instead of the overlapping draft rows; append keeps those rows and adds the full incoming quantities. Other rows are kept. Cancel makes no changes.</string>
     <string name="batch_codes_overlap_row">%1$s · %2$s: existing %3$s → incoming %4$s</string>
     <string name="batch_codes_overlap_committed">Some overlapping rows are already committed. Replacement is unavailable; appending adds more stock after review. To correct existing stock, cancel and use inventory adjustment.</string>
+    <string name="batch_codes_overlap_multiple">Multiple draft rows share this code and location, and their total differs from the import. Edit the original rows, or append only if you intend to add more stock.</string>
+    <string name="batch_codes_overlap_amount_review">Replacing the quantity keeps the original purchase total of CNY %1$s. Review the amount before confirming inbound stock.</string>
     <string name="batch_codes_replace">Replace overlapping draft rows</string>
     <string name="batch_codes_append">Append as additional quantities</string>
 </resources>

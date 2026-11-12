@@ -64,8 +64,8 @@ internal fun LabelPaperPickerSheet(
     var heightText by rememberSaveable { mutableStateOf(paper.heightMm.paperNumber()) }
     var mediaType by rememberSaveable { mutableStateOf(currentMedia) }
     var rotation by rememberSaveable { mutableStateOf(paper.rotationDegrees) }
-    var offsetX by rememberSaveable { mutableStateOf(paper.offsetXmm.toString()) }
-    var offsetY by rememberSaveable { mutableStateOf(paper.offsetYmm.toString()) }
+    var offsetX by rememberSaveable { mutableStateOf<String?>(null) }
+    var offsetY by rememberSaveable { mutableStateOf<String?>(null) }
     var presetName by rememberSaveable {
         mutableStateOf(savedPapers.firstOrNull { it.matches(paper.widthMm, paper.heightMm, currentMedia) }?.name.orEmpty())
     }
@@ -75,13 +75,16 @@ internal fun LabelPaperPickerSheet(
     val draft = remember(paper, width, height, rotation, offsetX, offsetY) {
         if (width == null || height == null) null else runCatching {
             paper.copy(widthMm = width, heightMm = height, rotationDegrees = rotation,
-                offsetXmm = offsetX.replace(',', '.').toFloat(), offsetYmm = offsetY.replace(',', '.').toFloat())
+                offsetXmm = offsetX?.replace(',', '.')?.toFloat() ?: paper.offsetXmm,
+                offsetYmm = offsetY?.replace(',', '.')?.toFloat() ?: paper.offsetYmm)
         }.getOrNull()
     }
     val compatibleSaved = savedPapers.filter {
         profile.supportsContinuous || it.media == LabelMediaType.Gap
     }
-    val selectedSaved = compatibleSaved.firstOrNull { it.name == presetName && it.paper == draft && it.media == mediaType }
+    val selectedSaved = compatibleSaved.firstOrNull {
+        it.name == presetName && it.resolvePaper(paper.offsetXmm, paper.offsetYmm) == draft && it.media == mediaType
+    }
     val canSave = draft != null && (savedPapers.size < LabelPaperPresetStore.MaxPresets ||
         savedPapers.any { it.name == presetName.trim() })
 
@@ -110,8 +113,11 @@ internal fun LabelPaperPickerSheet(
                     Button(
                         onClick = {
                             draft?.let {
-                                val preset = SavedLabelPaper(presetName.trim(), it.widthMm, it.heightMm, mediaType,
-                                    it.rotationDegrees, it.offsetXmm, it.offsetYmm)
+                                val preset = SavedLabelPaper(
+                                    presetName.trim(), it.widthMm, it.heightMm, mediaType, it.rotationDegrees,
+                                    it.offsetXmm.takeIf { offsetX != null },
+                                    it.offsetYmm.takeIf { offsetY != null },
+                                )
                                 store.save(listOf(preset) + savedPapers.filterNot { saved ->
                                     saved.name == preset.name
                                 })
@@ -171,8 +177,8 @@ internal fun LabelPaperPickerSheet(
                                 val current = compatibleSaved.firstOrNull { it.matches(paper.widthMm, paper.heightMm, currentMedia) }
                                 selectSize(paper.widthMm, paper.heightMm, currentMedia, current?.name.orEmpty())
                                 rotation = paper.rotationDegrees
-                                offsetX = paper.offsetXmm.toString()
-                                offsetY = paper.offsetYmm.toString()
+                                offsetX = null
+                                offsetY = null
                             },
                             label = { Text(paperDimensions(paper.widthMm, paper.heightMm)) },
                         )
@@ -186,8 +192,8 @@ internal fun LabelPaperPickerSheet(
                                     onClick = {
                                         selectSize(saved.widthMm, saved.heightMm, saved.media, saved.name)
                                         rotation = saved.rotationDegrees
-                                        offsetX = saved.offsetXmm.toString()
-                                        offsetY = saved.offsetYmm.toString()
+                                        offsetX = saved.offsetXmm?.toString()
+                                        offsetY = saved.offsetYmm?.toString()
                                     },
                                     label = { Text(saved.name.ifBlank { paperDimensions(saved.widthMm, saved.heightMm) }) },
                                 )
@@ -245,10 +251,16 @@ internal fun LabelPaperPickerSheet(
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PaperField(offsetX, { offsetX = it }, stringResource(R.string.bluetooth_label_print_offset_x),
-                        Modifier.weight(1f).testTag("label_paper_offset_x"))
-                    PaperField(offsetY, { offsetY = it }, stringResource(R.string.bluetooth_label_print_offset_y),
-                        Modifier.weight(1f).testTag("label_paper_offset_y"))
+                    PaperField(
+                        offsetX ?: paper.offsetXmm.toString(), { offsetX = it },
+                        stringResource(R.string.bluetooth_label_print_offset_x),
+                        Modifier.weight(1f).testTag("label_paper_offset_x"),
+                    )
+                    PaperField(
+                        offsetY ?: paper.offsetYmm.toString(), { offsetY = it },
+                        stringResource(R.string.bluetooth_label_print_offset_y),
+                        Modifier.weight(1f).testTag("label_paper_offset_y"),
+                    )
                 }
                 if (custom) OutlinedTextField(
                     value = presetName,

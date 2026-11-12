@@ -11,15 +11,18 @@ internal data class SavedLabelPaper(
     val heightMm: Float,
     val media: LabelMediaType,
     val rotationDegrees: Int = 0,
-    val offsetXmm: Float = 0f,
-    val offsetYmm: Float = 0f,
+    // Missing axes inherit the selected printer's calibration.
+    val offsetXmm: Float? = null,
+    val offsetYmm: Float? = null,
 ) {
     init {
         require(name.length <= 60)
-        paper // Validate all settings, including rotation and offsets.
+        resolvePaper(0f, 0f)
     }
 
-    val paper get() = M1TestPaperProfile(widthMm, heightMm, rotationDegrees, offsetXmm, offsetYmm)
+    fun resolvePaper(currentOffsetXmm: Float, currentOffsetYmm: Float) =
+        M1TestPaperProfile(widthMm, heightMm, rotationDegrees,
+            offsetXmm ?: currentOffsetXmm, offsetYmm ?: currentOffsetYmm)
 
     fun matches(width: Float?, height: Float?, type: LabelMediaType): Boolean =
         widthMm == width && heightMm == height && media == type
@@ -37,9 +40,7 @@ internal class LabelPaperPresetStore(private val preferences: SharedPreferences)
             val migrated = (0 until (old?.length() ?: 0)).mapNotNull { index ->
                 runCatching {
                     val entry = old!!.getJSONObject(index)
-                    val paper = readPaper(entry)
-                    SavedLabelPaper(entry.getString("name"), paper.widthMm, paper.heightMm,
-                        LabelMediaType.Gap, paper.rotationDegrees, paper.offsetXmm, paper.offsetYmm)
+                    readPreset(entry, "width", "height", LabelMediaType.Gap)
                 }.getOrNull()
             }
             if (migrated.isNotEmpty()) {
@@ -59,10 +60,7 @@ internal class LabelPaperPresetStore(private val preferences: SharedPreferences)
         return (0 until entries.length()).mapNotNull { index ->
             runCatching {
                 val entry = entries.getJSONObject(index)
-                SavedLabelPaper(entry.optString("name"), entry.getDouble("width_mm").toFloat(),
-                    entry.getDouble("height_mm").toFloat(), LabelMediaType.fromId(entry.getString("media")),
-                    entry.optInt("rotation", 0), entry.optDouble("offsetX", 0.0).toFloat(),
-                    entry.optDouble("offsetY", 0.0).toFloat())
+                readPreset(entry, "width_mm", "height_mm", LabelMediaType.fromId(entry.getString("media")))
             }.getOrNull()
         }
     }
@@ -70,9 +68,10 @@ internal class LabelPaperPresetStore(private val preferences: SharedPreferences)
     fun save(papers: List<SavedLabelPaper>) {
         val entries = JSONArray()
         papers.forEach { paper ->
-            entries.put(writePaper(paper.paper).put("name", paper.name)
+            entries.put(JSONObject().put("name", paper.name)
                 .put("width_mm", paper.widthMm.toDouble()).put("height_mm", paper.heightMm.toDouble())
-                .put("media", paper.media.id))
+                .put("media", paper.media.id).put("rotation", paper.rotationDegrees)
+                .put("offsetX", paper.offsetXmm?.toDouble()).put("offsetY", paper.offsetYmm?.toDouble()))
         }
         preferences.edit().putString(Key, entries.toString()).apply()
     }
@@ -101,6 +100,14 @@ internal class LabelPaperPresetStore(private val preferences: SharedPreferences)
     fun last(): M1TestPaperProfile? = runCatching {
         readPaper(JSONObject(preferences.getString("last_paper", null) ?: return null))
     }.getOrNull()
+
+    private fun readPreset(entry: JSONObject, widthKey: String, heightKey: String, media: LabelMediaType) =
+        SavedLabelPaper(
+            entry.optString("name"), entry.getDouble(widthKey).toFloat(), entry.getDouble(heightKey).toFloat(),
+            media, entry.optInt("rotation", 0),
+            if (entry.isNull("offsetX")) null else entry.getDouble("offsetX").toFloat(),
+            if (entry.isNull("offsetY")) null else entry.getDouble("offsetY").toFloat(),
+        )
 
     private fun writePaper(paper: M1TestPaperProfile) = JSONObject()
         .put("width", paper.widthMm.toDouble()).put("height", paper.heightMm.toDouble())

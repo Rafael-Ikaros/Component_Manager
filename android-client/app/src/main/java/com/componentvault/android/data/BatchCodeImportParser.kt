@@ -11,7 +11,19 @@ import java.util.UUID
 
 internal enum class CodeImportResolution { Replace, Append }
 
-internal data class CodeImportOverlap(val incoming: BatchJlcRow, val existing: List<BatchJlcRow>, val committed: Boolean)
+internal data class CodeImportOverlap(val incoming: BatchJlcRow, val existing: List<BatchJlcRow>, val committed: Boolean) {
+    val quantityChanges: Boolean
+        get() {
+            var total = 0L
+            for (row in existing) {
+                val quantity = row.quantityText.trim().toIntOrNull()?.takeIf { it > 0 } ?: return true
+                total += quantity
+            }
+            return total != incoming.quantityText.toLongOrNull()
+        }
+
+    val ambiguousReplacement: Boolean get() = existing.size > 1 && quantityChanges
+}
 
 /** Only reads the input columns. Catalog lookup and inventory writes stay in the batch workflow. */
 internal object BatchCodeImportParser {
@@ -92,26 +104,33 @@ internal object BatchCodeImportParser {
                resolution: CodeImportResolution? = null): Pair<BatchJlcDraft, Int> {
         val overlap = overlaps(draft, rows, receipts)
         require(overlap.isEmpty() || resolution != null) { "导入内容与草稿重叠，请选择替换或追加。" }
-        require(resolution != CodeImportResolution.Replace || overlap.none { it.committed }) {
-            "重叠记录已入库，不能通过重新导入替换库存。"
+        val replacing = resolution == CodeImportResolution.Replace
+        if (replacing) {
+            require(overlap.none { it.committed }) { "重叠记录已入库，不能通过重新导入替换库存。" }
+            require(overlap.none { it.ambiguousReplacement }) {
+                "相同编码和库位有多条草稿，无法直接替换不同的合计数量。请编辑原行或选择追加。"
+            }
         }
         val byKey = overlap.associateBy { key(it.incoming) }
-        val retained = if (resolution == CodeImportResolution.Replace)
-            draft.rows.filterNot { key(it) in byKey } else draft.rows
+        val correctedQuantities = if (replacing) {
+            overlap.filter(CodeImportOverlap::quantityChanges)
+                .associate { it.existing.single().id to it.incoming.quantityText }
+        } else emptyMap()
+        val retained = draft.rows.map { row ->
+            correctedQuantities[row.id]?.let { row.copy(quantityText = it) } ?: row
+        }
         val known = retained.mapTo(receipts.toMutableSet()) { it.id }
         val added = rows.mapNotNull { row ->
             val matches = byKey[key(row)]
+            if (replacing && matches != null) return@mapNotNull null
             if (matches == null && row.id in receipts) return@mapNotNull null
-            val id = when {
-                matches != null && resolution == CodeImportResolution.Replace -> matches.existing.first().id
-                matches != null || row.id in known -> "codes-${UUID.randomUUID()}"
-                else -> row.id
-            }
+            val id = if (matches != null || row.id in known) "codes-${UUID.randomUUID()}" else row.id
             require(known.add(id)) { "导入记录重复，请重新选择文件。" }
             row.copy(id = id)
         }
         require(retained.size + added.size <= BatchJlcDraftCodec.MaxRows) { "批量草稿最多 500 条，请先处理现有记录。" }
-        return draft.copy(rows = retained + added) to (rows.size - added.size)
+        val replaced = if (replacing) overlap.size else 0
+        return draft.copy(rows = retained + added) to (rows.size - added.size - replaced)
     }
 
     private fun hash(value: String) = MessageDigest.getInstance("SHA-256")

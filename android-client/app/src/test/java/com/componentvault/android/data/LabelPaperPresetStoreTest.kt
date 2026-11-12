@@ -1,6 +1,7 @@
 package com.componentvault.android.data
 
 import android.content.Context
+import org.json.JSONArray
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -26,7 +27,7 @@ class LabelPaperPresetStoreTest {
         assertEquals(listOf("大标签", "小标签"), reopened.load().map { it.name })
         reopened.save("大标签", paper.copy(rotationDegrees = 180))
         assertEquals(2, reopened.load().size)
-        assertEquals(180, reopened.load().first().paper.rotationDegrees)
+        assertEquals(180, reopened.load().first().rotationDegrees)
         reopened.delete("小标签")
         assertEquals(listOf("大标签"), LabelPaperPresetStore(preferences).load().map { it.name })
     }
@@ -38,7 +39,7 @@ class LabelPaperPresetStoreTest {
         assertFailsWith<IllegalArgumentException> { store.save("额外纸张", paper) }
         assertFailsWith<IllegalArgumentException> { store.save("  ", paper) }
         store.save("纸张0", paper.copy(rotationDegrees = 90))
-        assertEquals(90, store.load().first().paper.rotationDegrees)
+        assertEquals(90, store.load().first().rotationDegrees)
     }
 
     @Test fun corruptSettingsFallBackWithoutLosingUsablePresets() {
@@ -72,7 +73,7 @@ class LabelPaperPresetStoreTest {
         val store = LabelPaperPresetStore(context)
         val expected = M1TestPaperProfile(40f, 30f, 90, 2f, -1f)
         assertEquals(expected, store.last())
-        assertEquals(expected, store.load().single { it.name == "P1" }.paper)
+        assertEquals(expected, store.load().single { it.name == "P1" }.resolvePaper(-2.5f, 0f))
         assertEquals(3, store.load().size)
         store.delete("P1")
         assertEquals(listOf(30f, 40f), LabelPaperPresetStore(context).load().map { it.widthMm })
@@ -82,12 +83,34 @@ class LabelPaperPresetStoreTest {
         preferences.edit().putString("saved_label_papers",
             """[{"name":"old", "width_mm":40,"height_mm":30,"media":"gap"}]""").commit()
         val store = LabelPaperPresetStore(preferences)
-        assertEquals(M1TestPaperProfile(40f, 30f), store.load().single().paper)
+        assertEquals(M1TestPaperProfile(40f, 30f, offsetXmm = -2.5f, offsetYmm = 1f),
+            store.load().single().resolvePaper(-2.5f, 1f))
         store.save("rotated", M1TestPaperProfile(40f, 30f, 90, 2f, -1f))
         assertEquals(2, store.load().size)
         assertEquals(90, store.load().last().rotationDegrees)
         assertEquals(false, LabelPrinterProfile.DetongerP1.usesCpcl)
         assertEquals(true, LabelPrinterProfile.DetongerP1.supportsContinuous)
         assertEquals(LabelPrinterProfile.DetongerP1, LabelPrinterProfile.DetongerP1.configurable)
+    }
+
+    @Test fun rewritingPresetsKeepsMissingAxesAndExplicitZeroDistinct() {
+        preferences.edit().putString("saved_label_papers", """
+            [
+                {"name":"old","width_mm":40,"height_mm":30,"media":"gap"},
+                {"name":"zero X","width_mm":40,"height_mm":30,"media":"gap","offsetX":0},
+                {"name":"remove","width_mm":30,"height_mm":20,"media":"gap"}
+            ]
+        """.trimIndent()).commit()
+        val store = LabelPaperPresetStore(preferences)
+        store.delete("remove")
+        val rewritten = JSONArray(preferences.getString("saved_label_papers", "[]"))
+        assertEquals(false, rewritten.getJSONObject(0).has("offsetX"))
+        assertEquals(false, rewritten.getJSONObject(0).has("offsetY"))
+        assertEquals(0.0, rewritten.getJSONObject(1).getDouble("offsetX"))
+        assertEquals(false, rewritten.getJSONObject(1).has("offsetY"))
+        val (old, zeroX) = LabelPaperPresetStore(preferences).load()
+        assertEquals(M1TestPaperProfile(40f, 30f, offsetXmm = 2f, offsetYmm = -1f),
+            old.resolvePaper(2f, -1f))
+        assertEquals(M1TestPaperProfile(40f, 30f, offsetYmm = 1f), zeroX.resolvePaper(-2.5f, 1f))
     }
 }
