@@ -6,6 +6,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SupvanT50PrintProtocolTest {
@@ -57,13 +58,25 @@ class SupvanT50PrintProtocolTest {
 
     @Test
     fun acceptsFiftyMillimeterPaperOnlyWhenTheInkFitsTheHead() {
-        val pixels = IntArray(400 * 80) { -1 }
-        pixels[400 + 8] = 0xff000000.toInt()
-        assertTrue(SupvanT50PrintProtocol.encode(400, 80, pixels).isNotEmpty())
-        pixels[400 + 7] = 0xff000000.toInt()
-        assertEquals("supvan_print_area", assertFailsWith<IllegalArgumentException> {
-            SupvanT50PrintProtocol.encode(400, 80, pixels)
-        }.message)
+        val width = 400
+        val height = 80
+        val pixels = IntArray(width * height) { -1 }
+        val ink = 0xff000000.toInt()
+        fun fits() = SupvanT50PrintProtocol.fitsPrintArea(width, height) { x, y -> pixels[y * width + x] }
+
+        pixels[width + 8] = ink
+        pixels[(height - 2) * width + 391] = ink
+        assertTrue(fits())
+        assertTrue(SupvanT50PrintProtocol.encode(width, height, pixels).isNotEmpty())
+        for ((x, y) in listOf(7 to 1, 392 to 1, 200 to 0, 200 to height - 1)) {
+            val index = y * width + x
+            pixels[index] = ink
+            assertFalse(fits(), "Ink at ($x, $y) falls outside the print area")
+            assertEquals("supvan_print_area", assertFailsWith<IllegalArgumentException> {
+                SupvanT50PrintProtocol.encode(width, height, pixels)
+            }.message)
+            pixels[index] = -1
+        }
     }
 
     private fun reply(command: Int, size: Int = 8): ByteArray = ByteArray(size).apply {

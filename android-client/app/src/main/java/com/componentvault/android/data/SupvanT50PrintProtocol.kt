@@ -52,8 +52,31 @@ internal object SupvanT50PrintProtocol {
         }
     }
 
+    fun fitsPrintArea(width: Int, height: Int, pixelAt: (x: Int, y: Int) -> Int): Boolean {
+        if (width !in 1..400 || height !in 80..2400) return false
+        val left = (HeadDots - width) / 2
+        // Source X is mirrored, so the right edge of the head sets the left ink margin.
+        val firstPrintableX = (width + left - HeadDots).coerceAtLeast(0)
+        val pastPrintableX = (width + left).coerceAtMost(width)
+        for (y in 0 until height) {
+            if (y < MarginRows || y >= height - MarginRows) {
+                for (x in 0 until width) if (hasInk(pixelAt(x, y))) return false
+            } else {
+                for (x in 0 until firstPrintableX) if (hasInk(pixelAt(x, y))) return false
+                for (x in pastPrintableX until width) if (hasInk(pixelAt(x, y))) return false
+            }
+        }
+        return true
+    }
+
+    private fun hasInk(pixel: Int): Boolean {
+        val luminance = (pixel ushr 16 and 255) * 299 + (pixel ushr 8 and 255) * 587 + (pixel and 255) * 114
+        return pixel ushr 24 >= 128 && luminance < 128_000
+    }
+
     fun encode(width: Int, height: Int, pixels: IntArray): List<ByteArray> {
-        require(width in 1..400 && height in 80..2400 && pixels.size == width * height)
+        require(pixels.size == width * height)
+        require(fitsPrintArea(width, height) { x, y -> pixels[y * width + x] }) { "supvan_print_area" }
         val raster = ByteArray(height * RowBytes)
         val left = (HeadDots - width) / 2
         // The T50 Pro mirrors the printhead axis relative to the editor.
@@ -61,12 +84,8 @@ internal object SupvanT50PrintProtocol {
             val sourceRow = y * width
             for (x in 0 until width) {
                 val pixel = pixels[sourceRow + (width - 1 - x)]
-                val luminance = (pixel ushr 16 and 255) * 299 + (pixel ushr 8 and 255) * 587 + (pixel and 255) * 114
-                if (pixel ushr 24 < 128 || luminance >= 128_000) continue
+                if (!hasInk(pixel)) continue
                 val dot = x + left
-                require(dot in 0 until HeadDots && y in MarginRows until height - MarginRows) {
-                    "supvan_print_area"
-                }
                 val index = y * RowBytes + dot / 8
                 raster[index] = (raster.unsigned(index) or (1 shl (dot % 8))).toByte()
             }

@@ -94,6 +94,7 @@ import com.componentvault.android.data.LabelPrinterProfile
 import com.componentvault.android.data.LabelMediaType
 import com.componentvault.android.data.M1TestPaperProfile
 import com.componentvault.android.data.PrinterDeviceCandidate
+import com.componentvault.android.data.SupvanT50PrintProtocol
 import com.componentvault.android.model.ComponentLabelSeed
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.toLabelSeed
@@ -111,12 +112,14 @@ private data class PreviewRequest(
     val textTemplateId: String,
     val paper: M1TestPaperProfile?,
     val designs: Map<String, LabelDesign>,
-    val freeLabel: FreeLabel? = null,
+    val freeLabel: FreeLabel?,
+    val validateSupvanArea: Boolean,
 )
 private data class PrintPreview(
     val request: PreviewRequest? = null,
     val bitmap: Bitmap? = null,
     val error: String? = null,
+    val fitsPrintArea: Boolean = true,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -362,25 +365,37 @@ internal fun BluetoothLabelPrintScreen(
             design?.let { seed.sku to it }
         }.toMap()
     val previewRequest = PreviewRequest(previewSeeds, previewTemplate.id, previewTextTemplate.id,
-        previewPaper, printDesigns, previewFreeLabel)
+        previewPaper, printDesigns, previewFreeLabel,
+        validateSupvanArea = !hasQueue && activeProfile == LabelPrinterProfile.SupvanT50Pro)
     var preview by remember { mutableStateOf(PrintPreview()) }
     LaunchedEffect(previewRequest) {
         if ((previewSeed != null || previewFreeLabel != null) && previewPaper != null) {
             var generated: Bitmap? = null
             preview = try {
-                val bitmap = withContext(Dispatchers.Default) {
+                val result = withContext(Dispatchers.Default) {
+                    var fitsPrintArea = true
+                    fun checkPrintArea(bitmap: Bitmap) {
+                        if (previewRequest.validateSupvanArea && fitsPrintArea) {
+                            fitsPrintArea = SupvanT50PrintProtocol.fitsPrintArea(bitmap.width, bitmap.height, bitmap::getPixel)
+                        }
+                    }
                     M1ComponentLabelRenderer.render(previewSeed, previewTemplate, previewTextTemplate, previewPaper,
                         printDesigns[previewSeed?.sku ?: "__free__"], previewFreeLabel).also {
                         generated = it
+                        checkPrintArea(it)
                     }
                     previewSeeds.drop(1).forEach { seed ->
                         currentCoroutineContext().ensureActive()
-                        M1ComponentLabelRenderer.render(seed, previewTemplate, previewTextTemplate, previewPaper,
-                            printDesigns[seed.sku]).recycle()
+                        val bitmap = M1ComponentLabelRenderer.render(seed, previewTemplate, previewTextTemplate,
+                            previewPaper, printDesigns[seed.sku])
+                        try {
+                            checkPrintArea(bitmap)
+                        } finally {
+                            bitmap.recycle()
+                        }
                     }
-                    generated!!
+                    PrintPreview(request = previewRequest, bitmap = generated, fitsPrintArea = fitsPrintArea)
                 }
-                val result = PrintPreview(request = previewRequest, bitmap = bitmap)
                 generated = null
                 result
             } catch (error: Exception) {
@@ -416,11 +431,13 @@ internal fun BluetoothLabelPrintScreen(
     val blankQr = previewFreeLabel != null && activeDesign?.elements?.any {
         it.type == LabelElementType.Qr && it.text.isBlank()
     } == true
-    val previewError = preview.error.takeIf { preview.request == previewRequest }
+    val previewError = preview.takeIf { it.request == previewRequest }?.let {
+        it.error ?: if (it.fitsPrintArea) null else context.getString(R.string.label_supvan_print_area)
+    }
     val canCreate = editable && (if (draftFreeLabel != null) validFree
         else validSelection && printDesigns.size == draftSelections.size) &&
         !needsProtocol && compatiblePaper && invalidGeometryFields.isEmpty() && !blankQr &&
-        preview.request == previewRequest && preview.bitmap != null && preview.error == null
+        preview.request == previewRequest && preview.bitmap != null && previewError == null
     val selectedElement = activeDesign?.elements?.firstOrNull { it.id == selectedElementId }
     fun elementCaption(element: LabelElement, limit: Int): String = element.text.take(limit).ifBlank {
         context.getString(if (element.type == LabelElementType.Text) R.string.label_ui_empty_text
