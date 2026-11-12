@@ -196,6 +196,12 @@ internal fun BluetoothLabelPrintScreen(
         if (freeTemplate == FreeLabelTemplate.Qr) "qr" else if (freeMode) "text" else null
     ) }
     var invalidGeometryFields by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
+    val invalidFontSizeInputs = rememberSaveable(saver = mapSaver(
+        save = { it.toMap() },
+        restore = { saved -> mutableStateMapOf<String, String>().apply {
+            saved.forEach { (key, value) -> put(key, value as String) }
+        } },
+    )) { mutableStateMapOf<String, String>() }
     var draftDesignJson by rememberSaveable { mutableStateOf("{}") }
     var pendingTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingTextTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -438,9 +444,12 @@ internal fun BluetoothLabelPrintScreen(
     val previewError = preview.takeIf { it.request == previewRequest }?.let {
         it.error ?: if (it.fitsPrintArea) null else context.getString(R.string.label_supvan_print_area)
     }
+    val hasInvalidFontSize = !hasQueue && printDesigns.any { (sku, design) ->
+        design.elements.any { "$sku:${it.id}" in invalidFontSizeInputs }
+    }
     val canCreate = editable && (if (draftFreeLabel != null) validFree
         else validSelection && printDesigns.size == draftSelections.size) &&
-        !needsProtocol && compatiblePaper && invalidGeometryFields.isEmpty() && !blankQr &&
+        !needsProtocol && compatiblePaper && invalidGeometryFields.isEmpty() && !hasInvalidFontSize && !blankQr &&
         preview.request == previewRequest && preview.bitmap != null && previewError == null
     val selectedElement = activeDesign?.elements?.firstOrNull { it.id == selectedElementId }
     fun elementCaption(element: LabelElement, limit: Int): String = element.text.take(limit).ifBlank {
@@ -659,6 +668,7 @@ internal fun BluetoothLabelPrintScreen(
                             labelPrinterProtocolName(activeProfile), activeProfile.widthRange.start.toString(),
                             activeProfile.widthRange.endInclusive.toString(), activeProfile.heightRange.start.toString(),
                             activeProfile.heightRange.endInclusive.toString())
+                        hasInvalidFontSize -> stringResource(R.string.label_editor_font_size_invalid)
                         previewError != null -> previewError
                         blankQr -> stringResource(R.string.label_ui_enter_qr)
                         draftFreeLabel != null && !validFree || draftFreeLabel == null && !validSelection ->
@@ -799,6 +809,13 @@ internal fun BluetoothLabelPrintScreen(
                         LabelFontSelector(selectedElement.font, editable) { font ->
                             activeDesign?.let { updateDesign(it.withFont(selectedElement.id, font)) }
                         }
+                        val field = "${previewSeed?.sku ?: "__free__"}:${selectedElement.id}"
+                        LabelFontSizeField(field, selectedElement.fontSizePt, invalidFontSizeInputs[field], editable,
+                            onInvalid = { invalidFontSizeInputs[field] = it },
+                            onChange = { sizePt ->
+                                invalidFontSizeInputs.remove(field)
+                                activeDesign?.let { updateDesign(it.withFontSize(selectedElement.id, sizePt)) }
+                            })
                     } else if (previewFreeLabel != null) {
                         OutlinedTextField(selectedElement.text,
                             { activeDesign?.let { design -> updateDesign(design.withQrPayload(selectedElement.id, it)) } },
@@ -1049,6 +1066,7 @@ internal fun BluetoothLabelPrintScreen(
                                 }))
                                 val prefix = "__free__:${selectedElement.id}:"
                                 invalidGeometryFields = ArrayList(invalidGeometryFields.filterNot { it.startsWith(prefix) })
+                                invalidFontSizeInputs.remove("__free__:${selectedElement.id}")
                                 selectedElementId = null; sheetPanel = null
                             }, enabled = editable) { Text(stringResource(R.string.label_tool_remove_element)) }
                         }
@@ -1062,7 +1080,7 @@ internal fun BluetoothLabelPrintScreen(
                         if (previewFreeLabel != null) freeCopies.toIntOrNull() ?: 1
                         else draftSelections.firstOrNull { it.first.sku == previewSeed?.sku }?.second ?: 1,
                         previewFreeLabel?.title ?: previewSeed?.sku.orEmpty(),
-                        preview.request == previewRequest && preview.error == null && preview.bitmap != null,
+                        preview.request == previewRequest && preview.error == null && preview.bitmap != null && !hasInvalidFontSize,
                         { localMessage = it },
                     )
                 }
@@ -1104,6 +1122,7 @@ internal fun BluetoothLabelPrintScreen(
                 draftDesignJson = "{}"
                 selectedElementId = null
                 invalidGeometryFields = arrayListOf()
+                invalidFontSizeInputs.clear()
                 pendingPaper = null
             }) { Text(stringResource(R.string.label_editor_reset_confirm)) } },
             dismissButton = { TextButton(onClick = { pendingPaper = null }) {
@@ -1121,6 +1140,7 @@ internal fun BluetoothLabelPrintScreen(
             draftDesignJson = "{}"
             selectedElementId = null
             invalidGeometryFields = arrayListOf()
+            invalidFontSizeInputs.clear()
             pendingTemplateId = null
             pendingTextTemplateId = null
         }) { Text(stringResource(R.string.label_editor_reset_confirm)) } },
@@ -1364,6 +1384,38 @@ private val LabelFont.nameResource: Int
     }
 
 @Composable
+private fun LabelFontSizeField(
+    fieldId: String,
+    sizePt: Float?,
+    invalidInput: String?,
+    enabled: Boolean,
+    onInvalid: (String) -> Unit,
+    onChange: (Float?) -> Unit,
+) {
+    var input by rememberSaveable(fieldId) { mutableStateOf(invalidInput ?: sizePt?.toString().orEmpty()) }
+    OutlinedTextField(
+        value = input,
+        onValueChange = { value ->
+            input = value
+            val size = value.trim().replace(',', '.').toFloatOrNull()
+            when {
+                value.isBlank() -> onChange(null)
+                size != null && size.isFinite() && size > 0f -> onChange(size)
+                else -> onInvalid(value)
+            }
+        },
+        label = { Text(stringResource(R.string.label_editor_font_size)) },
+        supportingText = { Text(stringResource(if (invalidInput == null) R.string.label_editor_font_size_auto
+            else R.string.label_editor_font_size_invalid)) },
+        modifier = Modifier.fillMaxWidth().testTag("label_font_size"),
+        enabled = enabled,
+        isError = invalidInput != null,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+    )
+}
+
+@Composable
 private fun LabelElementNumberField(
     fieldId: String,
     label: String,
@@ -1412,6 +1464,7 @@ private fun readLabelDrafts(encoded: String): Map<String, LabelDesign> = runCatc
                     widthMm = item.getDouble("width").toFloat(),
                     heightMm = item.getDouble("height").toFloat(),
                     font = LabelFont.fromId(item.optString("font")),
+                    fontSizePt = item.optDouble("fontSizePt").toFloat().takeIf { it.isFinite() && it > 0f },
                 )
             }
             put(sku, LabelDesign(elements))
@@ -1432,6 +1485,7 @@ private fun writeLabelDrafts(drafts: Map<String, LabelDesign>): String = JSONObj
                     put("width", element.widthMm.toDouble())
                     put("height", element.heightMm.toDouble())
                     if (element.font != LabelFont.Default) put("font", element.font.id)
+                    element.fontSizePt?.let { put("fontSizePt", it.toDouble()) }
                 })
             }
         })

@@ -106,12 +106,16 @@ class LabelPrintQueueStoreTest {
     }
 
     @Test
-    fun textFontsRoundTripAndMissingOrUnknownFontsFallBackToDefault() {
+    fun textFontsAndSizesRoundTripAndOlderDesignsUseDefaults() {
         val paper = M1TestPaperProfile(40f, 60f)
         val original = LabelDesign.default(seed, ComponentLabelTemplate.Qr30x40,
             ComponentTextLabelTemplate.default, paper)
         val design = original.withFont("name", LabelFont.Bold).withFont("sku", LabelFont.Monospace)
+            .withFontSize("name", 12.5f).withFontSize("details", 9f)
         assertEquals(design, design.withFont("qr", LabelFont.Serif))
+        assertEquals(design, design.withFontSize("qr", 14f))
+        assertEquals(original, original.withFontSize("name", 12.5f).withFontSize("name", null))
+        assertFailsWith<IllegalArgumentException> { original.withFontSize("name", Float.POSITIVE_INFINITY) }
         val queue = LabelPrintQueue.create(listOf(seed to 1), paper = paper, designs = mapOf(seed.sku to design))
         val encoded = JSONObject(LabelPrintQueueCodec.encode(queue))
         assertEquals(queue, LabelPrintQueueCodec.decode(encoded.toString()))
@@ -119,9 +123,13 @@ class LabelPrintQueueStoreTest {
         val elements = encoded.getJSONArray("items").getJSONObject(0).getJSONObject("design").getJSONArray("elements")
         val byId = (0 until elements.length()).map(elements::getJSONObject).associateBy { it.getString("id") }
         assertEquals("bold", byId.getValue("name").getString("font"))
+        assertEquals(12.5, byId.getValue("name").getDouble("fontSizePt"))
+        assertTrue(!byId.getValue("sku").has("fontSizePt"))
         byId.getValue("name").remove("font")
+        byId.getValue("name").remove("fontSizePt")
         byId.getValue("sku").put("font", "future-font")
-        byId.getValue("qr").put("font", "serif")
+        byId.getValue("details").put("fontSizePt", -1)
+        byId.getValue("qr").put("font", "serif").put("fontSizePt", 14)
         assertEquals(original, LabelPrintQueueCodec.decode(encoded.toString()).items.single().design)
     }
 

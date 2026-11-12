@@ -21,6 +21,7 @@ internal object LabelTextRenderer {
         bounds: RectF,
         lines: List<String>,
         font: LabelFont = LabelFont.Default,
+        textSizeDots: Float? = null,
         ellipsize: Boolean = false,
         maxTextDots: Int = Int.MAX_VALUE,
     ) {
@@ -41,14 +42,41 @@ internal object LabelTextRenderer {
             }
         }
 
-        // Search whole-dot sizes using the selected face's actual glyph bounds.
+        val layout = if (textSizeDots != null) {
+            require(textSizeDots >= MinTextDots) { "当前字号太小，请增大字号。" }
+            require(textSizeDots <= maxOf(canvas.width, canvas.height)) { "字号超出纸张范围，请减小字号。" }
+            paint.textSize = textSizeDots
+            requireNotNull(measure(visible, paint, box, ellipsize)) {
+                "当前字号放不下，请减小字号或扩大文字框。"
+            }
+        } else {
+            requireNotNull(fitAutomatically(visible, paint, box, ellipsize, maxTextDots)) {
+                "文字内容无法完整放入当前纸张，请增大纸张或缩短文字。"
+            }
+        }
+
+        paint.textSize = layout.textSize
+        var baseline = box.top + (box.height() - layout.height) / 2 - layout.inkTop
+        for (line in layout.lines) {
+            canvas.drawText(line.text, (box.left + line.leftInset).toFloat(), baseline.toFloat(), paint)
+            baseline += layout.lineAdvance
+        }
+    }
+
+    private fun fitAutomatically(
+        lines: List<String>,
+        paint: TextPaint,
+        box: Rect,
+        ellipsize: Boolean,
+        maxTextDots: Int,
+    ): TextLayout? {
         var low = MinTextDots
-        var high = minOf(box.height() / visible.size, maxTextDots)
+        var high = minOf(box.height() / lines.size, maxTextDots)
         var best: TextLayout? = null
         while (low <= high) {
             val size = (low + high) / 2
             paint.textSize = size.toFloat()
-            val layout = measure(visible, paint, box, ellipsize)
+            val layout = measure(lines, paint, box, ellipsize)
             if (layout == null) {
                 high = size - 1
             } else {
@@ -56,14 +84,7 @@ internal object LabelTextRenderer {
                 low = size + 1
             }
         }
-        requireNotNull(best) { "文字内容无法完整放入当前纸张，请增大纸张或缩短文字。" }
-
-        paint.textSize = best.textSize
-        var baseline = box.top + (box.height() - best.height) / 2 - best.inkTop
-        for (line in best.lines) {
-            canvas.drawText(line.text, (box.left + line.leftInset).toFloat(), baseline.toFloat(), paint)
-            baseline += best.lineAdvance
-        }
+        return best
     }
 
     private fun measure(lines: List<String>, paint: TextPaint, box: Rect, ellipsize: Boolean): TextLayout? {

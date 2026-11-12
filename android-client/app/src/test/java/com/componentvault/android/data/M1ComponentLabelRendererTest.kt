@@ -158,11 +158,11 @@ class M1ComponentLabelRendererTest {
         assertFalse(rasters[LabelFont.Monospace.ordinal].contentEquals(rasters[LabelFont.Serif.ordinal]))
     }
 
-    @Test fun freeTextGrowsWithTheBoxHeightBeyondSixteenDots() {
+    @Test fun automaticTextGrowsWithTheBoxWhileManualSizeStaysFixed() {
         val paper = M1TestPaperProfile(40f, 30f)
-        fun inkHeight(heightMm: Float): Int {
+        fun inkHeight(heightMm: Float, fontSizePt: Float? = null): Int {
             val design = LabelDesign(listOf(LabelElement("text", LabelElementType.Text, "A01", 4f, 4f,
-                30f, heightMm, LabelFont.Bold)))
+                30f, heightMm, LabelFont.Bold, fontSizePt)))
             val bitmap = M1ComponentLabelRenderer.render(null, ComponentLabelTemplate.default,
                 ComponentTextLabelTemplate.default, paper, design, FreeLabel("A01", FreeLabelTemplate.Text))
             try {
@@ -176,6 +176,10 @@ class M1ComponentLabelRendererTest {
         val small = inkHeight(3f)
         val large = inkHeight(16f)
         assertTrue(large > maxOf(small, 16))
+        val fixed = inkHeight(3f, 7f)
+        assertEquals(fixed, inkHeight(16f, 7f))
+        assertTrue(inkHeight(16f, 14f) > fixed)
+        assertFailsWith<IllegalArgumentException> { inkHeight(3f, 28f) }
     }
 
     @Test fun freeQrUsesEditablePayloadWithoutAnInventorySeed() {

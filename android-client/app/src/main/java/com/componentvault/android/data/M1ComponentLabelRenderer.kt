@@ -176,7 +176,8 @@ internal object M1ComponentLabelRenderer {
                 }
                 try {
                     LabelTextRenderer.draw(canvas, textBox,
-                        element.text.split(Regex("\\r\\n|\\r|\\n| \\| ")), font = element.font)
+                        element.text.split(Regex("\\r\\n|\\r|\\n| \\| ")), font = element.font,
+                        textSizeDots = element.fontSizePt?.let { it * Dpi / 72f })
                 } finally {
                     canvas.restore()
                 }

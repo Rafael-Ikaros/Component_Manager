@@ -160,8 +160,9 @@ internal object LabelPrintQueueCodec {
             put(JSONObject().put("id", element.id).put("type", element.type.name)
                 .put("text", element.text).put("xMm", element.xMm).put("yMm", element.yMm)
                 .put("widthMm", element.widthMm).put("heightMm", element.heightMm).apply {
-                    if (element.type == LabelElementType.Text && element.font != LabelFont.Default) {
-                        put("font", element.font.id)
+                    if (element.type == LabelElementType.Text) {
+                        if (element.font != LabelFont.Default) put("font", element.font.id)
+                        element.fontSizePt?.let { put("fontSizePt", it.toDouble()) }
                     }
                 })
         }
@@ -183,6 +184,9 @@ internal object LabelPrintQueueCodec {
                 heightMm = element.getDouble("heightMm").toFloat(),
                 font = if (type == LabelElementType.Text) LabelFont.fromId(element.optString("font"))
                     else LabelFont.Default,
+                fontSizePt = if (type == LabelElementType.Text) {
+                    element.optDouble("fontSizePt").toFloat().takeIf { it.isFinite() && it > 0f }
+                } else null,
             )
         })
     }

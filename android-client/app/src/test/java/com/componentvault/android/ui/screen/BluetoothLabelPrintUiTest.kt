@@ -370,7 +370,7 @@ class BluetoothLabelPrintUiTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun textElementsKeepTheirOwnFontInThePrintQueue() {
+    fun textElementsKeepTheirOwnFontAndSizeInThePrintQueue() {
         val store = LabelPrintQueueStore(context)
         store.clear()
         val seed = ComponentLabelSeed("C1101", "R 100", "Passive", "0603", "A", 10, 1)
@@ -388,24 +388,47 @@ class BluetoothLabelPrintUiTest {
             val selector = compose.onNodeWithTag("label_font_selector")
             selector.performScrollTo().performClick()
             compose.onNodeWithTag("label_font_${LabelFont.Bold.id}").performClick()
+            val size = compose.onNodeWithTag("label_font_size").performScrollTo()
+            assertEquals("", size.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+            size.performTextReplacement("12.5")
             compose.onNodeWithTag("label_select_sku").performScrollTo().performClick()
             selector.performScrollTo().performClick()
             compose.onNodeWithTag("label_font_${LabelFont.Monospace.id}").performClick()
+            size.performScrollTo().performTextReplacement("0")
             compose.onNodeWithTag("label_select_name").performScrollTo().performClick()
             selector.assertTextContains(context.getString(R.string.label_editor_font_selection,
                 context.getString(R.string.label_font_bold)))
+            assertEquals("12.5", size.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+            val done = compose.onNodeWithTag("label_content_done")
+            val back = compose.onNodeWithContentDescription(context.getString(R.string.action_back))
+            val submit = compose.onNodeWithTag("label_print_submit")
+            done.performClick()
+            back.performClick()
+            submit.assertIsNotEnabled()
+            compose.onNodeWithText(context.getString(R.string.label_editor_font_size_invalid)).assertExists()
+
+            openEditor()
+            compose.onNodeWithText(context.getString(R.string.label_ui_content)).performClick()
+            compose.onNodeWithTag("label_select_sku").performScrollTo().performClick()
+            assertEquals("0", size.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+            size.performScrollTo().performTextReplacement("10.25")
             compose.onNodeWithTag("label_select_qr").performScrollTo().performClick()
             selector.assertDoesNotExist()
+            size.assertDoesNotExist()
 
-            compose.onNodeWithTag("label_content_done").performClick()
-            compose.onNodeWithContentDescription(context.getString(R.string.action_back)).performClick()
+            done.performClick()
+            back.performClick()
             waitForPrintableConfirmation()
-            compose.onNodeWithTag("label_print_submit").performClick()
+            submit.performClick()
             compose.waitUntil(10_000) { store.load().items.isNotEmpty() }
             val elements = requireNotNull(store.load().items.single().design).elements.associateBy { it.id }
             assertEquals(LabelFont.Bold, elements.getValue("name").font)
+            assertEquals(12.5f, elements.getValue("name").fontSizePt)
             assertEquals(LabelFont.Monospace, elements.getValue("sku").font)
+            assertEquals(10.25f, elements.getValue("sku").fontSizePt)
             assertEquals(LabelFont.Default, elements.getValue("qr").font)
+            assertEquals(null, elements.getValue("details").fontSizePt)
+            assertEquals(null, elements.getValue("qr").fontSizePt)
         } finally {
             store.clear()
         }

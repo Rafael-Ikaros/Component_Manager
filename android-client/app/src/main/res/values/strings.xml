@@ -607,6 +607,9 @@
     <string name="label_editor_element">Selected element</string>
     <string name="label_editor_text">Display text</string>
     <string name="label_editor_font_selection">Font · %1$s</string>
+    <string name="label_editor_font_size">Font size (pt)</string>
+    <string name="label_editor_font_size_auto">Leave blank to fit automatically.</string>
+    <string name="label_editor_font_size_invalid">Enter a positive font size in pt, or leave it blank for automatic sizing.</string>
     <string name="label_font_sans">Sans serif</string>
     <string name="label_font_bold">Bold sans serif</string>
     <string name="label_font_condensed">Condensed</string>

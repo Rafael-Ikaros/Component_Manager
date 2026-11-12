@@ -29,7 +29,12 @@ internal data class LabelElement(
     val widthMm: Float,
     val heightMm: Float,
     val font: LabelFont = LabelFont.Default,
-)
+    val fontSizePt: Float? = null,
+) {
+    init {
+        require(fontSizePt == null || (fontSizePt.isFinite() && fontSizePt > 0f))
+    }
+}
 
 internal data class LabelDesign(val elements: List<LabelElement>) {
     fun withText(id: String, text: String): LabelDesign = copy(elements = elements.map {
@@ -38,6 +43,10 @@ internal data class LabelDesign(val elements: List<LabelElement>) {
 
     fun withFont(id: String, font: LabelFont): LabelDesign = copy(elements = elements.map {
         if (it.id == id && it.type == LabelElementType.Text) it.copy(font = font) else it
+    })
+
+    fun withFontSize(id: String, fontSizePt: Float?): LabelDesign = copy(elements = elements.map {
+        if (it.id == id && it.type == LabelElementType.Text) it.copy(fontSizePt = fontSizePt) else it
     })
 
     fun withQrPayload(id: String, payload: String): LabelDesign = copy(elements = elements.map {

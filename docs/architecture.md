@@ -223,9 +223,11 @@ default user flow. Paper size, rotation and offsets are local raster options;
 the app does not write firmware paper-type or calibration settings.
 `M1ComponentLabelRenderer` creates a 203 dpi black-and-white raster shared by
 preview, export, and Bluetooth printing. `LabelTextRenderer` measures each text
-element using its selected font and fits it to the element on the printer's dot
-grid. The queue stores an optional font ID on each text element. Older elements
-use the default sans-serif font. QR codes retain their existing payload, integer
+element using its selected font on the printer's dot grid. Text fits automatically
+by default. An explicit point size stays fixed, and the confirmation page shows
+an error if it cannot fit. Drafts and queues store optional font IDs and point
+sizes. Older elements use automatic sizing and the default sans-serif font.
+QR codes retain their existing payload, integer
 module sizes, and quiet zones. Paper dimensions, rotation and offsets are local
 rendering options.
 Actual labels have no outer frame. Offsets translate the raster on the paper axes
