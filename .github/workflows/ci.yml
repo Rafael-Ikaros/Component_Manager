@@ -186,6 +186,7 @@ jobs:
           --tests 'com.componentvault.android.data.M1Spp*Test'
           --tests 'com.componentvault.android.data.HprtCpclSessionTest'
           --tests 'com.componentvault.android.data.CpclRasterJobTest'
+          --tests 'com.componentvault.android.data.SupvanT50PrintProtocolTest'
           --tests 'com.componentvault.android.data.M1ComponentLabelRendererTest'
           --tests 'com.componentvault.android.data.LabelPrint*Test'
           --tests 'com.componentvault.android.ui.screen.BluetoothLabelPrintUiTest'
@@ -274,6 +275,28 @@ jobs:
                       message = f"{case.get('classname')}.{case.get('name')}: {failure.get('message')}"
                       print('::error::' + message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A'))
           PY
+
+      - name: Build isolated T50 Pro test APK
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          gradle -p android-client -PsupvanTestPackage=true :app:assembleDebug --console=plain
+          apk=android-client/app/build/outputs/apk/debug/app-debug.apk
+          package=$("$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          if [[ "$package" != com.componentvault.android.supvantest ]]; then
+            echo "::error::Unexpected T50 Pro test APK package: $package"
+            exit 1
+          fi
+          cp "$apk" "$RUNNER_TEMP/ComponentVault-T50-Pro-test.apk"
+
+      - name: Upload isolated T50 Pro test APK
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-t50-pro-test-apk
+          path: ${{ runner.temp }}/ComponentVault-T50-Pro-test.apk
+          if-no-files-found: error
 
   windows-build:
     runs-on: windows-latest

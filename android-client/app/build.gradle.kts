@@ -12,6 +12,7 @@ val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
 val releaseVersionName = providers.gradleProperty("componentVersionName").orNull
 val releaseVersionCode = providers.gradleProperty("componentVersionCode").orNull?.toIntOrNull()
+val supvanTestPackage = providers.gradleProperty("supvanTestPackage").orNull == "true"
 val hprtCpclSdkDir = providers.gradleProperty("hprtCpclSdkDir").orNull?.let(::file)
 val hprtCpclJars = hprtCpclSdkDir?.let { sdkDir ->
     listOf("CPCL_SDK_V1.22.05.jar", "lzo_V1.0.jar").map { sdkDir.resolve(it) }.also { jars ->
@@ -32,6 +33,8 @@ android {
 
     defaultConfig {
         applicationId = "com.componentvault.android"
+        manifestPlaceholders["launcherLabel"] = "@string/app_name"
+        buildConfigField("boolean", "SUPVAN_T50_PRO", "false")
         minSdk = 28
         targetSdk = 35
         versionCode = 31
@@ -59,6 +62,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (supvanTestPackage) {
+                applicationIdSuffix = ".supvantest"
+                versionNameSuffix = "-supvan-test"
+                manifestPlaceholders["launcherLabel"] = "元件仓库 · T50 Pro 测试"
+                buildConfigField("boolean", "SUPVAN_T50_PRO", "true")
+            }
+        }
         release {
             isMinifyEnabled = false
             if (hasReleaseSigning) {
@@ -135,6 +146,7 @@ dependencies {
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     implementation("com.google.zxing:core:3.5.3")
     implementation("net.sourceforge.jexcelapi:jxl:2.6.12")
+    implementation("org.tukaani:xz:1.12")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
     implementation("androidx.compose.material3.adaptive:adaptive:1.2.0")

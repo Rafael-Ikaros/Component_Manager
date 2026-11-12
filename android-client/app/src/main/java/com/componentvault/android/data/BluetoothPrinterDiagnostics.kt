@@ -329,6 +329,91 @@ internal class BluetoothPrinterDiagnostics(context: Context) {
     fun printM1Label(candidate: PrinterDeviceCandidate, bitmap: Bitmap, paper: M1TestPaperProfile) =
         printM1Bitmap(candidate, bitmap, paper, M1FeedMode.Label, "m1_component_label")
 
+    fun printSupvanLabel(candidate: PrinterDeviceCandidate, bitmap: Bitmap) {
+        stopInternal(recordPrintInterruption = false)
+        printResult = M1TestPrintResult.None
+        canContinueBatch = false
+        val width = bitmap.width
+        val height = bitmap.height
+        report = "transport=supvan_t50_spp\nbitmap_width_dots=$width\nbitmap_height_dots=$height\n"
+        if (!candidate.paired || candidate.type !in setOf(
+                BluetoothDevice.DEVICE_TYPE_CLASSIC, BluetoothDevice.DEVICE_TYPE_DUAL,
+            )
+        ) {
+            finish(PrinterProbeStatus.Unsupported, "error=supvan_unsupported_device")
+            printResult = M1TestPrintResult.Rejected
+            return
+        }
+        try {
+            if (adapter?.isEnabled != true) {
+                finish(PrinterProbeStatus.BluetoothOff, "error=bluetooth_off")
+                printResult = M1TestPrintResult.Rejected
+                return
+            }
+            // The queue releases its bitmap as soon as the transport returns.
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            status = PrinterProbeStatus.Connecting
+            val session = SppSession(generation, candidate.address, isPrint = true, cpcl = false)
+            sppSession = session
+            Thread({ runSupvanPrint(candidate, width, height, pixels, session) }, "supvan-t50-print").start()
+        } catch (_: SecurityException) {
+            finish(PrinterProbeStatus.PermissionRequired, "error=permission_required")
+            printResult = M1TestPrintResult.Rejected
+        } catch (_: RuntimeException) {
+            finish(PrinterProbeStatus.ConnectionFailed, "error=supvan_prepare_failed")
+            printResult = M1TestPrintResult.Rejected
+        }
+    }
+
+    private fun runSupvanPrint(
+        candidate: PrinterDeviceCandidate,
+        width: Int,
+        height: Int,
+        pixels: IntArray,
+        session: SppSession,
+    ) {
+        try {
+            val blocks = SupvanT50PrintProtocol.encode(width, height, pixels)
+            val connection = acquireM1Connection(candidate, session) ?: return
+            scheduleSppDeadline(session, 120_000, "supvan_print")
+            SupvanT50PrintSession(connection.input, connection.output) { isCurrentSpp(session) }.print(
+                blocks,
+                beforeStart = {
+                    // Once START_PRINT is attempted, a lost reply leaves the physical outcome uncertain.
+                    session.bytesAttempted = 16
+                    postSpp(session) { status = PrinterProbeStatus.Printing }
+                },
+                progress = { line -> postSpp(session) { report += "$line\n" } },
+            )
+            postSpp(session) {
+                finish(PrinterProbeStatus.Complete, "print_confirmation=physical_review\nprint_result=sent_unconfirmed")
+                printResult = M1TestPrintResult.SentUnconfirmed
+            }
+        } catch (exception: Exception) {
+            postSpp(session) {
+                val detail = when (exception.message) {
+                    "cover_open" -> "status_bit=cover_open"
+                    "paper_out" -> "status_bit=paper_out"
+                    "supvan_print_area" -> "error=supvan_print_area"
+                    "supvan_reply_timeout", "supvan_status_timeout" -> "error=${exception.message}"
+                    else -> if (exception is SecurityException) "error=permission_required" else "error=supvan_transport_failed"
+                }
+                val result = when (exception) {
+                    is SecurityException -> PrinterProbeStatus.PermissionRequired
+                    is java.net.SocketTimeoutException -> PrinterProbeStatus.TimedOut
+                    else -> PrinterProbeStatus.ConnectionFailed
+                }
+                finish(result, detail)
+                printResult = failedPrintResult(session.bytesAttempted)
+            }
+        } finally {
+            cancelSppDeadline(session)
+            session.sockets.closeCurrent()
+            session.connection?.let(m1Connections::closeIfOwned)
+        }
+    }
+
     fun printCpclLabel(candidate: PrinterDeviceCandidate, bitmap: Bitmap, media: LabelMediaType) {
         prepareM1Operation(candidate.address, cpcl = true)
         printResult = M1TestPrintResult.None

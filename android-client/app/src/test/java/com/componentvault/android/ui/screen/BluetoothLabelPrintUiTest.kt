@@ -210,6 +210,45 @@ class BluetoothLabelPrintUiTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun supvanConfirmationBlocksEdgeInkUntilCalibrationFitsThePrintHead() {
+        val store = LabelPrintQueueStore(context)
+        store.clear()
+        val preferences = context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE)
+        val printer = SavedLabelPrinter("00:11:22:33:44:73", "T50 Pro",
+            LabelPrinterProfile.SupvanT50Pro.id, LabelMediaType.Gap.id)
+        LabelPrinterPreferences(preferences).apply {
+            save(listOf(printer), printer.address, printer.profileId, printer.mediaType)
+            saveOffset(printer.address, LabelPrintOffset(-3.5f, 0f))
+        }
+        val visible = mutableStateOf(true)
+        try {
+            val seed = ComponentLabelSeed("C393939", "TYPE-C", "Connector", "SMD", "A", 10, 1)
+            setLabelContent {
+                MaterialTheme {
+                    if (visible.value) BluetoothLabelPrintScreen(emptyList(), seed,
+                        initialPaper = M1TestPaperProfile(50f, 30f), onDismiss = {})
+                }
+            }
+            val error = context.getString(R.string.label_supvan_print_area)
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(error).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("label_print_submit").assertIsNotEnabled()
+            assertTrue(store.load().items.isEmpty())
+
+            compose.onNodeWithTag("label_print_calibration").performScrollTo().performClick()
+            compose.onNodeWithTag("label_calibration_x").performScrollTo().performTextReplacement("0")
+            compose.onNodeWithTag("label_calibration_apply").performScrollTo().performClick()
+            waitForPrintableConfirmation()
+            compose.onNodeWithText(error).assertDoesNotExist()
+        } finally {
+            compose.runOnIdle { visible.value = false }
+            compose.waitForIdle()
+            store.clear()
+            preferences.edit().clear().commit()
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun previouslySavedCpclPrinterShowsOneGenericProtocolAndCanBeForgotten() {
         LabelPrintQueueStore(context).clear()
         val preferences = LabelPrinterPreferences(context.getSharedPreferences("m1_label_print", Context.MODE_PRIVATE))
