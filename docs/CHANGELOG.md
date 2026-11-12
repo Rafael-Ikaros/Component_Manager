@@ -17,6 +17,22 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.22] - 2026-11-12
+
+### Android 标签打印
+
+- 新增硕方 SUPVAN T50 Pro 的专用蓝牙打印驱动，复用标签预览和打印队列。每张发送后需核对实物，再继续打印。入口仅在独立测试包开放，包名为 `com.componentvault.android.supvantest`。[PR #33](https://github.com/Rafael-Ikaros/Component_Manager/pull/33)
+- T50 Pro 打印确认页按当前纸张、旋转和偏移检查实际印区。内容超界时提示调整位置，并阻止创建队列。
+- 压缩依赖 XZ for Java 升至 `1.12`。GitHub CI 运行新协议测试，并为 PR 构建和上传独立测试 APK。
+
+### T50 Pro 实测
+
+反馈者使用独立测试包 `cce406f` 验证了以下三项。
+
+- 连续打印两张标签，均正常出纸。
+- 断开蓝牙并重连后，打印正常。
+- 打印带密集二维码的长标签，出纸正常。
+
 ## [0.7.9-dev.21] - 2026-11-12
 
 ### Android 标签打印
