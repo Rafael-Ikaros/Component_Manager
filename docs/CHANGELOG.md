@@ -17,6 +17,14 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+## [0.7.9-dev.24] - 2026-11-12
+
+### 打印机兼容性
+
+- 补充汉印 M1 的字号实测记录。小米 9 使用 dev.23 和 M1 原驱动，在 40 × 60 mm 间隙纸上以无衬线打印同一标签，6、8、10 pt 各出一张。
+- 对照导出点阵和实物照片，三张均未发现缺笔画或裁切，二维码均能解码。6 pt 的细笔画更容易挤在一起，8 pt 在这组样张中更容易辨认。[M1 小字实测记录](https://github.com/Rafael-Ikaros/Component_Manager/blob/887b2a6f2657a7b60eca303e479823864799b149/docs/printer-compatibility.md#L47)
+- 本版更新实测文档，打印逻辑沿用 dev.23。
+
 ## [0.7.9-dev.23] - 2026-11-12
 
 ### Android 标签打印
