@@ -12,6 +12,8 @@ val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
 val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
 val releaseVersionName = providers.gradleProperty("componentVersionName").orNull
 val releaseVersionCode = providers.gradleProperty("componentVersionCode").orNull?.toIntOrNull()
+val devRelease = releaseVersionCode != null &&
+    releaseVersionName?.matches(Regex("""[0-9]+\.[0-9]+\.[0-9]+-dev\.[1-9][0-9]*""")) == true
 val supvanTestPackage = providers.gradleProperty("supvanTestPackage").orNull == "true"
 val hprtCpclSdkDir = providers.gradleProperty("hprtCpclSdkDir").orNull?.let(::file)
 val hprtCpclJars = hprtCpclSdkDir?.let { sdkDir ->
@@ -71,6 +73,7 @@ android {
             }
         }
         release {
+            buildConfigField("boolean", "SUPVAN_T50_PRO", devRelease.toString())
             isMinifyEnabled = false
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
