@@ -16,6 +16,7 @@
 bump: patch
 
 <!-- Add unreleased notes below this line. -->
+- Android 导入菜单新增「批量 C 编码 / XLSX 导入」：支持逐行粘贴 C 编码与数量，或读取 XLSX 前三列（C 编码、数量、库位编码），复用现有资料解析、待补充、确认与批量入库逻辑。
 
 ## [0.7.9-dev.18] - 2026-11-12
 

@@ -37,6 +37,7 @@ class ImportFlowUiTest {
                     onImportComponent = { selected = "single" },
                     onImportBom = { selected = "bom" },
                     onBatchJlc = { selected = "batch" },
+                    onBatchCodes = { selected = "codes" },
                 )
             }
         }
@@ -48,6 +49,7 @@ class ImportFlowUiTest {
         val workflows = listOf(
             R.string.import_menu_single,
             R.string.import_menu_batch,
+            R.string.batch_codes_title,
             R.string.import_menu_bom,
         )
         workflows.forEach { labelRes ->
@@ -56,7 +58,9 @@ class ImportFlowUiTest {
         }
         compose.onNodeWithText(context.getString(R.string.import_menu_migration)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.import_menu_manual)).assertDoesNotExist()
-        compose.onNodeWithText(context.getString(R.string.import_menu_single)).performClick()
+        compose.onNodeWithText(context.getString(R.string.batch_codes_title)).performScrollTo().performClick()
+        assertEquals("codes", selected)
+        compose.onNodeWithText(context.getString(R.string.import_menu_single)).performScrollTo().performClick()
         assertEquals("single", selected)
     }
 
