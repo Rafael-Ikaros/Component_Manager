@@ -1,0 +1,11 @@
+<resources>
+    <string name="batch_codes_title">Batch C codes / XLSX import</string>
+    <string name="batch_codes_menu_hint">Paste C codes and quantities, or read C codes, quantities and location IDs from XLSX.</string>
+    <string name="batch_codes_hint">Enter one C code and quantity per line, separated by spaces, commas or tabs. Text uses the location below. Quantities for the same code and location are combined. Review before confirming inbound.</string>
+    <string name="batch_codes_input">C code and quantity (one pair per line)</string>
+    <string name="batch_codes_xlsx">Import from XLSX</string>
+    <string name="batch_codes_xlsx_hint">Reads the first visible worksheet: column 1 C code, column 2 quantity, column 3 existing location ID. Blank locations use the selected location. Headers and blank rows are supported; up to 500 rows and 10 MiB. Quantities must be positive integers. Identical imports in the current batch are skipped.</string>
+    <string name="batch_codes_parse">Add and parse</string>
+    <string name="batch_codes_result">Added %1$d items; skipped %2$d duplicates in this batch.</string>
+    <string name="batch_codes_failed">Could not read the import. Check the file and its format.</string>
+</resources>

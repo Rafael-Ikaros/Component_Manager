@@ -1,0 +1,11 @@
+<resources>
+    <string name="batch_codes_title">批量 C 编码 / XLSX 导入</string>
+    <string name="batch_codes_menu_hint">粘贴 C 编码和数量，或从 XLSX 读取 C 编码、数量、库位编码。</string>
+    <string name="batch_codes_hint">每行填写 C 编码和数量，用空格、逗号或制表符分隔。文本统一入库到下方库位。相同编码与库位会合计数量；解析后仍需确认入库。</string>
+    <string name="batch_codes_input">C 编码与数量（每行一组）</string>
+    <string name="batch_codes_xlsx">从 XLSX 导入</string>
+    <string name="batch_codes_xlsx_hint">读取第一个可见工作表：第 1 列 C 编码，第 2 列数量，第 3 列现有库位编码。第三列为空时使用选定库位；支持表头和空行，最多 500 行、10 MiB。数量必须为正整数。相同内容在当前批次重复导入会跳过。</string>
+    <string name="batch_codes_parse">加入并解析</string>
+    <string name="batch_codes_result">新增 %1$d 项，跳过当前批次中重复的 %2$d 项。</string>
+    <string name="batch_codes_failed">无法读取导入内容，请检查文件和格式。</string>
+</resources>
