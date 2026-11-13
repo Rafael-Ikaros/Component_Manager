@@ -190,6 +190,7 @@
     <string name="sync_component_created_local">Component was created locally.</string>
     <string name="sync_component_saved_local">Component was saved locally.</string>
     <string name="sync_component_save_failed">Unable to save the component.</string>
+    <string name="sync_component_edit_stale">This component changed or was removed. Reopen it and review the current data before saving.</string>
     <string name="sync_select_component_first">Select a component first.</string>
     <string name="sync_component_not_found">The selected component could not be found.</string>
     <string name="sync_component_deleted_local">Component was marked as deleted on this device.</string>
@@ -256,6 +257,8 @@
     <string name="sync_invalid_movement_quantity">Enter a valid movement quantity.</string>
     <string name="sync_movement_batch_empty">Scan at least one component before saving the batch.</string>
     <string name="sync_duplicate_active_sku">An active component with the same SKU already exists.</string>
+    <string name="sync_pull_sku_conflict">SKU %1$s belongs to different components on this device and on the server. Local inventory and sync progress were kept. Review the duplicate before syncing again.</string>
+    <string name="sync_missing_queued_record">A pending sync record references missing data (%1$s). Pending changes were kept.</string>
     <string name="sync_unsupported_movement_type">Unsupported movement type.</string>
     <string name="settings_local_learning_cleared">Local import learning was cleared on this device.</string>
 

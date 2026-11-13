@@ -16,7 +16,7 @@ internal class InventoryWorkbookService(
             try {
                 val snapshot = readWorkbookSnapshot(db)
                 val images = snapshot.components.mapNotNull { component ->
-                    inventoryImageStore.resolve(component.description)?.let { component.id to it }
+                    component.description?.let(inventoryImageStore::resolve)?.let { component.id to it }
                 }.toMap()
                 val bytes = InventoryWorkbookWriter.write(snapshot.copy(images = images))
                 InventoryWorkbookCodec.parse(bytes)
@@ -175,7 +175,12 @@ internal class InventoryWorkbookService(
         val marker = WorkbookImageCodec.marker(image)
         if (!inventoryImageStore.exists(marker)) createdImages += marker
         inventoryImageStore.persist(image)
-        val description = component.description.lineSequence()
+        if (workbook.source == WorkbookSource.ComponentVault &&
+            component.description?.lineSequence()?.any { it == marker } == true
+        ) {
+            return component
+        }
+        val description = component.description.orEmpty().lineSequence()
             .filterNot { it.startsWith("本地图片：") }
             .joinToString("\n")
             .trim()
@@ -237,7 +242,7 @@ internal class InventoryWorkbookService(
 
     private fun readWorkbookSnapshot(db: SQLiteDatabase): InventoryWorkbook {
         val components = db.rawQuery(
-            "SELECT id,sku,name,category,package_name,location,COALESCE(description,''),quantity,min_stock,updated_at,deleted,base_updated_at,inventory_unit_cost FROM components ORDER BY id",
+            "SELECT id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,inventory_unit_cost FROM components ORDER BY id",
             null,
         ).use { cursor ->
             buildList {
@@ -267,7 +272,7 @@ internal class InventoryWorkbookService(
             }
         }
         val movements = db.rawQuery(
-            "SELECT id,component_id,movement_type,quantity,reason,COALESCE(note,''),happened_at,updated_at,deleted,location_id,destination_location_id,purchase_amount,cost_amount FROM stock_movements ORDER BY id",
+            "SELECT id,component_id,movement_type,quantity,reason,note,happened_at,updated_at,deleted,location_id,destination_location_id,purchase_amount,cost_amount FROM stock_movements ORDER BY id",
             null,
         ).use { cursor ->
             buildList {

@@ -41,7 +41,7 @@ class BatchJlcDatabaseTest {
         assertEquals("0.3333333333333333",paid.inventoryUnitCost)
         assertEquals("1",repository.loadMovements().first { it.componentId==paid.id }.purchaseAmount)
         val oneThird = java.math.BigDecimal("1").divide(java.math.BigDecimal(3),16,java.math.RoundingMode.HALF_EVEN).toPlainString()
-        assertTrue(repository.saveComponent(ComponentDraft(id=paid.id,sku=paid.sku,name=paid.name,category=paid.category,packageName=paid.packageName,location=paid.location,description=paid.description,quantity=3,minStock=0,valuationUnitCost=oneThird,valuationAmount="1")).isSuccess)
+        assertTrue(repository.saveComponent(ComponentDraft(id=paid.id,sku=paid.sku,name=paid.name,category=paid.category,packageName=paid.packageName,location=paid.location,description=paid.description,quantity=3,minStock=0,valuationUnitCost=oneThird,valuationAmount="1",expectedUpdatedAt=paid.updatedAt)).isSuccess)
         assertEquals(oneThird,repository.loadComponents().first { it.id==paid.id }.inventoryUnitCost)
         assertEquals("0.0000000000000001",repository.loadMovements().first { it.componentId==paid.id && it.movementType=="adjustment" }.costAmount)
         assertTrue(!repository.saveComponent(ComponentDraft(sku="EMPTYPAID",name="Invalid",category="IC",packageName="SMD",location="A",description="",quantity=0,minStock=0,purchaseAmount="1")).isSuccess)
@@ -65,7 +65,7 @@ class BatchJlcDatabaseTest {
 
     @Test fun costFlowsAndUnknownInbound() = runBlocking {
         val original = repository.loadComponents().single()
-        assertTrue(repository.saveComponent(ComponentDraft(id = original.id, sku = original.sku, name = original.name, category = original.category, packageName = original.packageName, location = original.location, description = original.description, quantity = 10, minStock = 1, valuationUnitCost = "1")).isSuccess)
+        assertTrue(repository.saveComponent(ComponentDraft(id = original.id, sku = original.sku, name = original.name, category = original.category, packageName = original.packageName, location = original.location, description = original.description, quantity = 10, minStock = 1, valuationUnitCost = "1", expectedUpdatedAt = original.updatedAt)).isSuccess)
         val paid = listOf(row("paid", "C70565", "10", "A").copy(purchaseAmount = "20"))
         assertTrue(repository.commitBatchJlc("cost", paid).isSuccess)
         assertEquals("1.5", repository.loadComponents().single().inventoryUnitCost)

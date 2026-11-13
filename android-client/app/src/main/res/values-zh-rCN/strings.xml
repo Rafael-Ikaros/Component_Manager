@@ -174,6 +174,7 @@
     <string name="sync_component_created_local">元器件已在本地创建。</string>
     <string name="sync_component_saved_local">元器件已保存到本地。</string>
     <string name="sync_component_save_failed">无法保存元器件。</string>
+    <string name="sync_component_edit_stale">元器件已变更或删除，请重新打开并核对当前资料后再保存。</string>
     <string name="sync_select_component_first">请先选择一个元器件。</string>
     <string name="sync_component_not_found">未找到所选元器件。</string>
     <string name="sync_component_deleted_local">元件已在当前设备上标记为删除。</string>
@@ -240,6 +241,8 @@
     <string name="sync_invalid_movement_quantity">请输入有效的变动数量。</string>
     <string name="sync_movement_batch_empty">请至少扫描一个元件后再提交批量变动。</string>
     <string name="sync_duplicate_active_sku">已存在相同 SKU 的有效元器件。</string>
+    <string name="sync_pull_sku_conflict">本机和服务端的 SKU %1$s 对应不同元器件。本地库存和同步进度已保留，请核对重复料号后再同步。</string>
+    <string name="sync_missing_queued_record">待同步记录引用的数据已缺失（%1$s）。待同步改动已保留。</string>
     <string name="sync_unsupported_movement_type">不支持的库存变动类型。</string>
     <string name="settings_local_learning_cleared">当前设备上的本地导入学习已清空。</string>
     <string name="settings_connection_title">服务器连接</string>

@@ -86,6 +86,7 @@ fun ComponentVaultApp(
     var selectedSettingsSectionName by rememberSaveable { mutableStateOf<String?>(null) }
     var componentEditorVisible by rememberSaveable { mutableStateOf(false) }
     var componentEditorTargetId by rememberSaveable { mutableStateOf<String?>(null) }
+    var componentEditorExpectedUpdatedAt by rememberSaveable { mutableStateOf<String?>(null) }
     var movementEditorVisible by rememberSaveable { mutableStateOf(false) }
     var movementBatchReviewVisible by rememberSaveable { mutableStateOf(false) }
     var movementScanModeVisible by rememberSaveable { mutableStateOf(false) }
@@ -168,6 +169,7 @@ fun ComponentVaultApp(
     fun closeComponentEditor() {
         componentEditorVisible = false
         componentEditorTargetId = null
+        componentEditorExpectedUpdatedAt = null
         componentEditorInitialDraft = null
         componentEditorImportCandidate = null
     }
@@ -207,6 +209,8 @@ fun ComponentVaultApp(
         importCandidate: ComponentImportCandidate? = null,
     ) {
         componentEditorTargetId = componentId
+        componentEditorExpectedUpdatedAt =
+            uiState.availableComponents.firstOrNull { it.id == componentId }?.updatedAt
         componentEditorInitialDraft = initialDraft
         componentEditorImportCandidate = importCandidate
         componentEditorVisible = true
@@ -246,7 +250,7 @@ fun ComponentVaultApp(
     ) {
         componentSaveCoordinator.submitEditorDraft(
             draft = draft,
-            importedDraft = editingComponent == null && componentEditorInitialDraft != null,
+            importedDraft = componentEditorTargetId == null && componentEditorInitialDraft != null,
             importCandidate = componentEditorImportCandidate,
             onComplete = onComplete,
             onSaved = { result ->
@@ -707,6 +711,8 @@ fun ComponentVaultApp(
             visible = componentEditorVisible,
             scannerVisible = uiState.movements.scan.isScannerVisible,
             existing = editingComponent,
+            editingId = componentEditorTargetId,
+            expectedUpdatedAt = componentEditorExpectedUpdatedAt,
             initialDraft = componentEditorInitialDraft,
             availableCategories = uiState.inventory.availableCategories,
             storageLocations = uiState.inventory.storageLocations,
@@ -837,10 +843,14 @@ internal fun ComponentEditorRoute(
     onDismiss: () -> Unit,
     onSave: (ComponentDraft, (OperationResult) -> Unit) -> Unit,
     onSaveAndGenerateLabel: (ComponentDraft, (OperationResult) -> Unit) -> Unit,
+    editingId: String? = existing?.id,
+    expectedUpdatedAt: String? = existing?.updatedAt,
 ) {
     if (visible && !scannerVisible) {
         ComponentEditorSurface(
             existing = existing,
+            editingId = editingId,
+            expectedUpdatedAt = expectedUpdatedAt,
             initialDraft = initialDraft,
             availableCategories = availableCategories,
             storageLocations = storageLocations,

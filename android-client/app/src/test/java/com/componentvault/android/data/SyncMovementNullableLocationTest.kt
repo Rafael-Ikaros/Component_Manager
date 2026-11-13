@@ -26,7 +26,8 @@ class SyncMovementNullableLocationTest {
                 context.getSharedPreferences("nullable_location_test", Context.MODE_PRIVATE), Any())
             db.execSQL("INSERT INTO storage_locations(id, name, updated_at, deleted) VALUES ('shelf', 'Shelf', '2026-10-28T00:00:00Z', 0)")
             applyPull(service, db, listOf(movement("json-null", JSONObject.NULL, JSONObject.NULL),
-                movement("legacy-null", "null", "null"), movement("real", "shelf", "shelf")))
+                movement("legacy-null", "null", "null").put("note", "null"),
+                movement("real", "shelf", "shelf").put("note", "")))
             assertLocations(db, "json-null", null)
             assertLocations(db, "legacy-null", null)
             assertLocations(db, "real", "shelf")
@@ -39,6 +40,9 @@ class SyncMovementNullableLocationTest {
             val outgoing = outgoingMethod.invoke(service, db, "json-null") as JSONObject
             assertTrue(outgoing.isNull("location_id"))
             assertTrue(outgoing.isNull("destination_location_id"))
+            assertTrue(outgoing.has("note") && outgoing.isNull("note"))
+            assertEquals("null", (outgoingMethod.invoke(service, db, "legacy-null") as JSONObject).getString("note"))
+            assertEquals("", (outgoingMethod.invoke(service, db, "real") as JSONObject).getString("note"))
             applyPull(service, db, emptyList())
             assertLocations(db, "json-null", null)
             db.rawQuery("SELECT COUNT(*), SUM(quantity), MIN(updated_at) FROM stock_movements", null).use {
@@ -60,7 +64,7 @@ class SyncMovementNullableLocationTest {
 
     private fun movement(id: String, source: Any, destination: Any) = JSONObject()
         .put("id", id).put("component_id", "component").put("movement_type", "in")
-        .put("quantity", 7).put("reason", "test").put("note", "preserve")
+        .put("quantity", 7).put("reason", "test").put("note", JSONObject.NULL)
         .put("happened_at", "2026-10-28T00:00:00Z").put("updated_at", "2026-10-28T00:00:00Z")
         .put("deleted", false).put("location_id", source).put("destination_location_id", destination)
 
@@ -70,7 +74,7 @@ class SyncMovementNullableLocationTest {
         method.isAccessible = true
         db.beginTransaction()
         try {
-            method.invoke(service, db, JSONObject().put("inventory_protocol", 1)
+            method.invoke(service, db, JSONObject().put("inventory_protocol", 1).put("cost_protocol", 1)
                 .put("stock_movements", JSONArray(movements)), emptyList<Any>())
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }

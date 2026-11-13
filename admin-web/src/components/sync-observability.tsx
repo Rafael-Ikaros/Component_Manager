@@ -91,7 +91,7 @@ function AuditLog() {
 function Conflicts() {
   const { t } = useI18n();
   const resource = useAdminResource<{ items: Conflict[] }>("/admin-api/sync/conflicts?limit=100");
-  return <div className="space-y-3"><p className="text-sm text-muted-foreground">{t("显示最近 100 次被拒绝的冲突写入。处理记录用于追溯，不会重放旧数据；需要修改时，请刷新客户端后重新编辑并同步。")}</p><ResourceState {...resource} />{resource.data?.items.map((conflict) => <ConflictItem key={conflict.id} conflict={conflict} reload={resource.reload} />)}</div>;
+  return <div className="space-y-3"><p className="text-sm text-muted-foreground">{t("显示最近 100 次被拒绝的冲突写入。这里保存处理备注，客户端仍保留待同步的改动。")}</p><ResourceState {...resource} />{resource.data?.items.map((conflict) => <ConflictItem key={conflict.id} conflict={conflict} reload={resource.reload} />)}</div>;
 }
 
 function ConflictItem({ conflict, reload }: { conflict: Conflict; reload: () => Promise<void> }) {
@@ -111,7 +111,7 @@ function ConflictItem({ conflict, reload }: { conflict: Conflict; reload: () => 
     <div className="grid gap-3 md:grid-cols-2">{([["服务端版本", conflict.server_value], ["传入版本", conflict.incoming_value]] as const).map(([label, value]) => <div key={String(label)}><h4 className="mb-2 text-sm font-medium">{t(label)}</h4><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-3 text-xs">{JSON.stringify(value, null, 2)}</pre></div>)}</div>
     {conflict.resolutions.map((resolution) => <p key={resolution.id} className="text-sm">{formatDateTime(resolution.created_at, locale)} · {t(resolution.resolution === "server_kept" ? "确认保留服务端" : "已在客户端重新提交")} {resolution.note}</p>)}
     <label className="block text-sm">{t("处理备注")}<Input value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} /></label>
-    <div className="flex flex-wrap gap-2"><Button className="min-h-11 whitespace-normal" disabled={busy} onClick={() => void resolve("server_kept")}>{t("确认保留服务端")}</Button><Button className="min-h-11 whitespace-normal" variant="outline" disabled={busy} onClick={() => void resolve("client_resubmitted")}>{t("记录：已在客户端重新提交")}</Button></div>
+    <div className="flex flex-wrap gap-2"><Button className="min-h-11 whitespace-normal" disabled={busy} onClick={() => void resolve("server_kept")}>{t("记录保留服务端版本")}</Button><Button className="min-h-11 whitespace-normal" variant="outline" disabled={busy} onClick={() => void resolve("client_resubmitted")}>{t("记录：已在客户端重新提交")}</Button></div>
     {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
   </div></details>;
 }

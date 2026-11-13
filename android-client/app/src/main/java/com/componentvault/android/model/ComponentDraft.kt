@@ -13,4 +13,5 @@ data class ComponentDraft(
     val valuationUnitCost: String? = null,
     val valuationAmount: String? = null,
     val purchaseAmount: String? = null,
+    val expectedUpdatedAt: String? = null,
 )

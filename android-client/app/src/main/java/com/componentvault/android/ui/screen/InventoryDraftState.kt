@@ -22,6 +22,7 @@ private fun encodeComponentDraft(draft: ComponentDraft) = JSONObject().apply {
     put("valuationAmount", draft.valuationAmount ?: JSONObject.NULL)
     put("purchaseAmount", draft.purchaseAmount ?: JSONObject.NULL)
     put("id", draft.id)
+    put("expectedUpdatedAt", draft.expectedUpdatedAt)
     put("sku", draft.sku)
     put("name", draft.name)
     put("category", draft.category)
@@ -37,6 +38,7 @@ private fun decodeComponentDraft(json: JSONObject) = ComponentDraft(
     valuationAmount = if (json.isNull("valuationAmount")) null else json.getString("valuationAmount"),
     valuationUnitCost = if (json.isNull("valuationUnitCost")) null else json.getString("valuationUnitCost"),
     id = json.optString("id").takeIf(String::isNotEmpty),
+    expectedUpdatedAt = if (json.isNull("expectedUpdatedAt")) null else json.getString("expectedUpdatedAt"),
     sku = json.getString("sku"),
     name = json.getString("name"),
     category = json.getString("category"),

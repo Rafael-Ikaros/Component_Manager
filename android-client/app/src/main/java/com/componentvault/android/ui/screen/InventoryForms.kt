@@ -67,9 +67,12 @@ internal fun ComponentEditorSurface(
     onDismiss: () -> Unit,
     onSave: (ComponentDraft, (OperationResult) -> Unit) -> Unit,
     onSaveAndGenerateLabel: ((ComponentDraft, (OperationResult) -> Unit) -> Unit)? = null,
+    editingId: String? = existing?.id,
+    expectedUpdatedAt: String? = existing?.updatedAt,
 ) {
     val strings = vaultStrings()
-    val stateKey = existing?.id ?: initialDraft?.sku.orEmpty()
+    val isEditing = editingId != null
+    val stateKey = editingId ?: initialDraft?.sku.orEmpty()
     var sku by rememberSaveable(stateKey) { mutableStateOf(existing?.sku ?: initialDraft?.sku.orEmpty()) }
     var name by rememberSaveable(stateKey) { mutableStateOf(existing?.name ?: initialDraft?.name.orEmpty()) }
     var category by rememberSaveable(stateKey) { mutableStateOf(existing?.category ?: initialDraft?.category.orEmpty()) }
@@ -100,7 +103,7 @@ internal fun ComponentEditorSurface(
     var valuationText by rememberSaveable(stateKey) { mutableStateOf((initialDraft?.purchaseAmount ?: initialDraft?.valuationUnitCost).orEmpty()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val title = if (existing == null) {
+    val title = if (!isEditing) {
         strings.forms.addComponentTitle
     } else {
         strings.forms.editComponentTitle
@@ -119,7 +122,8 @@ internal fun ComponentEditorSurface(
             sku = LocalComponentSku.ensure(sku)
             validateComponentDraft(
                 strings = strings,
-                existingId = existing?.id,
+                existingId = editingId,
+                expectedUpdatedAt = expectedUpdatedAt,
                 sku = sku,
                 name = name,
                 category = category,
@@ -132,7 +136,7 @@ internal fun ComponentEditorSurface(
             )?.let { draft ->
                 errorMessage = null
                 val cost = runCatching { valuationUnit(valuationText) }.getOrElse { errorMessage = it.message; return@let }
-                onSave(draft.copy(valuationUnitCost = cost.takeIf { existing != null }, valuationAmount = if (existing != null) purchaseTotal(valuationText,!valuationIsTotal,draft.quantity) else null, purchaseAmount = if (existing == null) com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(valuationText)?.let { if (valuationIsTotal) it else it.multiply(java.math.BigDecimal(draft.quantity)) }) else null)) { result ->
+                onSave(draft.copy(valuationUnitCost = cost.takeIf { isEditing }, valuationAmount = if (isEditing) purchaseTotal(valuationText,!valuationIsTotal,draft.quantity) else null, purchaseAmount = if (!isEditing) com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(valuationText)?.let { if (valuationIsTotal) it else it.multiply(java.math.BigDecimal(draft.quantity)) }) else null)) { result ->
                     if (result.isSuccess) photoSession.finish(description, committed = true)
                     if (!result.isSuccess) {
                         errorMessage = result.message
@@ -144,7 +148,8 @@ internal fun ComponentEditorSurface(
             sku = LocalComponentSku.ensure(sku)
             validateComponentDraft(
                 strings = strings,
-                existingId = existing?.id,
+                existingId = editingId,
+                expectedUpdatedAt = expectedUpdatedAt,
                 sku = sku,
                 name = name,
                 category = category,
@@ -157,7 +162,7 @@ internal fun ComponentEditorSurface(
             )?.let { draft ->
                 errorMessage = null
                 val cost = runCatching { valuationUnit(valuationText) }.getOrElse { errorMessage = it.message; return@let }
-                onSaveAndGenerateLabel?.invoke(draft.copy(valuationUnitCost = cost.takeIf { existing != null }, valuationAmount = if (existing != null) purchaseTotal(valuationText,!valuationIsTotal,draft.quantity) else null, purchaseAmount = if (existing == null) com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(valuationText)?.let { if (valuationIsTotal) it else it.multiply(java.math.BigDecimal(draft.quantity)) }) else null)) { result ->
+                onSaveAndGenerateLabel?.invoke(draft.copy(valuationUnitCost = cost.takeIf { isEditing }, valuationAmount = if (isEditing) purchaseTotal(valuationText,!valuationIsTotal,draft.quantity) else null, purchaseAmount = if (!isEditing) com.componentvault.android.data.InventoryCost.text(com.componentvault.android.data.InventoryCost.decimal(valuationText)?.let { if (valuationIsTotal) it else it.multiply(java.math.BigDecimal(draft.quantity)) }) else null)) { result ->
                     if (result.isSuccess) photoSession.finish(description, committed = true)
                     if (!result.isSuccess) {
                         errorMessage = result.message
@@ -168,10 +173,10 @@ internal fun ComponentEditorSurface(
     ) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !valuationIsTotal, onClick = { valuationIsTotal = false }, label = { Text(if (existing == null) "购买单价" else "补录单价") })
-                FilterChip(selected = valuationIsTotal, onClick = { valuationIsTotal = true }, label = { Text(if (existing == null) "购买总金额" else "补录当前总额") })
+                FilterChip(selected = !valuationIsTotal, onClick = { valuationIsTotal = false }, label = { Text(if (!isEditing) "购买单价" else "补录单价") })
+                FilterChip(selected = valuationIsTotal, onClick = { valuationIsTotal = true }, label = { Text(if (!isEditing) "购买总金额" else "补录当前总额") })
             }
-            OutlinedTextField(value = valuationText, onValueChange = { valuationText = it }, label = { Text(if (existing == null) "实际采购金额（CNY）" else if (valuationIsTotal) "补录当前库存总额（CNY）" else "补录当前库存单价（CNY）") }, supportingText = { Text(if (existing == null) "留空表示成本未知；0 表示赠品。" else "留空保留现有成本；填写将按当前库存估值并记录调整，不修改历史采购。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(value = valuationText, onValueChange = { valuationText = it }, label = { Text(if (!isEditing) "实际采购金额（CNY）" else if (valuationIsTotal) "补录当前库存总额（CNY）" else "补录当前库存单价（CNY）") }, supportingText = { Text(if (!isEditing) "留空表示成本未知；0 表示赠品。" else "留空保留现有成本；填写将按当前库存估值并记录调整，不修改历史采购。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         }
         item {
             SectionPane(
@@ -295,6 +300,7 @@ private fun EditableChoiceField(
 private fun validateComponentDraft(
     strings: ComponentVaultStrings,
     existingId: String?,
+    expectedUpdatedAt: String?,
     sku: String,
     name: String,
     category: String,
@@ -322,6 +328,7 @@ private fun validateComponentDraft(
 
     return ComponentDraft(
         id = existingId,
+        expectedUpdatedAt = expectedUpdatedAt,
         sku = sku,
         name = name,
         category = category,

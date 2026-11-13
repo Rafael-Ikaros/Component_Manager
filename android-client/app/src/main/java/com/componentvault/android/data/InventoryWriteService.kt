@@ -525,10 +525,15 @@ internal class InventoryWriteService(
         db: SQLiteDatabase,
         draft: ComponentDraft,
     ): String {
+        val existingComponent = draft.id?.let { getComponentById(db, it) }
+        if (draft.id != null) {
+            check(existingComponent != null && !existingComponent.deleted &&
+                existingComponent.updatedAt == draft.expectedUpdatedAt
+            ) { text(R.string.sync_component_edit_stale) }
+        }
         ensureUniqueActiveSku(db, draft.sku.trim(), draft.id)
         val updatedAt = utcNow()
         val componentId = draft.id ?: "cmp-${randomId()}"
-        val existingComponent = draft.id?.let { getComponentById(db, it) }
         val oldTotal = existingComponent?.quantity ?: 0
         require(draft.purchaseAmount == null || draft.quantity > 0) { "填写采购金额时数量必须大于零。" }
         val valuationTotal = InventoryCost.decimal(draft.valuationAmount)

@@ -7,14 +7,16 @@ import java.security.MessageDigest
 import java.math.BigDecimal
 
 internal enum class WorkbookSource { ComponentVault, LcscAndroidErp }
-internal data class WorkbookComponent(val id:String,val sku:String,val name:String,val category:String,val packageName:String,val location:String,val description:String,val quantity:Int,val minStock:Int,val updatedAt:String,val deleted:Boolean,val baseUpdatedAt:String?,val inventoryUnitCost:String? = null)
+internal data class WorkbookComponent(val id:String,val sku:String,val name:String,val category:String,val packageName:String,val location:String,val description:String?,val quantity:Int,val minStock:Int,val updatedAt:String,val deleted:Boolean,val baseUpdatedAt:String?,val inventoryUnitCost:String? = null)
 internal data class WorkbookLocation(val id:String,val name:String,val updatedAt:String,val deleted:Boolean)
 internal data class WorkbookAllocation(val componentId:String,val locationId:String,val quantity:Int)
-internal data class WorkbookMovement(val id:String,val componentId:String,val type:String,val quantity:Int,val reason:String,val note:String,val happenedAt:String,val updatedAt:String,val deleted:Boolean,val locationId:String?,val destinationLocationId:String?,val purchaseAmount:String? = null,val costAmount:String? = null)
+internal data class WorkbookMovement(val id:String,val componentId:String,val type:String,val quantity:Int,val reason:String,val note:String?,val happenedAt:String,val updatedAt:String,val deleted:Boolean,val locationId:String?,val destinationLocationId:String?,val purchaseAmount:String? = null,val costAmount:String? = null)
 internal data class InventoryWorkbook(val source:WorkbookSource,val components:List<WorkbookComponent>,val locations:List<WorkbookLocation>,val allocations:List<WorkbookAllocation>,val movements:List<WorkbookMovement>,val fingerprint:String,val warnings:List<String>,val images:Map<String,ByteArray> = emptyMap())
 
 internal object InventoryWorkbookCodec {
     const val MAX_FILE_BYTES = 50 * 1024 * 1024
+    const val NULLABLE_TEXT_META = "nullableText"
+    private val textCellTypes = setOf("s", "inlineStr", "str")
     val componentHeaders=listOf("id","sku","name","category","package_name","location","description","quantity","min_stock","updated_at","deleted","base_updated_at","image_preview","inventory_unit_cost")
     val locationHeaders=listOf("id","name","updated_at","deleted")
     val allocationHeaders=listOf("component_id","location_id","quantity")
@@ -25,23 +27,25 @@ internal object InventoryWorkbookCodec {
         val meta=sheets["meta"] ?: error("缺少 meta 工作表。")
         val pairs=meta.associate { it.values.getOrElse(0){""}.trim() to it.values.getOrElse(1){""}.trim() }
         return when {
-            pairs["format"]=="component-vault" && pairs["schemaVersion"] in setOf("1","2") -> own(sheets,bytes,pairs["schemaVersion"]=="2")
+            pairs["format"]=="component-vault" && pairs["schemaVersion"] in setOf("1","2") -> own(sheets,bytes,pairs["schemaVersion"]=="2", pairs[NULLABLE_TEXT_META] == "1")
             pairs["schemaVersion"]=="1" && sheets.containsKey("inventory_items") -> lcsc(sheets,bytes)
             else -> error("不支持的库存工作簿格式或版本。")
         }
     }
 
-    private fun own(s:Map<String,List<TabularRow>>,b:ByteArray,v2:Boolean):InventoryWorkbook {
+    private fun own(s:Map<String,List<TabularRow>>,b:ByteArray,v2:Boolean,nullableText:Boolean):InventoryWorkbook {
         if(v2) {
             require(s["components"]?.firstOrNull()?.values == componentHeaders && s["stock_movements"]?.firstOrNull()?.values == movementHeaders) { "schema2 必须包含成本列。" }
             requireTextColumns(s,"components",listOf(13),allowBlank=true)
             requireTextColumns(s,"stock_movements",listOf(11,12),allowBlank=true)
         }
         requireTextColumns(s,"components",listOf(0,1));requireTextColumns(s,"storage_locations",listOf(0,1));requireTextColumns(s,"allocations",listOf(0,1));requireTextColumns(s,"stock_movements",listOf(0,1,9,10),allowBlank=true)
-        val c=table(s,"components",componentHeaders).map{r->WorkbookComponent(r.req("id"),r.req("sku"),r.req("name"),r.req("category"),r.req("package_name"),r.req("location"),r["description"].orEmpty(),r.nonNeg("quantity"),r.nonNeg("min_stock"),r.req("updated_at"),r.bool("deleted"),r["base_updated_at"].blankNull(),r["inventory_unit_cost"].blankNull()?.also { InventoryCost.decimal(it,16) })}
+        val descriptions = optionalText(s, "components", "description", componentHeaders, nullableText)
+        val c=table(s,"components",componentHeaders).mapIndexed{index,r->WorkbookComponent(r.req("id"),r.req("sku"),r.req("name"),r.req("category"),r.req("package_name"),r.req("location"),descriptions[index],r.nonNeg("quantity"),r.nonNeg("min_stock"),r.req("updated_at"),r.bool("deleted"),r["base_updated_at"].blankNull(),r["inventory_unit_cost"].blankNull()?.also { InventoryCost.decimal(it,16) })}
         val l=table(s,"storage_locations",locationHeaders).map{r->WorkbookLocation(r.req("id"),r.req("name"),r.req("updated_at"),r.bool("deleted"))}
         val a=table(s,"allocations",allocationHeaders).map{r->WorkbookAllocation(r.req("component_id"),r.req("location_id"),r.nonNeg("quantity"))}
-        val m=table(s,"stock_movements",movementHeaders).map{r->WorkbookMovement(r.req("id"),r.req("component_id"),r.req("movement_type"),r.integer("quantity"),r.req("reason"),r["note"].orEmpty(),r.req("happened_at"),r.req("updated_at"),r.bool("deleted"),r["location_id"].blankNull(),r["destination_location_id"].blankNull(),r["purchase_amount"].blankNull()?.also { InventoryCost.decimal(it) },InventoryCost.signed(r["cost_amount"].blankNull()))}
+        val notes = optionalText(s, "stock_movements", "note", movementHeaders, nullableText)
+        val m=table(s,"stock_movements",movementHeaders).mapIndexed{index,r->WorkbookMovement(r.req("id"),r.req("component_id"),r.req("movement_type"),r.integer("quantity"),r.req("reason"),notes[index],r.req("happened_at"),r.req("updated_at"),r.bool("deleted"),r["location_id"].blankNull(),r["destination_location_id"].blankNull(),r["purchase_amount"].blankNull()?.also { InventoryCost.decimal(it) },InventoryCost.signed(r["cost_amount"].blankNull()))}
         validate(c,l,a,m); return InventoryWorkbook(WorkbookSource.ComponentVault,c,l,a,m,sha(b),emptyList(),WorkbookImageCodec.extract(b,c,12))
     }
 
@@ -72,7 +76,26 @@ internal object InventoryWorkbookCodec {
     }
     private fun unique(v:List<String>,n:String){require(v.size==v.toSet().size){n+" 存在重复值。"}}
     private fun table(s:Map<String,List<TabularRow>>,n:String,h:List<String>):List<Map<String,String>>{val rows=s[n]?:error("缺少 "+n+" 工作表。");require(rows.firstOrNull()?.values==h || rows.firstOrNull()?.values==h.filterNot { it in setOf("inventory_unit_cost","purchase_amount","cost_amount") }){n+" 表头不匹配。"};return rows.drop(1).map{row->h.mapIndexed{i,k->k to row.values.getOrElse(i){""}}.toMap()}}
-    private fun requireTextColumns(s:Map<String,List<TabularRow>>,name:String,columns:List<Int>,allowBlank:Boolean=false){s[name]?.drop(1)?.forEach{row->columns.forEach{column->val value=row.values.getOrElse(column){""};if(value.isNotBlank()||!allowBlank)require(row.cellTypes.getOrElse(column){""} in setOf("s","inlineStr","str")){"$name 第 ${row.rowNumber} 行的 ID/SKU/库位必须是 Excel 文本单元格。"}}}}
+    // New backups omit a NULL cell and write an explicit text cell for an empty string.
+    // Older exports collapsed both cases, so preserve their previous interpretation.
+    private fun optionalText(
+        sheets: Map<String, List<TabularRow>>,
+        sheet: String,
+        field: String,
+        headers: List<String>,
+        nullableText: Boolean,
+    ): List<String?> {
+        val column = headers.indexOf(field)
+        return sheets[sheet].orEmpty().drop(1).map { row ->
+            val value = row.values.getOrElse(column) { "" }
+            if (!nullableText || value.isNotEmpty() || row.cellTypes.getOrElse(column) { "" } in textCellTypes) {
+                value
+            } else {
+                null
+            }
+        }
+    }
+    private fun requireTextColumns(s:Map<String,List<TabularRow>>,name:String,columns:List<Int>,allowBlank:Boolean=false){s[name]?.drop(1)?.forEach{row->columns.forEach{column->val value=row.values.getOrElse(column){""};if(value.isNotBlank()||!allowBlank)require(row.cellTypes.getOrElse(column){""} in textCellTypes){"$name 第 ${row.rowNumber} 行的 ID/SKU/库位必须是 Excel 文本单元格。"}}}}
     private fun Map<String,String>.req(k:String)=get(k)?.trim()?.takeIf{it.isNotEmpty()}?:error(k+" 不能为空。")
     private fun Map<String,String>.integer(k:String)=integral(k).let{runCatching{it.intValueExact()}.getOrElse{error(k+" 必须是严格整数且不能溢出。")}}
     private fun Map<String,String>.nonNeg(k:String)=integer(k).also{require(it>=0){k+" 不能为负数。"}}

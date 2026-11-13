@@ -381,14 +381,16 @@ internal class InventorySyncService(
             queuedEntities.forEach { entity ->
                 when (entity.entityType) {
                     "component" -> {
-                        getComponentJson(db, entity.entityId)?.let {
-                            payload.getJSONArray("components").put(it)
+                        val component = checkNotNull(getComponentJson(db, entity.entityId)) {
+                            text(R.string.sync_missing_queued_record, entity.entityId)
                         }
+                        payload.getJSONArray("components").put(component)
                     }
                     "stock_movement" -> {
-                        getMovementJson(db, entity.entityId)?.let {
-                            payload.getJSONArray("stock_movements").put(it)
+                        val movement = checkNotNull(getMovementJson(db, entity.entityId)) {
+                            text(R.string.sync_missing_queued_record, entity.entityId)
                         }
+                        payload.getJSONArray("stock_movements").put(movement)
                     }
                 }
             }
@@ -493,7 +495,7 @@ internal class InventorySyncService(
                 put("movement_type", cursor.getString(cursor.getColumnIndexOrThrow("movement_type")))
                 put("quantity", cursor.getInt(cursor.getColumnIndexOrThrow("quantity")))
                 put("reason", cursor.getString(cursor.getColumnIndexOrThrow("reason")))
-                put("note", cursor.getString(cursor.getColumnIndexOrThrow("note")))
+                put("note", cursor.getString(cursor.getColumnIndexOrThrow("note")) ?: JSONObject.NULL)
                 put("happened_at", cursor.getString(cursor.getColumnIndexOrThrow("happened_at")))
                 put("updated_at", cursor.getString(cursor.getColumnIndexOrThrow("updated_at")))
                 put("deleted", cursor.getInt(cursor.getColumnIndexOrThrow("deleted")) == 1)
@@ -644,20 +646,32 @@ internal class InventorySyncService(
             )
         }
         val components = pullResponse.optJSONArray("components") ?: JSONArray()
-        for (index in 0 until components.length()) {
-            val component = components.getJSONObject(index)
+        val snapshots = List(components.length(), components::getJSONObject)
+        val remoteIds = snapshots.mapTo(mutableSetOf()) { it.getString("id") }
+        val pushedComponents = pushedEntities.filter { it.entityType == "component" }.associateBy { it.entityId }
+        val applicableSnapshots = snapshots.filter { component ->
             val id = component.getString("id")
-            val pushed = pushedEntities.firstOrNull { it.entityType == "component" && it.entityId == id }
+            val pushed = pushedComponents[id]
             val queued = db.rawQuery(
                 "SELECT entity_updated_at FROM sync_queue WHERE entity_type = 'component' AND entity_id = ?",
                 arrayOf(id),
             ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-            if (SyncProtocol.canApplyInventorySnapshot(queued, pushed?.entityUpdatedAt)) {
-                upsertRemoteComponent(db, component)
-            } else if (pushed != null) {
+            val canApply = SyncProtocol.canApplyInventorySnapshot(queued, pushed?.entityUpdatedAt)
+            if (!canApply && pushed != null) {
                 // A second local edit survives the pull, based on the version actually uploaded.
                 db.execSQL("UPDATE components SET base_updated_at = ? WHERE id = ?", arrayOf(pushed.entityUpdatedAt, id))
             }
+            canApply
+        }
+        // Release SKUs reassigned by this snapshot before writing the final rows in the same transaction.
+        for (component in applicableSnapshots) {
+            db.execSQL(
+                "UPDATE components SET deleted = 1 WHERE id = ? AND deleted = 0 AND (sku <> ? OR ? = 1)",
+                arrayOf(component.getString("id"), component.getString("sku"), if (component.getBoolean("deleted")) 1 else 0),
+            )
+        }
+        for (component in applicableSnapshots) {
+            upsertRemoteComponent(db, component)
         }
 
         val movements = pullResponse.optJSONArray("stock_movements") ?: JSONArray()
@@ -673,9 +687,7 @@ internal class InventorySyncService(
         }
 
         pushedEntities.forEach { entity ->
-            if (entity.entityType == "component" && (0 until components.length()).none {
-                components.getJSONObject(it).getString("id") == entity.entityId
-            }) {
+            if (entity.entityType == "component" && entity.entityId !in remoteIds) {
                 db.execSQL("UPDATE components SET base_updated_at = ? WHERE id = ?", arrayOf(entity.entityUpdatedAt, entity.entityId))
             }
             removeQueuedIfSuperseded(
@@ -691,9 +703,19 @@ internal class InventorySyncService(
         db: SQLiteDatabase,
         component: JSONObject,
     ) {
+        val id = component.getString("id")
+        val sku = component.getString("sku")
+        val deleted = component.getBoolean("deleted")
+        if (!deleted) {
+            val skuAvailable = db.rawQuery(
+                "SELECT 1 FROM components WHERE sku = ? AND id <> ? AND deleted = 0",
+                arrayOf(sku, id),
+            ).use { !it.moveToFirst() }
+            check(skuAvailable) { text(R.string.sync_pull_sku_conflict, sku) }
+        }
         val values = ContentValues().apply {
-            put("id", component.getString("id"))
-            put("sku", component.getString("sku"))
+            put("id", id)
+            put("sku", sku)
             put("name", component.getString("name"))
             put("category", component.getString("category"))
             put("package_name", component.getString("package_name"))
@@ -703,15 +725,12 @@ internal class InventorySyncService(
             put("quantity", component.getInt("quantity"))
             put("min_stock", component.getInt("min_stock"))
             put("updated_at", component.getString("updated_at"))
-            put("deleted", if (component.getBoolean("deleted")) 1 else 0)
+            put("deleted", if (deleted) 1 else 0)
             put("base_updated_at", component.getString("updated_at"))
         }
-        db.insertWithOnConflict(
-            "components",
-            null,
-            values,
-            SQLiteDatabase.CONFLICT_REPLACE,
-        )
+        if (db.update("components", values, "id = ?", arrayOf(id)) == 0) {
+            db.insertOrThrow("components", null, values)
+        }
         val allocations = component.optJSONArray("allocations") ?: JSONArray().put(
             JSONObject().put("location_id", component.getString("location").trim().ifBlank { "待整理" })
                 .put("quantity", component.getInt("quantity")),
@@ -763,7 +782,7 @@ internal class InventorySyncService(
             put("cost_amount", if (movement.isNull("cost_amount")) null else movement.getString("cost_amount"))
             put("quantity", movement.getInt("quantity"))
             put("reason", movement.getString("reason"))
-            put("note", movement.optString("note"))
+            put("note", if (movement.isNull("note")) null else movement.getString("note"))
             put("happened_at", movement.getString("happened_at"))
             put("updated_at", movement.getString("updated_at"))
             put("deleted", if (movement.getBoolean("deleted")) 1 else 0)

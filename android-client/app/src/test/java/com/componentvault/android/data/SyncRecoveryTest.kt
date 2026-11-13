@@ -2,6 +2,7 @@ package com.componentvault.android.data
 
 import android.app.Application
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import com.componentvault.android.data.bom.BomParseResult
 import com.componentvault.android.data.bom.BomPreset
 import com.componentvault.android.data.bom.BomPresetStore
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -120,10 +122,99 @@ class SyncRecoveryTest {
         } finally { helper.close(); file.delete() }
     }
 
+    @Test fun pullSkuCollisionRollsBackAndRetainsLocalStockHistoryQueueAndCursor(): Unit = runBlocking {
+        withServer(cancelBom = false, requestCount = 4, pullReply = {
+            withDatabase { db ->
+                ensureStorageLocation(db, "A", inventoryTime)
+                db.execSQL(
+                    "INSERT INTO components(id, sku, name, category, package_name, location, quantity, min_stock, updated_at) " +
+                        "VALUES ('local', 'C100', 'Local', 'category', '0603', 'A', 10, 0, ?)",
+                    arrayOf(inventoryTime),
+                )
+                setAllocationQuantity(db, "local", "A", 10)
+                db.execSQL(
+                    "INSERT INTO stock_movements(id, component_id, movement_type, quantity, reason, happened_at, updated_at, location_id) " +
+                        "VALUES ('inbound', 'local', 'inbound', 10, 'Test', ?, ?, 'A')",
+                    arrayOf(inventoryTime, inventoryTime),
+                )
+                enqueueEntity(db, "component", "local", inventoryTime)
+                enqueueEntity(db, "stock_movement", "inbound", inventoryTime)
+            }
+            pullSnapshot(remoteComponent("unrelated", "C200", 0), remoteComponent("remote", "C100", 2))
+        }) { service, settings, _, _ ->
+            preferences.edit().putLong(InventoryPreferenceKeys.SYNC_CURSOR, 7).commit()
+            val result = service.runSync { settings }
+            assertFalse(result.isSuccess)
+            assertTrue(result.message.contains("C100"))
+            assertEquals(7L, preferences.getLong(InventoryPreferenceKeys.SYNC_CURSOR, -1))
+            withDatabase { db ->
+                assertEquals(10, scalar(db, "SELECT quantity FROM components WHERE id = 'local' AND deleted = 0"))
+                assertEquals(10, allocationQuantity(db, "local", "A"))
+                assertEquals(1, scalar(db, "SELECT COUNT(*) FROM stock_movements WHERE component_id = 'local'"))
+                assertEquals(2, scalar(db, "SELECT COUNT(*) FROM sync_queue"))
+                assertEquals(0, scalar(db, "SELECT COUNT(*) FROM components WHERE id IN ('remote', 'unrelated')"))
+            }
+        }
+    }
+
+    @Test fun pullAppliesRemoteSkuReassignmentAndUpdatesExistingComponentById(): Unit = runBlocking {
+        withServer(cancelBom = false, pullReply = {
+            pullSnapshot(remoteComponent("replacement", "C100", 2), remoteComponent("old", "C200", 5))
+        }) { service, settings, _, _ ->
+            withDatabase { db ->
+                ensureStorageLocation(db, "A", inventoryTime)
+                db.execSQL(
+                    "INSERT INTO components(id, sku, name, category, package_name, location, quantity, min_stock, updated_at) " +
+                        "VALUES ('old', 'C100', 'Old', 'category', '0603', 'A', 3, 0, ?)",
+                    arrayOf(inventoryTime),
+                )
+                setAllocationQuantity(db, "old", "A", 3)
+            }
+            service.runSync { settings } // Inventory succeeds before the simulated BOM failure.
+            assertEquals(8L, preferences.getLong(InventoryPreferenceKeys.SYNC_CURSOR, -1))
+            withDatabase { db ->
+                assertEquals(5, scalar(db, "SELECT quantity FROM components WHERE id = 'old' AND sku = 'C200' AND deleted = 0"))
+                assertEquals(2, scalar(db, "SELECT quantity FROM components WHERE id = 'replacement' AND sku = 'C100' AND deleted = 0"))
+                assertEquals(5, allocationQuantity(db, "old", "A"))
+                assertEquals(2, allocationQuantity(db, "replacement", "A"))
+            }
+        }
+    }
+
+    @Test fun missingQueuedEntityIsReportedWithoutAcknowledgingIt(): Unit = runBlocking {
+        withServer(cancelBom = false, requestCount = 2) { service, settings, _, _ ->
+            withDatabase { enqueueEntity(it, "component", "missing-item", inventoryTime) }
+            val result = service.runSync { settings }
+            assertFalse(result.isSuccess)
+            assertTrue(result.message.contains("missing-item"))
+            withDatabase { assertEquals(1, scalar(it, "SELECT COUNT(*) FROM sync_queue")) }
+        }
+    }
+
+    private fun withDatabase(block: (SQLiteDatabase) -> Unit) {
+        val helper = InventoryDatabaseHelper(context)
+        try { block(helper.writableDatabase) } finally { helper.close() }
+    }
+
+    private fun scalar(db: SQLiteDatabase, sql: String): Int =
+        db.rawQuery(sql, null).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else -1 }
+
+    private fun pullSnapshot(vararg components: JSONObject): String = JSONObject()
+        .put("inventory_protocol", 1).put("cost_protocol", 1).put("sync_cursor", 8)
+        .put("server_time", inventoryTime).put("components", JSONArray(components.toList())).toString()
+
+    private fun remoteComponent(id: String, sku: String, quantity: Int): JSONObject = JSONObject()
+        .put("id", id).put("sku", sku).put("name", id).put("category", "category")
+        .put("package_name", "0603").put("location", "A").put("quantity", quantity)
+        .put("min_stock", 0).put("updated_at", inventoryTime).put("deleted", false)
+        .put("allocations", JSONArray().put(JSONObject().put("location_id", "A").put("quantity", quantity)))
+
     private suspend fun withServer(cancelBom: Boolean, bomReply: (() -> String)? = null,
+        pullReply: (() -> String)? = null, requestCount: Int = if (bomReply != null) 6 else 5,
         block: suspend (InventorySyncService, SyncConfiguration, CompletableFuture<Unit>, CompletableFuture<Unit>) -> Unit) {
         preferences.edit().clear().commit()
         File(context.filesDir, "bom-presets.json").delete()
+        context.deleteDatabase("component-vault.db")
         val helper = InventoryDatabaseHelper(context)
         ServerSocket(0).use { server ->
             server.soTimeout = 10_000
@@ -133,7 +224,7 @@ class SyncRecoveryTest {
             val bomStarted = CompletableFuture<Unit>()
             val releaseBom = CompletableFuture<Unit>()
             val responder = CompletableFuture.runAsync {
-                repeat(if (bomReply != null) 6 else 5) { index ->
+                repeat(requestCount) { index ->
                     server.accept().use { socket ->
                         socket.soTimeout = 10_000
                         val reader = socket.getInputStream().bufferedReader()
@@ -141,11 +232,11 @@ class SyncRecoveryTest {
                         val length = headers.firstOrNull { it.startsWith("Content-Length:", true) }?.substringAfter(':')?.trim()?.toInt() ?: 0
                         repeat(length) { reader.read() }
                         val body = when (index) {
-                            0 -> JSONObject().put("inventory_protocol", 1).put("bom_preset_protocol", 1)
+                            0 -> JSONObject().put("inventory_protocol", 1).put("cost_protocol", 1).put("bom_preset_protocol", 1)
                                 .put("photo_protocol", if (bomReply != null) 1 else 0).toString()
                             1 -> "{\"server_id\":\"server\",\"account_id\":\"account\",\"role\":\"admin\"}"
                             2 -> "{}"
-                            3 -> "{\"inventory_protocol\":1,\"sync_cursor\":1,\"server_time\":\"$inventoryTime\"}"
+                            3 -> pullReply?.invoke() ?: pullSnapshot()
                             4 -> {
                                 bomStarted.complete(Unit)
                                 if (cancelBom) releaseBom.get(10, TimeUnit.SECONDS)

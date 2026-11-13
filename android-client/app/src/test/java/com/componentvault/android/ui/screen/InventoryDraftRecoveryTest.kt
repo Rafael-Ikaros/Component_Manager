@@ -5,13 +5,16 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.SavedStateHandle
+import com.componentvault.android.R
 import com.componentvault.android.data.InventoryDatabaseHelper
 import com.componentvault.android.data.InventoryRepository
 import com.componentvault.android.model.ComponentDraft
@@ -19,6 +22,7 @@ import com.componentvault.android.model.ComponentImportCandidate
 import com.componentvault.android.model.ComponentImportFieldOrigin
 import com.componentvault.android.model.ComponentImportFieldOrigins
 import com.componentvault.android.model.ComponentImportSourceType
+import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.StorageLocationSaveIntent
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -57,11 +61,63 @@ class InventoryDraftRecoveryTest {
             fieldOrigins = ComponentImportFieldOrigins(name = ComponentImportFieldOrigin.User),
         )
         val draftSaved = with(ComponentDraftSaver) { with(saverScope) { save(draft) } }!!
+        val editDraft = draft.copy(id = "cmp-1", expectedUpdatedAt = "2026-11-13T00:00:00Z")
+        val editSaved = with(ComponentDraftSaver) { with(saverScope) { save(editDraft) } }!!
         val candidateSaved = with(ComponentImportCandidateSaver) { with(saverScope) { save(candidate) } }!!
         assertEquals(draft, ComponentDraftSaver.restore(draftSaved))
+        assertEquals(editDraft, ComponentDraftSaver.restore(editSaved))
+        val oldEditSaved = org.json.JSONObject(editSaved).apply { remove("expectedUpdatedAt") }.toString()
+        assertEquals(editDraft.copy(expectedUpdatedAt = null), ComponentDraftSaver.restore(oldEditSaved))
         assertEquals(candidate, ComponentImportCandidateSaver.restore(candidateSaved))
         assertNull(ComponentDraftSaver.restore(with(ComponentDraftSaver) { with(saverScope) { save(null) } }!!))
         assertNull(ComponentImportCandidateSaver.restore(with(ComponentImportCandidateSaver) { with(saverScope) { save(null) } }!!))
+    }
+
+    @Test
+    fun restoredEditKeepsOpeningVersionAndRemainsAnEditWhenComponentDisappears() {
+        val tester = StateRestorationTester(compose)
+        val original = ComponentRecord(
+            id = "edit-part", sku = "C123", name = "Original", category = "IC",
+            packageName = "SOT-23", location = "A", description = "", quantity = 10,
+            minStock = 0, updatedAt = "2026-11-13T00:00:00Z", deleted = false,
+        )
+        val current = mutableStateOf<ComponentRecord?>(original)
+        val submitted = mutableListOf<ComponentDraft>()
+        val compactMode = InventoryLayoutMode(
+            widthClass = InventoryWidthClass.Compact,
+            supportsListDetail = false,
+            formPresentation = InventoryFormPresentation.FullScreenRoute,
+            secondaryPanePresentation = InventorySecondaryPanePresentation.FullScreenRoute,
+        )
+        tester.setContent {
+            val openingVersion = rememberSaveable { original.updatedAt }
+            MaterialTheme {
+                ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
+                    ComponentEditorRoute(
+                        visible = true, scannerVisible = false, existing = current.value,
+                        initialDraft = null, availableCategories = emptyList(), storageLocations = emptyList(),
+                        layoutMode = compactMode,
+                        onDismiss = {}, onSave = { draft, _ -> submitted.add(draft) },
+                        onSaveAndGenerateLabel = { draft, _ -> submitted.add(draft) },
+                        editingId = original.id, expectedUpdatedAt = openingVersion,
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Original").performTextReplacement("Renamed")
+        compose.runOnIdle {
+            current.value = original.copy(quantity = 8, updatedAt = "2026-11-13T00:01:00Z")
+        }
+        tester.emulateSavedInstanceStateRestore()
+        compose.runOnIdle { current.value = null }
+        compose.onNodeWithText("Renamed").assertTextContains("Renamed")
+        compose.onNodeWithText(context.getString(R.string.action_save)).performClick()
+        compose.runOnIdle {
+            val draft = submitted.single()
+            assertEquals(original.id, draft.id)
+            assertEquals(original.updatedAt, draft.expectedUpdatedAt)
+            assertEquals(original.quantity, draft.quantity)
+        }
     }
 
     @Test

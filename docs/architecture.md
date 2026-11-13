@@ -98,6 +98,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - `ComponentSaveCoordinator` 负责导入查重、追加确认和失败重试，应用壳只处理页面与标签入口。`BomImportOperations` 负责文件解析与只读匹配预览，`InventoryBackupOperations` 负责文档 URI 读写；业务提交继续经 Repository。
 - `InventoryRepository` 保留配置、读取和预览入口；`InventoryWriteService` 管理元件、库位、出入库、批量入库和转移事务，`InventoryImportCatalog` 管理识别、官方查询、学习映射与查询缓存。学习映射写入复用元件保存的同一个 SQLite 事务。
 - `InventorySyncService` 管理网络交换、账户绑定、上传快照、拉取和队列确认；与保存同步配置共用配置锁。账户检查仍在上传前，拉取及队列确认同事务提交，随后保存游标。`InventoryPreferenceKeys` 集中共享键值，不改变已有设置文件或键名。
+- Android 拉取按元件 ID 写入。相同 SKU 仍被另一条本地记录占用时回滚拉取，保留本地数据、待同步记录和游标。编辑器保存时核对打开表单时的版本，避免覆盖表单打开后发生的库存变动。
 - 流水的来源/目标库位区分 JSON 空值与文本。同步事务仅修正不存在对应真实库位的历史 `null` 字符串引用，保留流水、库存和原时间；不新增 schema 迁移。
 - Android 设置和库存内容消费外层安全区域后处理 IME inset；主导航切换清除输入焦点。库存的全部、低库存、分类、库位、排序共用单行横向滚动栏，直接下拉立即生效；不再提供重复的综合筛选按钮与面板。底部 NavigationBar 在 IME 实际遮住底部时使用 NavigationSuiteType.None 释放占高，库存外部底边距同时归零，页面继续负责 imePadding；不改变 MainActivity 的全局窗口策略，侧边 rail 不受影响。
 - 主 Tab 与设置分组内容使用 180ms 原生 Animatable 淡入，只组合当前页面；独立 SecondaryPageScaffold 额外上移 8dp，不在普通重组或 IME 变化时重播。原生时长缩放响应系统设置，不改系统配置。SaveableStateHolder 保留草稿和滚动状态。

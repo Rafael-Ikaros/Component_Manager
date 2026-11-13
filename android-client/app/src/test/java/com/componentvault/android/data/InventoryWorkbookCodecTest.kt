@@ -30,6 +30,33 @@ class InventoryWorkbookCodecTest {
         assertEquals(model.movements, parsed.movements)
     }
 
+    @Test fun nullableTextDistinguishesNullEmptyAndLiteralNull() {
+        val original = sample()
+        val values = listOf(null, "", "null")
+        val model = original.copy(
+            components = values.mapIndexed { index, value ->
+                original.components.single().copy(id = "cmp-$index", sku = "C$index", description = value)
+            },
+            allocations = values.indices.map { index ->
+                original.allocations.single().copy(componentId = "cmp-$index")
+            },
+            movements = values.mapIndexed { index, value ->
+                original.movements.single().copy(id = "mov-$index", componentId = "cmp-$index", note = value)
+            },
+        )
+        val bytes = InventoryWorkbookWriter.write(model)
+        val parsed = InventoryWorkbookCodec.parse(bytes)
+        assertEquals(values, parsed.components.map { it.description })
+        assertEquals(values, parsed.movements.map { it.note })
+
+        val oldSchema2 = rewriteEntries(bytes) { path, xml ->
+            if (path.endsWith("sheet1.xml")) xml.replace("nullableText", "unused") else xml
+        }
+        val oldParsed = InventoryWorkbookCodec.parse(oldSchema2)
+        assertEquals(listOf("", "", "null"), oldParsed.components.map { it.description })
+        assertEquals(listOf("", "", "null"), oldParsed.movements.map { it.note })
+    }
+
     @Test fun duplicateActiveSkuIsRejected(){
         val duplicate=sample().components.first().copy(id="cmp-2")
         val model=sample(sample().components+duplicate).copy(allocations=sample().allocations+WorkbookAllocation("cmp-2","loc-1",4))

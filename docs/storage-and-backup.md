@@ -116,6 +116,8 @@ Windows 使用库存行或详情中的鼠标操作。
 工作表顺序为 meta、components、storage_locations、allocations、stock_movements。
 meta 无表头，以 key/value 两列记录 format=component-vault、schemaVersion=2、exportedAt=UTC ISO。
 新版兼容读取旧 schemaVersion=1；旧备份没有成本字段，恢复后为成本未知，不当作零成本。
+Android 新导出的备份还记录 `nullableText=1`，用于区分元件说明和流水备注的空值、空字符串和实际文字。
+未包含该标记的旧备份仍按原规则把空单元格恢复为空字符串。
 
 - components: id,sku,name,category,package_name,location,description,quantity,min_stock,updated_at,deleted,base_updated_at,image_preview,inventory_unit_cost
 - storage_locations: id,name,updated_at,deleted
