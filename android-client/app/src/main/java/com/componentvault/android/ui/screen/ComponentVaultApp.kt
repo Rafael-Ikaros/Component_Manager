@@ -418,6 +418,7 @@ fun ComponentVaultApp(
                         }
                     },
                     storageLocations = uiState.inventory.storageLocations,
+                    allocations = uiState.inventory.allocations,
                 )
             }
 
@@ -738,6 +739,7 @@ fun ComponentVaultApp(
                         }
                     },
                     storageLocations = uiState.inventory.storageLocations,
+                    allocations = uiState.inventory.allocations,
                 )
             }
 

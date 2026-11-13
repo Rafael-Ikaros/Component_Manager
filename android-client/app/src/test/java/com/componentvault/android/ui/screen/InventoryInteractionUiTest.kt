@@ -326,6 +326,57 @@ class InventoryInteractionUiTest {
     }
 
     @Test
+    fun manualOutboundUsesStockedLocationAndKeepsSourceWhenBalanceChanges() {
+        val part = ComponentRecord(item.id, item.sku, item.name, item.category, item.packageName,
+            "A", "", 103, 0, item.updatedAt, false)
+        val allocations = mutableStateOf(listOf(
+            ComponentAllocationRecord(part.id, "B", "Shelf B", 103),
+            ComponentAllocationRecord("other", "A", "Shelf A", 5),
+        ))
+        var submitted: MovementEntryDraft? = null
+        var complete: ((OperationResult) -> Unit)? = null
+        setInventoryContent {
+            MaterialTheme {
+                MovementEditorSurface(
+                    components = listOf(part),
+                    selectedComponentId = part.id,
+                    layoutMode = compactMode,
+                    storageLocations = listOf(StorageLocationRecord("A", "Shelf A", ""),
+                        StorageLocationRecord("B", "Shelf B", "")),
+                    allocations = allocations.value,
+                    onDismiss = {},
+                    onSave = { draft, result -> submitted = draft; complete = result },
+                )
+            }
+        }
+        val save = context.getString(R.string.action_save)
+        val outbound = context.getString(R.string.movement_type_outbound)
+        compose.onNodeWithText(save).assertIsEnabled()
+        compose.onNodeWithTag("component_editor_fields").performScrollToNode(hasText("Shelf A"))
+        compose.onNodeWithText("Shelf A").assertIsDisplayed()
+        compose.onNodeWithTag("component_editor_fields").performScrollToNode(hasText(outbound))
+        compose.onNodeWithText(outbound).performClick()
+        val stockedLocation = context.getString(R.string.movement_location_with_stock, "Shelf B", 103)
+        compose.onNodeWithTag("component_editor_fields").performScrollToNode(hasText(stockedLocation))
+        compose.onNodeWithText(stockedLocation).assertIsDisplayed()
+        compose.onNode(hasSetTextAction() and hasText(context.getString(R.string.field_quantity)))
+            .performScrollTo().performTextReplacement("2")
+        compose.onNodeWithText(save).performClick()
+        compose.runOnIdle {
+            assertEquals("B", submitted?.locationId)
+            assertEquals(2, submitted?.quantity)
+            allocations.value = listOf(ComponentAllocationRecord(part.id, "A", "Shelf A", 103))
+            complete?.invoke(OperationResult(false,
+                context.getString(R.string.movement_source_stock_insufficient, 0, 2)))
+        }
+        compose.onNodeWithText(context.getString(R.string.movement_location_with_stock, "Shelf B", 0))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.movement_source_stock_insufficient, 0, 2))
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(save).assertIsNotEnabled()
+    }
+
+    @Test
     fun searchStaysInlineAndResultsRemainVisibleWhileTyping() {
         val query = mutableStateOf("")
         setInventoryContent {

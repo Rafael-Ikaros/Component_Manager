@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="movement_source_stock_insufficient">所选库位可用 %1$d 件，本次需要 %2$d 件。</string>
+</resources>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="movement_source_stock_insufficient">The selected location has %1$d available. Requested quantity: %2$d.</string>
+</resources>

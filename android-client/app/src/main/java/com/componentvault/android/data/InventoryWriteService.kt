@@ -650,23 +650,23 @@ internal class InventoryWriteService(
             val destinationLocation = draft.destinationLocationId?.trim()?.takeIf(String::isNotEmpty)
             val delta = calculateQuantityDelta(draft.movementType, draft.quantity)
             val newQuantity = component.quantity + delta
-            if (newQuantity < 0) {
-                throw IllegalStateException(text(R.string.sync_negative_stock_error))
-            }
 
             val updatedAt = utcNow()
             ensureStorageLocation(db, sourceLocation, updatedAt)
             destinationLocation?.let { ensureStorageLocation(db, it, updatedAt) }
+            val sourceQuantity = allocationQuantity(db, draft.componentId, sourceLocation)
+            val requestedFromSource = if (draft.movementType == "transfer") draft.quantity.toLong() else -delta.toLong()
+            check(sourceQuantity.toLong() >= requestedFromSource) {
+                text(R.string.movement_source_stock_insufficient, sourceQuantity, requestedFromSource)
+            }
+            check(newQuantity >= 0) { text(R.string.sync_negative_stock_error) }
             if (draft.movementType == "transfer") {
-                val sourceQuantity = allocationQuantity(db, draft.componentId, sourceLocation)
                 val destinationQuantity = allocationQuantity(db, draft.componentId, requireNotNull(destinationLocation))
                 val transferred = StockAllocationMath.transfer(sourceQuantity, destinationQuantity, draft.quantity)
                 setAllocationQuantity(db, draft.componentId, sourceLocation, transferred.first)
                 setAllocationQuantity(db, draft.componentId, destinationLocation, transferred.second)
             } else {
-                val currentAllocation = allocationQuantity(db, draft.componentId, sourceLocation)
-                val allocationDelta = calculateQuantityDelta(draft.movementType, draft.quantity)
-                val newAllocation = StockAllocationMath.applyDelta(currentAllocation, allocationDelta)
+                val newAllocation = StockAllocationMath.applyDelta(sourceQuantity, delta)
                 setAllocationQuantity(db, draft.componentId, sourceLocation, newAllocation)
             }
             val nextCost = when {

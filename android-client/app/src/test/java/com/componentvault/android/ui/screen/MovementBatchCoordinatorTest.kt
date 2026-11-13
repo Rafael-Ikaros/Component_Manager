@@ -19,6 +19,43 @@ import org.robolectric.annotation.Config
 @Config(sdk = [28], application = Application::class)
 class MovementBatchCoordinatorTest {
     @Test
+    fun outboundDefaultsToStockedLocationWithoutRedirectingExistingDraftAfterRefresh() {
+        val component = ComponentRecord(
+            id = "part", sku = "C1", name = "Part", category = "IC",
+            packageName = "SOT-23", location = "A", description = "", quantity = 103,
+            minStock = 1, updatedAt = "2026-10-18", deleted = false,
+        )
+        val locations = listOf(
+            StorageLocationRecord("A", "Shelf A", "2026-10-18"),
+            StorageLocationRecord("B", "Shelf B", "2026-10-18"),
+        )
+        fun coordinator(stockedLocation: String) = MovementBatchCoordinator(
+            RuntimeEnvironment.getApplication(), listOf(component), locations,
+            listOf(ComponentAllocationRecord(component.id, stockedLocation, "Shelf $stockedLocation", 103)),
+        )
+        val outbound = MovementQuickAction.Outbound.movementType
+        val initial = coordinator("B")
+        val queued = initial.enqueue(MovementBatchSessionUiState(defaultMovementType = outbound), component)
+        assertEquals("B", queued.queuedItems.single().location)
+        val inbound = initial.enqueue(MovementBatchSessionUiState(), component).queuedItems.single()
+        assertEquals("A", inbound.location)
+        val edited = inbound.copy(quantityText = "2", reason = "My reason", isDirty = true)
+        val switched = initial.withMovementType(edited, outbound)
+        assertEquals("B", switched.location)
+        assertEquals("2", switched.quantityText)
+        assertEquals("My reason", switched.reason)
+        assertEquals("B", initial.withMovementType(switched, outbound).location)
+
+        val refreshed = coordinator("A")
+        val reconciled = refreshed.reconcile(queued.copy(queuedItems = listOf(switched)))
+        val stale = reconciled.queuedItems.single()
+        assertEquals("B", stale.location)
+        assertEquals("2", stale.quantityText)
+        assertEquals("My reason", stale.reason)
+        assertFalse(refreshed.validate(reconciled).isValid)
+    }
+
+    @Test
     fun dirtyQuantitySurvivesRescanAndReconciliationThenValidatesAgainstCurrentLocationStock() {
         val component = ComponentRecord(
             id = "part", sku = "C1", name = "Part", category = "IC",

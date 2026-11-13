@@ -3,4 +3,6 @@
     <string name="movement_source_location">Stock location</string>
     <string name="movement_destination_location">Destination location</string>
     <string name="movement_no_locations">No available locations. Manage locations in Settings first.</string>
+    <string name="movement_no_stock_locations">This component has no stock at any active location.</string>
+    <string name="movement_location_with_stock">%1$s · %2$d available</string>
 </resources>

@@ -29,14 +29,24 @@ internal class MovementBatchCoordinator(
         },
     )
 
+    fun withMovementType(item: MovementBatchQueueItemUiState, movementType: String): MovementBatchQueueItemUiState {
+        val location = if (movementType == MovementQuickAction.Outbound.movementType &&
+            (item.locationQuantities[item.location] ?: 0) <= 0
+        ) {
+            item.locationQuantities.entries.filter { it.value > 0 }.maxByOrNull { it.value }?.key ?: item.location
+        } else {
+            item.location
+        }
+        return item.copy(movementType = movementType, location = location, errorMessage = null)
+    }
+
     fun enqueue(
         session: MovementBatchSessionUiState,
         component: ComponentRecord,
     ): MovementBatchSessionUiState {
         val existingItem = session.queuedItems.firstOrNull { it.componentId == component.id }
         val queuedItems = if (existingItem == null) {
-            session.queuedItems + toMovementBatchQueueItem(component).copy(
-                movementType = session.defaultMovementType,
+            session.queuedItems + withMovementType(toMovementBatchQueueItem(component), session.defaultMovementType).copy(
                 reason = application.getString(
                     if (session.defaultMovementType == MovementQuickAction.Outbound.movementType)
                         R.string.scan_stock_outbound else R.string.scan_stock_inbound,
@@ -53,7 +63,6 @@ internal class MovementBatchCoordinator(
                         componentSku = component.sku,
                         category = component.category,
                         packageName = component.packageName,
-                        location = item.location.takeIf { it in movementLocationQuantities(component.id) } ?: component.location,
                         locationQuantities = movementLocationQuantities(component.id),
                         locationNames = locations.filterNot { it.deleted }.associate { it.id to it.name },
                         currentStock = component.quantity,
@@ -122,7 +131,6 @@ internal class MovementBatchCoordinator(
                         componentSku = component.sku,
                         category = component.category,
                         packageName = component.packageName,
-                        location = item.location.takeIf { it in movementLocationQuantities(component.id) } ?: component.location,
                         locationQuantities = movementLocationQuantities(component.id),
                         locationNames = locations.filterNot { it.deleted }.associate { it.id to it.name },
                         currentStock = component.quantity,

@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.componentvault.android.model.LocalComponentSku
+import com.componentvault.android.model.ComponentAllocationRecord
 import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.MovementEntryDraft
@@ -398,14 +399,24 @@ internal fun MovementEntryFields(
     state: MovementEditorState,
     onStateChange: (MovementEditorState) -> Unit,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    sourceLocations: List<StorageLocationRecord> = storageLocations,
+    sourceQuantities: Map<String, Int> = emptyMap(),
+    stockError: String? = null,
+    sourceMessage: String? = null,
 ) {
     val strings = vaultStrings()
     SectionPane(title = strings.forms.movementEntryTitle) {
         MovementLocationSelector(
             title = stringResource(R.string.movement_source_location),
             value = state.locationId,
-            locations = storageLocations,
+            locations = sourceLocations,
             onSelect = { onStateChange(state.copy(locationId = it, errorMessage = null)) },
+            quantities = sourceQuantities,
+            selectedLocation = storageLocations.firstOrNull { it.id == state.locationId },
+        )
+        if (sourceMessage != null) Text(
+            sourceMessage,
+            color = MaterialTheme.colorScheme.error,
         )
         if (state.movementType == "transfer") {
             MovementLocationSelector(
@@ -425,6 +436,9 @@ internal fun MovementEntryFields(
             minimum = if (state.movementType == "adjustment") Int.MIN_VALUE else 1,
             skipZero = state.movementType == "adjustment",
         )
+        (state.errorMessage ?: stockError)?.takeIf { it.isNotBlank() }?.let { message ->
+            Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
         if (state.movementType == "inbound") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = !state.purchaseIsUnit, onClick = { onStateChange(state.copy(purchaseIsUnit = false)) }, label = { Text("购买总金额") })
@@ -458,13 +472,6 @@ internal fun MovementEntryFields(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        state.errorMessage?.takeIf { it.isNotBlank() }?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
     }
 }
 
@@ -474,14 +481,22 @@ internal fun MovementLocationSelector(
     title: String,
     value: String,
     locations: List<StorageLocationRecord>,
+    quantities: Map<String, Int> = emptyMap(),
+    selectedLocation: StorageLocationRecord? = null,
     onSelect: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val active = locations.filterNot(StorageLocationRecord::deleted)
+    @Composable
+    fun locationLabel(location: StorageLocationRecord): String {
+        val available = quantities[location.id] ?: return location.name
+        return stringResource(R.string.movement_location_with_stock, location.name, available)
+    }
     Text(title, style = MaterialTheme.typography.labelLarge)
     Box {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-            Text(active.firstOrNull { it.id == value }?.name ?: stringResource(R.string.importer_select_location))
+        OutlinedButton(onClick = { expanded = true }, enabled = active.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
+            Text((selectedLocation ?: active.firstOrNull { it.id == value })?.let { locationLabel(it) }
+                ?: stringResource(R.string.importer_select_location))
         }
         DropdownMenu(
             expanded = expanded,
@@ -490,12 +505,9 @@ internal fun MovementLocationSelector(
         ) {
             active.forEach { location ->
                 DropdownMenuItem(
-                    text = { Text(location.name, maxLines = 2) },
+                    text = { Text(locationLabel(location), maxLines = 2) },
                     onClick = { expanded = false; onSelect(location.id) },
                 )
-            }
-            if (active.isEmpty()) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.movement_no_locations)) }, onClick = {}, enabled = false)
             }
         }
     }
@@ -511,38 +523,73 @@ internal fun MovementEditorSurface(
     onDismiss: () -> Unit,
     onSave: (MovementEntryDraft, (OperationResult) -> Unit) -> Unit,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    allocations: List<ComponentAllocationRecord> = emptyList(),
 ) {
     val strings = vaultStrings()
     val defaultReasons = listOf("inbound", "outbound", "adjustment", "transfer")
         .associateWith { movementTypeLabel(it) }
     var componentMenuExpanded by remember { mutableStateOf(false) }
-    var selectedComponent by remember(selectedComponentId, components) {
-        mutableStateOf(
-            components.firstOrNull { it.id == selectedComponentId } ?: components.firstOrNull(),
-        )
-    }
+    var chosenComponentId by remember(selectedComponentId) { mutableStateOf(selectedComponentId) }
+    val selectedComponent = if (chosenComponentId == null) components.firstOrNull()
+        else components.firstOrNull { it.id == chosenComponentId }
+    var saving by remember { mutableStateOf(false) }
     var editorState by remember(initialMovementType) {
         mutableStateOf(
             MovementEditorState(
                 movementType = initialMovementType ?: "inbound",
                 reason = defaultReasons.getValue(initialMovementType ?: "inbound"),
-                locationId = components.firstOrNull { it.id == selectedComponentId }?.location.orEmpty(),
             ),
         )
+    }
+    val activeLocations = storageLocations.filterNot(StorageLocationRecord::deleted)
+    val quantities = allocations.asSequence()
+        .filter { it.componentId == selectedComponent?.id }
+        .associate { it.locationId to it.quantity }
+    fun sourceOptions(type: String) = if (type == "outbound" || type == "transfer") {
+        activeLocations.filter { (quantities[it.id] ?: 0) > 0 }
+    } else activeLocations
+    val sourceLocations = sourceOptions(editorState.movementType)
+    val requiresStock = editorState.movementType == "outbound" || editorState.movementType == "transfer"
+    val sourceId = editorState.locationId.ifBlank {
+        sourceLocations.firstOrNull { it.id == selectedComponent?.location }?.id
+            ?: if (requiresStock) sourceLocations.maxByOrNull { quantities[it.id] ?: 0 }?.id.orEmpty() else ""
+    }
+    val stateWithSource = editorState.copy(locationId = sourceId)
+    val sourceIsValid = sourceLocations.any { it.id == sourceId }
+    val available = quantities[sourceId] ?: 0
+    val quantity = editorState.quantityText.toIntOrNull()
+    val requested = when {
+        quantity == null -> 0L
+        requiresStock -> quantity.toLong()
+        editorState.movementType == "adjustment" && quantity < 0 -> -quantity.toLong()
+        else -> 0L
+    }
+    val stockError = if (sourceId.isNotBlank() && requested > available) {
+        stringResource(R.string.movement_source_stock_insufficient, available, requested)
+    } else null
+    val sourceMessage = when {
+        activeLocations.isEmpty() -> stringResource(R.string.movement_no_locations)
+        requiresStock && sourceLocations.isEmpty() -> stringResource(R.string.movement_no_stock_locations)
+        sourceId.isNotBlank() && !sourceIsValid && stockError == null ->
+            stringResource(R.string.scan_stock_select_location)
+        else -> null
     }
 
     AdaptiveFormSurface(
         title = strings.forms.recordStockMovementTitle,
         layoutMode = layoutMode,
         onDismiss = onDismiss,
+        saveEnabled = !saving && selectedComponent != null && sourceIsValid && stockError == null,
         onSave = {
             validateMovementEditorState(
                 strings = strings,
                 selectedComponentId = selectedComponent?.id,
-                state = editorState,
+                state = stateWithSource,
             ).onSuccess { draft ->
-                editorState = editorState.copy(errorMessage = null)
+                saving = true
+                editorState = stateWithSource.copy(errorMessage = null)
                 onSave(draft) { result ->
+                    saving = false
                     if (!result.isSuccess) {
                         editorState = editorState.copy(errorMessage = result.message)
                     }
@@ -575,9 +622,9 @@ internal fun MovementEditorSurface(
                                 DropdownMenuItem(
                                     text = { Text("${component.name} (${component.sku})") },
                                     onClick = {
-                                        selectedComponent = component
+                                        chosenComponentId = component.id
                                         componentMenuExpanded = false
-                                        editorState = editorState.copy(locationId = component.location, errorMessage = null)
+                                        editorState = editorState.copy(locationId = "", errorMessage = null)
                                     },
                                 )
                             }
@@ -589,7 +636,9 @@ internal fun MovementEditorSurface(
                         ValueBlock(label = strings.common.fieldSku, value = component.sku)
                         ValueBlock(label = strings.common.fieldCategory, value = localizedCategoryLabel(component.category))
                         ValueBlock(label = strings.common.fieldPackage, value = component.packageName)
-                        ValueBlock(label = strings.common.fieldLocation, value = component.location)
+                        ValueBlock(label = strings.common.fieldLocation, value = displayLocationName(
+                            component.location, storageLocations, strings.common.labelNotConfigured,
+                        ))
                         ValueBlock(
                             label = strings.movements.currentStockLabel,
                             value = component.quantity.toString(),
@@ -601,6 +650,7 @@ internal fun MovementEditorSurface(
                     onMovementTypeChange = { movementType ->
                         editorState = editorState.copy(
                             movementType = movementType,
+                            locationId = sourceId.takeIf { id -> sourceOptions(movementType).any { it.id == id } }.orEmpty(),
                             reason = if (editorState.reason.isBlank() ||
                                 editorState.reason == defaultReasons[editorState.movementType]
                             ) defaultReasons.getValue(movementType) else editorState.reason,
@@ -612,9 +662,15 @@ internal fun MovementEditorSurface(
         }
         item {
             MovementEntryFields(
-                state = editorState,
+                state = stateWithSource,
                 onStateChange = { editorState = it },
-                storageLocations = storageLocations,
+                storageLocations = activeLocations,
+                sourceLocations = sourceLocations,
+                sourceQuantities = if (requiresStock || editorState.movementType == "adjustment") {
+                    activeLocations.associate { it.id to (quantities[it.id] ?: 0) }
+                } else emptyMap(),
+                stockError = stockError,
+                sourceMessage = sourceMessage,
             )
         }
     }
@@ -653,6 +709,7 @@ internal fun AdaptiveFormSurface(
     saveLabel: String? = null,
     onSave: () -> Unit,
     onSecondarySave: (() -> Unit)? = null,
+    saveEnabled: Boolean = true,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     val strings = vaultStrings()
@@ -693,7 +750,7 @@ internal fun AdaptiveFormSurface(
                                         Text(saveLabel)
                                     }
                                 }
-                                TextButton(onClick = onSave) {
+                                TextButton(onClick = onSave, enabled = saveEnabled) {
                                     Text(strings.common.actionSave)
                                 }
                             },
@@ -727,7 +784,7 @@ internal fun AdaptiveFormSurface(
                                 Text(saveLabel)
                             }
                         }
-                        TextButton(onClick = onSave) {
+                        TextButton(onClick = onSave, enabled = saveEnabled) {
                             Text(strings.common.actionSave)
                         }
                     },

@@ -3,4 +3,6 @@
     <string name="movement_source_location">发生变动的库位</string>
     <string name="movement_destination_location">转入库位</string>
     <string name="movement_no_locations">暂无可选库位，请先在设置中管理库位。</string>
+    <string name="movement_no_stock_locations">该元件在现有库位均无可用库存。</string>
+    <string name="movement_location_with_stock">%1$s · 可用 %2$d 件</string>
 </resources>

@@ -505,11 +505,9 @@ class InventoryViewModel(
         componentId: String,
         movementType: String,
     ) {
+        val coordinator = movementBatchCoordinator()
         updateMovementBatchItem(componentId) { item ->
-            item.copy(
-                movementType = movementType,
-                errorMessage = null,
-            )
+            coordinator.withMovementType(item, movementType)
         }
     }
 

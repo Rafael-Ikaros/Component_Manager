@@ -1,6 +1,7 @@
 package com.componentvault.android.data
 
 import android.app.Application
+import com.componentvault.android.R
 import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.MovementEntryDraft
 import com.componentvault.android.model.StorageLocationSaveIntent
@@ -83,6 +84,59 @@ class BatchTransferTest {
         assertEquals(0, allocation(first, "B"))
         assertEquals(4, allocation(second, "A"))
         assertEquals(0, scalar("SELECT COUNT(*) FROM stock_movements WHERE movement_type = 'transfer'"))
+    }
+
+    @Test fun outboundUsesSelectedLocationBalanceAfterTransferringAllStock() = runBlocking {
+        val component = addComponent("R1", 103)
+        val transfer = repository.transferComponentsBatch("A", "B", listOf(line(component, 103)))
+        assertTrue(transfer.isSuccess, transfer.message)
+        assertEquals("A", repository.loadComponents().first { it.id == component }.location)
+        val draft = MovementEntryDraft(
+            componentId = component, movementType = "outbound", quantity = 2,
+            reason = "Issue stock", note = "", locationId = "A",
+        )
+
+        val rejected = repository.recordMovement(draft)
+        assertFalse(rejected.isSuccess)
+        assertEquals(context.getString(R.string.movement_source_stock_insufficient, 0, 2L), rejected.message)
+        assertEquals(0, allocation(component, "A"))
+        assertEquals(103, allocation(component, "B"))
+        assertEquals(103, repository.loadComponents().first { it.id == component }.quantity)
+        assertEquals(0, scalar("SELECT COUNT(*) FROM stock_movements WHERE movement_type = 'outbound'"))
+
+        val accepted = repository.recordMovement(draft.copy(locationId = "B"))
+        assertTrue(accepted.isSuccess, accepted.message)
+        assertEquals(0, allocation(component, "A"))
+        assertEquals(101, allocation(component, "B"))
+        assertEquals(101, repository.loadComponents().first { it.id == component }.quantity)
+        assertEquals(1, scalar("SELECT COUNT(*) FROM stock_movements WHERE movement_type = 'outbound' AND location_id = 'B'"))
+    }
+
+    @Test fun staleSourceBalanceIsRejected() = runBlocking {
+        val component = addComponent("R1", 3)
+        val transfer = repository.transferComponentsBatch("A", "B", listOf(line(component, 1)))
+        assertTrue(transfer.isSuccess, transfer.message)
+        val outbound = MovementEntryDraft(
+            componentId = component, movementType = "outbound", quantity = 1,
+            reason = "Issue stock", note = "", locationId = "A",
+        )
+        val accepted = repository.recordMovement(outbound)
+        assertTrue(accepted.isSuccess, accepted.message)
+
+        val staleDrafts = listOf(
+            outbound.copy(quantity = 2),
+            outbound.copy(movementType = "transfer", quantity = 2, destinationLocationId = "B"),
+            outbound.copy(movementType = "adjustment", quantity = -2),
+        )
+        for (draft in staleDrafts) {
+            val rejected = repository.recordMovement(draft)
+            assertFalse(rejected.isSuccess)
+            assertEquals(context.getString(R.string.movement_source_stock_insufficient, 1, 2L), rejected.message)
+        }
+        assertEquals(1, allocation(component, "A"))
+        assertEquals(1, allocation(component, "B"))
+        assertEquals(2, repository.loadComponents().first { it.id == component }.quantity)
+        assertEquals(2, scalar("SELECT COUNT(*) FROM stock_movements"))
     }
 
     private suspend fun addComponent(sku: String, quantity: Int): String = repository.saveComponent(ComponentDraft(
