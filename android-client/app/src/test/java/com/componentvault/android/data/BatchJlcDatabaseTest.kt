@@ -63,6 +63,29 @@ class BatchJlcDatabaseTest {
         helper.close()
     }
 
+    @Test fun versionSixMigrationAddsReplayHistoryAndPreservesInventory() {
+        val helper = InventoryDatabaseHelper(context)
+        try {
+            SQLiteDatabase.create(null).use { db ->
+                helper.onCreate(db)
+                db.execSQL("DROP TABLE inventory_replay_history")
+                db.execSQL("INSERT INTO components(id,sku,name,category,package_name,location,quantity,min_stock,updated_at) " +
+                    "VALUES('kept','C100','Part','IC','0603','A',7,0,'2026-10-22T01:00:00Z')")
+                helper.onUpgrade(db, 6, 7)
+                db.rawQuery("SELECT quantity FROM components WHERE id='kept'", null).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(7, it.getInt(0))
+                }
+                db.rawQuery("SELECT COUNT(*) FROM inventory_replay_history", null).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(0, it.getInt(0))
+                }
+            }
+        } finally {
+            helper.close()
+        }
+    }
+
     @Test fun costFlowsAndUnknownInbound() = runBlocking {
         val original = repository.loadComponents().single()
         assertTrue(repository.saveComponent(ComponentDraft(id = original.id, sku = original.sku, name = original.name, category = original.category, packageName = original.packageName, location = original.location, description = original.description, quantity = 10, minStock = 1, valuationUnitCost = "1", expectedUpdatedAt = original.updatedAt)).isSuccess)
@@ -169,7 +192,7 @@ class BatchJlcDatabaseTest {
         }
         assertEquals(10, number("SELECT quantity FROM components WHERE sku='C70565'"))
         assertEquals(10, number("SELECT SUM(quantity) FROM component_allocations"))
-        assertEquals(6, number("PRAGMA user_version"))
+        assertEquals(7, number("PRAGMA user_version"))
         assertEquals(1, number("SELECT COUNT(*) FROM components WHERE sku='C70565' AND inventory_unit_cost IS NULL"))
         assertEquals(1, number("SELECT COUNT(*) FROM stock_movements WHERE id='old-movement' AND quantity=10 AND purchase_amount IS NULL AND cost_amount IS NULL"))
 

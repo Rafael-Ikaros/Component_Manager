@@ -26,6 +26,9 @@ import com.componentvault.android.model.InventoryScreenUiState
 import com.componentvault.android.model.InventorySortOption
 import com.componentvault.android.model.InventoryStockFilter
 import com.componentvault.android.model.InventoryUiState
+import com.componentvault.android.model.InventoryConflictComponent
+import com.componentvault.android.model.InventoryConflictMovementEdit
+import com.componentvault.android.model.InventoryConflictReview
 import com.componentvault.android.model.MovementBatchQueueItemUiState
 import com.componentvault.android.model.MovementBatchSessionUiState
 import com.componentvault.android.model.MovementBatchStage
@@ -42,12 +45,21 @@ import com.componentvault.android.model.ComponentAllocationRecord
 import com.componentvault.android.model.SyncConfiguration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import android.net.Uri
 
 internal data class InventoryBackupUiState(
     val loading:Boolean=false,
     val preview:InventoryRepository.WorkbookPreview?=null,
     val message:String="",
+)
+
+internal data class InventoryConflictReviewUiState(
+    val review: InventoryConflictReview? = null,
+    val loading: Boolean = false,
+    val submitting: Boolean = false,
+    val message: String? = null,
+    val failed: Boolean = false,
 )
 
 class InventoryViewModel(
@@ -80,6 +92,8 @@ class InventoryViewModel(
     private val defaultSyncMessage = application.getString(R.string.sync_no_sync_yet)
     private val defaultLastSyncedAt = application.getString(R.string.sync_never)
     internal var backupUiState by mutableStateOf(InventoryBackupUiState())
+        private set
+    internal var conflictReviewUiState by mutableStateOf(InventoryConflictReviewUiState())
         private set
 
     var uiState by mutableStateOf(
@@ -763,6 +777,65 @@ class InventoryViewModel(
             uiState = uiState.copy(isBusy = true)
             val result = repository.clearImportLearningMappings()
             reloadState(result.message)
+        }
+    }
+
+    internal fun loadInventoryConflictReview() {
+        if (uiState.isBusy || conflictReviewUiState.loading || conflictReviewUiState.submitting) return
+        viewModelScope.launch {
+            conflictReviewUiState = conflictReviewUiState.copy(loading = true, message = null, failed = false)
+            try {
+                conflictReviewUiState = InventoryConflictReviewUiState(review = repository.loadInventoryConflictReview())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                conflictReviewUiState = conflictReviewUiState.copy(
+                    loading = false,
+                    message = error.message ?: getApplication<Application>().getString(R.string.sync_conflict_load_failed),
+                    failed = true,
+                )
+            }
+        }
+    }
+
+    internal fun replayInventoryConflict(
+        component: InventoryConflictComponent,
+        edits: List<InventoryConflictMovementEdit>,
+    ) {
+        if (uiState.isBusy || conflictReviewUiState.loading || conflictReviewUiState.submitting) return
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            conflictReviewUiState = conflictReviewUiState.copy(submitting = true, message = null, failed = false)
+            uiState = uiState.copy(isBusy = true)
+            try {
+                val replay = repository.replayInventoryConflict(component, edits)
+                if (!replay.operation.isSuccess) {
+                    conflictReviewUiState = conflictReviewUiState.copy(message = replay.operation.message, failed = true)
+                    return@launch
+                }
+                // This component's replay is committed locally. Remove the old review so it cannot be submitted again.
+                val review = conflictReviewUiState.review
+                conflictReviewUiState = conflictReviewUiState.copy(
+                    review = review?.copy(components = review.components.filterNot { it.id == component.id }),
+                    message = context.getString(R.string.sync_conflict_saved_pending),
+                )
+                val result = repository.syncReviewedInventory(component.id, checkNotNull(replay.savedVersion))
+                conflictReviewUiState = conflictReviewUiState.copy(message = result.message, failed = !result.isSuccess)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                val fallback = context.getString(R.string.sync_conflict_submit_failed)
+                val detail = error.message ?: fallback
+                conflictReviewUiState = conflictReviewUiState.copy(
+                    message = conflictReviewUiState.message?.let { "$it\n$detail" } ?: detail,
+                    failed = true,
+                )
+            } finally {
+                conflictReviewUiState = conflictReviewUiState.copy(submitting = false)
+                withContext(kotlinx.coroutines.NonCancellable) {
+                    try { reloadState() } finally { uiState = uiState.copy(isBusy = false) }
+                }
+            }
         }
     }
 

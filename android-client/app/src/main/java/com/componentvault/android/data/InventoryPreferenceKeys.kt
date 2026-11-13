@@ -16,6 +16,7 @@ internal object InventoryPreferenceKeys {
     const val SYNC_RUN_PHASE = "sync_run_phase"
     const val SYNC_CONFIG_GENERATION = "sync_config_generation"
     const val SYNC_RUN_GENERATION = "sync_run_generation"
+    const val SYNC_INVENTORY_CONFLICT = "sync_inventory_conflict"
     const val INVENTORY_SUCCESS_GENERATION = "inventory_success_generation"
     const val BOM_SUCCESS_GENERATION = "bom_success_generation"
     const val BOM_LAST_SYNCED_AT = "bom_last_synced_at"

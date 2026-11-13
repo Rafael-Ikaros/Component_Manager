@@ -7,6 +7,10 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.annotation.StringRes
 import com.componentvault.android.R
 import com.componentvault.android.model.OperationResult
+import com.componentvault.android.model.InventoryConflictComponent
+import com.componentvault.android.model.InventoryConflictMovementEdit
+import com.componentvault.android.model.InventoryConflictReplayResult
+import com.componentvault.android.model.InventoryConflictReview
 import com.componentvault.android.model.SyncConfiguration
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -90,6 +94,7 @@ internal class InventorySyncService(
                     R.string.sync_run_pending else R.string.sync_run_complete
                 "Partial" -> if (pending.first != 0 || pending.second != 0) R.string.sync_run_new_changes_pending else R.string.sync_run_partial
                 "Failed" -> R.string.sync_run_failed
+                "Conflict" -> R.string.sync_replay_required
                 else -> R.string.sync_run_pending
             })
         }
@@ -132,7 +137,11 @@ internal class InventorySyncService(
         }
     }
 
-    internal suspend fun runSync(configuration: () -> SyncConfiguration): OperationResult = syncMutex.withLock {
+    internal suspend fun runSync(
+        reviewedComponentId: String? = null,
+        reviewedVersion: String? = null,
+        configuration: () -> SyncConfiguration,
+    ): OperationResult = syncMutex.withLock {
         withContext(Dispatchers.IO) {
             val settings = configuration()
             syncContext = currentCoroutineContext()
@@ -192,14 +201,45 @@ internal class InventorySyncService(
                 }
                 ensureSyncActive()
                 saveRunState("Running", "Inventory")
-                val pushPayload = buildPushPayload(settings.deviceId)
-                val pushResponse = callJson(
-                    settings = endpoint.configuration,
-                    method = "POST",
-                    path = "/sync/push",
-                    body = pushPayload.payload,
-                    accountId = accountId,
-                )
+                val pushPayload = buildPushPayload(settings.deviceId, reviewedComponentId)
+                if (reviewedComponentId != null) {
+                    val queued = pushPayload.queuedEntities.firstOrNull { it.entityType == "component" }
+                    check(queued != null && queued.entityUpdatedAt == reviewedVersion) { text(R.string.sync_replay_pending_changed) }
+                }
+                val pushResponse = try {
+                    callJson(
+                        settings = endpoint.configuration,
+                        method = "POST",
+                        path = "/sync/push",
+                        body = pushPayload.payload,
+                        accountId = accountId,
+                    )
+                } catch (error: SyncHttpException) {
+                    if (error.status == 409 && error.isInventoryVersionConflict) {
+                        preferences.edit().putBoolean(InventoryPreferenceKeys.SYNC_INVENTORY_CONFLICT, true).commit()
+                        val message = "${text(R.string.sync_replay_required)} ${error.message.orEmpty()}"
+                        saveRunState("Conflict", "Inventory", message)
+                        return@withContext OperationResult(false, message)
+                    }
+                    throw error
+                }
+                if (reviewedComponentId != null) {
+                    val message = text(R.string.sync_replay_uploaded)
+                    synchronized(syncConfigurationLock) {
+                        checkSyncConfigurationUnchanged(settings)
+                        databaseHelper.writableDatabase.use { db ->
+                            db.beginTransaction()
+                            try {
+                                acknowledgePush(db, pushPayload.queuedEntities)
+                                db.setTransactionSuccessful()
+                            } finally {
+                                db.endTransaction()
+                            }
+                        }
+                    }
+                    saveRunState("Partial", "", message)
+                    return@withContext OperationResult(true, message)
+                }
                 val cursor = readStoredSyncCursor()
                 val pullResponse = callJson(
                     settings = endpoint.configuration,
@@ -235,10 +275,14 @@ internal class InventorySyncService(
                         }
                     }
                     saveSyncCursor(cursorDecision)
-                    preferences.edit()
+                    val inventorySettings = preferences.edit()
                         .putString(InventoryPreferenceKeys.LAST_SYNCED_AT, pullResponse.optString("server_time"))
                         .putInt(InventoryPreferenceKeys.INVENTORY_SUCCESS_GENERATION,
-                            preferences.getInt(InventoryPreferenceKeys.SYNC_CONFIG_GENERATION, 0)).commit()
+                            preferences.getInt(InventoryPreferenceKeys.SYNC_CONFIG_GENERATION, 0))
+                    if (preferences.getBoolean(InventoryPreferenceKeys.SYNC_INVENTORY_CONFLICT, false) &&
+                        pendingSummary().first == 0
+                    ) inventorySettings.remove(InventoryPreferenceKeys.SYNC_INVENTORY_CONFLICT)
+                    inventorySettings.commit()
                 }
 
                 inventoryComplete = true
@@ -299,7 +343,12 @@ internal class InventorySyncService(
                     saveRunState("Cancelled", preferences.getString(InventoryPreferenceKeys.SYNC_RUN_PHASE, "").orEmpty(), text(R.string.sync_run_cancelled))
                     throw kotlinx.coroutines.CancellationException(text(R.string.sync_run_cancelled), exception)
                 }
-                saveRunState(if (inventoryComplete) "Partial" else "Failed", preferences.getString(InventoryPreferenceKeys.SYNC_RUN_PHASE, "").orEmpty())
+                val failureState = when {
+                    reviewedComponentId != null -> "Conflict"
+                    inventoryComplete -> "Partial"
+                    else -> "Failed"
+                }
+                saveRunState(failureState, preferences.getString(InventoryPreferenceKeys.SYNC_RUN_PHASE, "").orEmpty())
                 updateSyncStatus(
                     lastSyncedAt = null,
                     message = exception.message ?: text(R.string.sync_failed),
@@ -317,6 +366,72 @@ internal class InventorySyncService(
             }
         }
     }
+
+    internal suspend fun loadConflictReview(configuration: () -> SyncConfiguration): InventoryConflictReview =
+        withConflictSnapshot(configuration) { db, snapshot ->
+            conflictReplay.review(db, snapshot)
+        }
+
+    internal suspend fun replayConflict(
+        configuration: () -> SyncConfiguration,
+        component: InventoryConflictComponent,
+        edits: List<InventoryConflictMovementEdit>,
+        writeService: InventoryWriteService,
+    ): InventoryConflictReplayResult = try {
+        val version = withConflictSnapshot(configuration) { db, snapshot ->
+            conflictReplay.replay(db, snapshot, component, edits, writeService)
+        }
+        InventoryConflictReplayResult(OperationResult(true, text(R.string.sync_replay_saved)), version)
+    } catch (error: kotlinx.coroutines.CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        InventoryConflictReplayResult(OperationResult(false, error.message ?: text(R.string.sync_failed)))
+    }
+
+    private suspend fun <T> withConflictSnapshot(
+        configuration: () -> SyncConfiguration,
+        block: (SQLiteDatabase, JSONObject) -> T,
+    ): T = syncMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val settings = configuration()
+            syncContext = currentCoroutineContext()
+            try {
+                val endpoint = resolveSyncEndpoint(settings)
+                val identity = requireSyncIdentity(endpoint)
+                val accountId = identity.getString("account_id")
+                synchronized(syncConfigurationLock) {
+                    checkSyncConfigurationUnchanged(settings)
+                    check(preferences.getString(InventoryPreferenceKeys.BOUND_SERVER_ID, null) == identity.getString("server_id") &&
+                        preferences.getString(InventoryPreferenceKeys.BOUND_ACCOUNT_ID, null) == accountId
+                    ) { text(R.string.sync_account_mismatch) }
+                }
+                val snapshot = callJson(endpoint.configuration, "GET", SyncProtocol.pullPath(null), null,
+                    accountId = accountId)
+                check(snapshot.optInt("inventory_protocol") == 1 && snapshot.optInt("cost_protocol") == 1) {
+                    text(R.string.sync_inventory_protocol_unavailable)
+                }
+                synchronized(syncConfigurationLock) {
+                    checkSyncConfigurationUnchanged(settings)
+                    ensureSyncActive()
+                    databaseHelper.writableDatabase.use { db ->
+                        db.beginTransactionNonExclusive()
+                        try {
+                            val result = block(db, snapshot)
+                            ensureSyncActive()
+                            db.setTransactionSuccessful()
+                            result
+                        } finally {
+                            db.endTransaction()
+                        }
+                    }
+                }
+            } finally {
+                syncContext = null
+            }
+        }
+    }
+
+    private val conflictReplay = InventoryConflictReplay(appContext, this)
 
     /** Preset failures are partial failures: successful inventory sync remains committed. */
     private fun syncBomPresets(endpoint: ResolvedSyncEndpoint<JSONObject>, settings: SyncConfiguration, accountId: String): Pair<Boolean, String> {
@@ -349,60 +464,74 @@ internal class InventorySyncService(
             false to " " + text(R.string.sync_bom_failed, error.message ?: text(R.string.sync_failed))
         }
     }
-    private fun buildPushPayload(deviceId: String): SyncPayload {
-        databaseHelper.readableDatabase.use { db ->
-            val queuedEntities = mutableListOf<QueuedEntity>()
-            db.rawQuery(
-                """
-                SELECT entity_type, entity_id, entity_updated_at
-                FROM sync_queue
-                ORDER BY created_at ASC
-                """.trimIndent(),
-                null,
-            ).use { cursor ->
-                while (cursor.moveToNext()) {
-                    queuedEntities += QueuedEntity(
-                        entityType = cursor.getString(cursor.getColumnIndexOrThrow("entity_type")),
-                        entityId = cursor.getString(cursor.getColumnIndexOrThrow("entity_id")),
-                        entityUpdatedAt = cursor.getString(cursor.getColumnIndexOrThrow("entity_updated_at")),
-                    )
-                }
+    private fun buildPushPayload(deviceId: String, componentId: String?): SyncPayload =
+        databaseHelper.writableDatabase.use { db ->
+            db.beginTransactionNonExclusive()
+            try {
+                val result = buildPushPayload(db, deviceId, componentId)
+                db.setTransactionSuccessful()
+                result
+            } finally {
+                db.endTransaction()
             }
-
-            val payload = JSONObject().apply {
-                put("device_id", deviceId)
-                put("cost_protocol", 1)
-                put("inventory_protocol", 1)
-                put("components", JSONArray())
-                put("stock_movements", JSONArray())
-                put("storage_locations", getStorageLocationsJson(db))
-            }
-
-            queuedEntities.forEach { entity ->
-                when (entity.entityType) {
-                    "component" -> {
-                        val component = checkNotNull(getComponentJson(db, entity.entityId)) {
-                            text(R.string.sync_missing_queued_record, entity.entityId)
-                        }
-                        payload.getJSONArray("components").put(component)
-                    }
-                    "stock_movement" -> {
-                        val movement = checkNotNull(getMovementJson(db, entity.entityId)) {
-                            text(R.string.sync_missing_queued_record, entity.entityId)
-                        }
-                        payload.getJSONArray("stock_movements").put(movement)
-                    }
-                }
-            }
-
-            return SyncPayload(
-                payload = payload,
-                queuedEntities = queuedEntities,
-            )
         }
+
+    private fun buildPushPayload(db: SQLiteDatabase, deviceId: String, componentId: String?): SyncPayload {
+        val queuedEntities = mutableListOf<QueuedEntity>()
+        val targetFilter = if (componentId == null) "" else """
+            WHERE (entity_type = 'component' AND entity_id = ?)
+               OR (entity_type = 'stock_movement' AND entity_id IN
+                   (SELECT id FROM stock_movements WHERE component_id = ?))
+        """.trimIndent()
+        db.rawQuery(
+            """
+            SELECT entity_type, entity_id, entity_updated_at
+            FROM sync_queue
+            $targetFilter
+            ORDER BY created_at ASC
+            """.trimIndent(),
+            componentId?.let { arrayOf(it, it) },
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                queuedEntities += QueuedEntity(
+                    entityType = cursor.getString(cursor.getColumnIndexOrThrow("entity_type")),
+                    entityId = cursor.getString(cursor.getColumnIndexOrThrow("entity_id")),
+                    entityUpdatedAt = cursor.getString(cursor.getColumnIndexOrThrow("entity_updated_at")),
+                )
+            }
+        }
+
+        val payload = JSONObject().apply {
+            put("device_id", deviceId)
+            put("cost_protocol", 1)
+            put("inventory_protocol", 1)
+            put("components", JSONArray())
+            put("stock_movements", JSONArray())
+            // Review only accepts existing server locations. Leave unrelated local location changes queued for normal sync.
+            put("storage_locations", if (componentId == null) getStorageLocationsJson(db) else JSONArray())
+        }
+
+        queuedEntities.forEach { entity ->
+            when (entity.entityType) {
+                "component" -> {
+                    val component = checkNotNull(getComponentJson(db, entity.entityId)) {
+                        text(R.string.sync_missing_queued_record, entity.entityId)
+                    }
+                    payload.getJSONArray("components").put(component)
+                }
+                "stock_movement" -> {
+                    val movement = checkNotNull(getMovementJson(db, entity.entityId)) {
+                        text(R.string.sync_missing_queued_record, entity.entityId)
+                    }
+                    payload.getJSONArray("stock_movements").put(movement)
+                }
+            }
+        }
+
+        return SyncPayload(payload = payload, queuedEntities = queuedEntities)
     }
 
-    private fun getComponentJson(
+    internal fun getComponentJson(
         db: SQLiteDatabase,
         componentId: String,
     ): JSONObject? {
@@ -459,7 +588,8 @@ internal class InventorySyncService(
         }
     }
 
-    private fun getMovementJson(
+    @JvmName("getMovementJson")
+    internal fun getMovementJson(
         db: SQLiteDatabase,
         movementId: String,
     ): JSONObject? {
@@ -556,7 +686,12 @@ internal class InventorySyncService(
                 if (path == "/auth/me" && responseCode == 404) {
                     throw IllegalStateException(text(R.string.sync_identity_route_unavailable))
                 }
-                throw IllegalStateException(buildErrorMessage(responseCode, responseText))
+                val detail = runCatching { JSONObject(responseText).optString("detail") }.getOrDefault("")
+                val inventoryConflict = path == "/sync/push" && (
+                    detail.startsWith("Inventory conflict for ") ||
+                        detail.startsWith("A changed inventory snapshot")
+                    )
+                throw SyncHttpException(responseCode, buildErrorMessage(responseCode, responseText), inventoryConflict)
             }
             if (responseText.isBlank()) {
                 JSONObject()
@@ -686,8 +821,12 @@ internal class InventorySyncService(
             )
         }
 
-        pushedEntities.forEach { entity ->
-            if (entity.entityType == "component" && entity.entityId !in remoteIds) {
+        acknowledgePush(db, pushedEntities, remoteIds)
+    }
+
+    private fun acknowledgePush(db: SQLiteDatabase, entities: List<QueuedEntity>, pulledIds: Set<String> = emptySet()) {
+        entities.forEach { entity ->
+            if (entity.entityType == "component" && entity.entityId !in pulledIds) {
                 db.execSQL("UPDATE components SET base_updated_at = ? WHERE id = ?", arrayOf(entity.entityUpdatedAt, entity.entityId))
             }
             removeQueuedIfSuperseded(
@@ -699,7 +838,7 @@ internal class InventorySyncService(
         }
     }
 
-    private fun upsertRemoteComponent(
+    internal fun upsertRemoteComponent(
         db: SQLiteDatabase,
         component: JSONObject,
     ) {
@@ -731,7 +870,8 @@ internal class InventorySyncService(
         if (db.update("components", values, "id = ?", arrayOf(id)) == 0) {
             db.insertOrThrow("components", null, values)
         }
-        val allocations = component.optJSONArray("allocations") ?: JSONArray().put(
+        val serverAllocations = component.optJSONArray("allocations")
+        val allocations = serverAllocations ?: JSONArray().put(
             JSONObject().put("location_id", component.getString("location").trim().ifBlank { "待整理" })
                 .put("quantity", component.getInt("quantity")),
         )
@@ -739,7 +879,7 @@ internal class InventorySyncService(
             db.delete("component_allocations", "component_id = ?", arrayOf(component.getString("id")))
             for (index in 0 until allocations.length()) {
                 val allocation = allocations.getJSONObject(index)
-                if (component.optJSONArray("allocations") == null) {
+                if (serverAllocations == null) {
                     ensureStorageLocation(db, allocation.getString("location_id"), component.getString("updated_at"))
                 }
                 setAllocationQuantity(
@@ -849,7 +989,7 @@ internal class InventorySyncService(
         editor.apply()
     }
 
-    private fun upsertRemoteStorageLocation(db: SQLiteDatabase, location: JSONObject) {
+    internal fun upsertRemoteStorageLocation(db: SQLiteDatabase, location: JSONObject) {
         val id = location.getString("id")
         val remoteUpdatedAt = location.getString("updated_at")
         val existingUpdatedAt = db.rawQuery(
@@ -929,3 +1069,9 @@ internal class InventorySyncService(
     )
 
 }
+
+private class SyncHttpException(
+    val status: Int,
+    message: String,
+    val isInventoryVersionConflict: Boolean,
+) : IllegalStateException(message)

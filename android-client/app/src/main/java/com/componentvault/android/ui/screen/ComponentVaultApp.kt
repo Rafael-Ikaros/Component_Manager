@@ -103,6 +103,7 @@ fun ComponentVaultApp(
     var inventoryScannerVisible by rememberSaveable { mutableStateOf(false) }
     var inventoryScanMessage by remember { mutableStateOf<String?>(null) }
     var inventoryBackupVisible by rememberSaveable { mutableStateOf(false) }
+    var syncConflictReviewVisible by rememberSaveable { mutableStateOf(false) }
     var batchJlcVisible by rememberSaveable { mutableStateOf(false) }
     var batchCodeImport by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -490,6 +491,11 @@ fun ComponentVaultApp(
                 onDismiss = { inventoryBackupVisible = false; viewModel.clearInventoryBackupState() },
             )
 
+            syncConflictReviewVisible -> InventoryConflictReviewScreen(
+                viewModel = viewModel,
+                onDismiss = { syncConflictReviewVisible = false },
+            )
+
             batchJlcVisible -> BatchJlcInboundScreen(
                 appPreferences=uiState.appPreferences,
                 syncConfiguration=uiState.syncConfiguration,
@@ -696,6 +702,7 @@ fun ComponentVaultApp(
                                 onSaveAppPreferences = viewModel::saveAppPreferences,
                                 onTestConnection = viewModel::testConnection,
                                 onSyncNow = viewModel::runSync,
+                                onReviewSyncConflict = { syncConflictReviewVisible = true },
                                 onClearImportLearningMappings = viewModel::clearImportLearningMappings,
                                 onManageLocations = { storageLocationsVisible = true },
                                 onBackupRestore = { inventoryBackupVisible = true },

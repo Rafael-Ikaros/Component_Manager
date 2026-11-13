@@ -14,6 +14,7 @@ data class SyncConfiguration(
     val bomLastSyncedAt: String = "",
     val pendingInventory: Int = 0,
     val pendingBomPresets: Int = 0,
+    val hasInventoryConflict: Boolean = false,
 ) {
     val apiTokenMasked: String
         get() {

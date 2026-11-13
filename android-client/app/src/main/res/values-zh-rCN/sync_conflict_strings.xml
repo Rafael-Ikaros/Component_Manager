@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_replay_required">服务端库存已变动。请先复核待同步的出入库，再重试。</string>
+    <string name="sync_replay_uploaded">已同步复核过的出入库。其他待同步数据可通过「立即同步」处理。</string>
+    <string name="sync_replay_saved">复核过的出入库已保存到本机。</string>
+    <string name="sync_replay_deleted_component">该元件已在本机或服务端删除，待同步改动仍保存在本机。</string>
+    <string name="sync_replay_legacy_component">该服务端元件缺少库位分配记录。</string>
+    <string name="sync_replay_unsupported_movement">此冲突包含待确认出入库以外的改动，待同步内容仍保存在本机。</string>
+    <string name="sync_replay_stale">复核期间库存或待同步流水已变化，请刷新后重新核对数量和库位。</string>
+    <string name="sync_replay_pending_changed">复核后待同步库存又发生了变化，请重新同步以检查最新改动。</string>
+    <string name="sync_replay_location_unavailable">所选库位在服务端不可用。</string>
+    <string name="sync_replay_purchase_quantity">已有采购金额的入库须保留原数量。</string>
+    <string name="sync_conflict_review_title">复核同步冲突</string>
+    <string name="sync_conflict_review_description">请对照服务端当前库存复核待同步的出入库。确认后会备份原本地记录，保留服务端的元件资料，并在服务端库存的基础上重新应用所列流水。其他改动需要单独处理。</string>
+    <string name="sync_conflict_load_failed">无法读取同步复核。</string>
+    <string name="sync_conflict_submit_failed">无法应用已复核的库存流水。</string>
+    <string name="sync_conflict_saved_pending">复核后的流水已在本机保存，等待上传。</string>
+    <string name="sync_conflict_refresh">刷新服务端库存</string>
+    <string name="sync_conflict_no_components">当前没有需要复核的元件。</string>
+    <string name="sync_conflict_server_total">服务端库存 %1$d 件</string>
+    <string name="sync_conflict_view_component">复核流水</string>
+    <string name="sync_conflict_inbound">入库</string>
+    <string name="sync_conflict_outbound">出库</string>
+    <string name="sync_conflict_movement_step">%1$d · %2$s</string>
+    <string name="sync_conflict_quantity">数量</string>
+    <string name="sync_conflict_check_movements">请为每条流水选择库位并填写正数数量。出库时需确认所选库位有足够库存。</string>
+    <string name="sync_conflict_purchase_fixed">原采购总额 ¥%1$s。为保留原采购记录，此笔数量固定。</string>
+    <string name="sync_conflict_location">库位</string>
+    <string name="sync_conflict_confirm_action">确认重新应用</string>
+    <string name="sync_conflict_confirm_commit">确认并同步</string>
+    <string name="sync_conflict_confirm_description">要按本页显示的服务端库存重新应用 %1$s 的 %2$d 条复核流水吗？保存前会再次核对服务端版本。</string>
+</resources>

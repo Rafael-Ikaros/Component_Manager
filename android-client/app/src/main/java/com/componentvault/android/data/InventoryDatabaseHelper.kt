@@ -77,6 +77,7 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
         createMultiLocationTables(db)
         createBackupTables(db)
         createBatchJlcTables(db)
+        createInventoryReplayHistory(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -117,6 +118,20 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
             db.execSQL("ALTER TABLE stock_movements ADD COLUMN purchase_amount TEXT")
             db.execSQL("ALTER TABLE stock_movements ADD COLUMN cost_amount TEXT")
         }
+        if (oldVersion < 7 && newVersion >= 7) createInventoryReplayHistory(db)
+    }
+
+    private fun createInventoryReplayHistory(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS inventory_replay_history (
+                id INTEGER PRIMARY KEY,
+                component_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                local_snapshot TEXT NOT NULL
+            )
+            """.trimIndent(),
+        )
     }
 
     private fun createImportLearningTables(db: SQLiteDatabase) {
@@ -263,6 +278,6 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
 
     private companion object {
         const val DATABASE_NAME = "component-vault.db"
-        const val DATABASE_VERSION = 6
+        const val DATABASE_VERSION = 7
     }
 }

@@ -17,6 +17,7 @@ import com.componentvault.android.data.bom.BomInboundItem
 import com.componentvault.android.data.bom.BomProcurementStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 
@@ -626,7 +627,7 @@ internal class InventoryWriteService(
         }
     }
 
-    private fun validateMovementDraft(draft: MovementEntryDraft) {
+    internal fun validateMovementDraft(draft: MovementEntryDraft) {
         if (draft.componentId.isBlank() || draft.reason.isBlank() || draft.movementType.isBlank()) {
             throw IllegalStateException(text(R.string.sync_choose_component_type_reason))
         }
@@ -643,18 +644,19 @@ internal class InventoryWriteService(
         }
     }
 
-    private fun applyMovementDrafts(
+    internal fun applyMovementDrafts(
         db: SQLiteDatabase,
         drafts: List<MovementEntryDraft>,
+        previousMovements: List<JSONObject>? = null,
     ) {
-        drafts.forEach { draft ->
+        drafts.forEachIndexed { index, draft ->
             val component = getComponentById(db, draft.componentId)
                 ?: throw IllegalStateException(text(R.string.sync_choose_active_component_first))
 
             val sourceLocation = draft.locationId?.trim()?.takeIf(String::isNotEmpty) ?: component.location
             val destinationLocation = draft.destinationLocationId?.trim()?.takeIf(String::isNotEmpty)
             val delta = calculateQuantityDelta(draft.movementType, draft.quantity)
-            val newQuantity = component.quantity + delta
+            val newQuantity = Math.addExact(component.quantity, delta)
 
             val updatedAt = utcNow()
             ensureStorageLocation(db, sourceLocation, updatedAt)
@@ -679,7 +681,8 @@ internal class InventoryWriteService(
                 draft.movementType == "inbound" -> InventoryCost.inbound(component.quantity, component.inventoryUnitCost, draft.quantity, draft.purchaseAmount)
                 else -> component.inventoryUnitCost
             }
-            val movementId = "mov-${randomId()}"
+            val previous = previousMovements?.get(index)
+            val movementId = previous?.getString("id") ?: "mov-${randomId()}"
             val movementValues = ContentValues().apply {
                 put("id", movementId)
                 put("component_id", draft.componentId)
@@ -688,8 +691,8 @@ internal class InventoryWriteService(
                 put("cost_amount", if (draft.movementType == "inbound") InventoryCost.text(InventoryCost.decimal(draft.purchaseAmount)) else if (draft.movementType == "transfer") null else InventoryCost.amount(component.inventoryUnitCost, draft.quantity))
                 put("quantity", normalizeMovementQuantity(draft.movementType, draft.quantity))
                 put("reason", draft.reason.trim())
-                put("note", draft.note.trim())
-                put("happened_at", updatedAt)
+                put("note", if (previous != null && previous.isNull("note")) null else draft.note.trim())
+                put("happened_at", previous?.getString("happened_at") ?: updatedAt)
                 put("updated_at", updatedAt)
                 put("deleted", 0)
                 put("location_id", sourceLocation)

@@ -99,6 +99,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - `InventoryRepository` 保留配置、读取和预览入口；`InventoryWriteService` 管理元件、库位、出入库、批量入库和转移事务，`InventoryImportCatalog` 管理识别、官方查询、学习映射与查询缓存。学习映射写入复用元件保存的同一个 SQLite 事务。
 - `InventorySyncService` 管理网络交换、账户绑定、上传快照、拉取和队列确认；与保存同步配置共用配置锁。账户检查仍在上传前，拉取及队列确认同事务提交，随后保存游标。`InventoryPreferenceKeys` 集中共享键值，不改变已有设置文件或键名。
 - Android 拉取按元件 ID 写入。相同 SKU 仍被另一条本地记录占用时回滚拉取，保留本地数据、待同步记录和游标。编辑器保存时核对打开表单时的版本，避免覆盖表单打开后发生的库存变动。
+- Android 收到库存版本冲突后，在设置的同步页提供复核入口。预览读取服务端库存和库位，确认时再次核对服务端版本、本地待同步流水和库位。复核按元件处理，沿用库存事务和成本规则。原本地快照归档后，已核对的流水基于服务端库存重新计算，按原流水 ID 单独上传。正常同步继续使用原游标和服务端版本校验。
 - 流水的来源/目标库位区分 JSON 空值与文本。同步事务仅修正不存在对应真实库位的历史 `null` 字符串引用，保留流水、库存和原时间；不新增 schema 迁移。
 - Android 设置和库存内容消费外层安全区域后处理 IME inset；主导航切换清除输入焦点。库存的全部、低库存、分类、库位、排序共用单行横向滚动栏，直接下拉立即生效；不再提供重复的综合筛选按钮与面板。底部 NavigationBar 在 IME 实际遮住底部时使用 NavigationSuiteType.None 释放占高，库存外部底边距同时归零，页面继续负责 imePadding；不改变 MainActivity 的全局窗口策略，侧边 rail 不受影响。
 - 主 Tab 与设置分组内容使用 180ms 原生 Animatable 淡入，只组合当前页面；独立 SecondaryPageScaffold 额外上移 8dp，不在普通重组或 IME 变化时重播。原生时长缩放响应系统设置，不改系统配置。SaveableStateHolder 保留草稿和滚动状态。
@@ -106,7 +107,7 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - 库存筛选、结果操作、多选区与元件行共用一个LazyColumn；键盘展开或短窗口时可把头部滚出以完整查看元件，不固定占满列表高度。搜索值仍来自原ViewModel，滚回顶部可继续调整筛选，不增加库存提交入口。
 - 平板库存行和详情呈现独立在 `InventoryTabletParts.kt`，复用原左滑动作和业务回调；Expanded 窗口在扣除导航、页边距后的净宽达到836dp时显示420dp列表与详情，否则沿同一 Adaptive navigator 单窗格切换，Medium走独立详情路线。主界面及各主导航目的地使用 SaveableStateHolder 保留列表/设置上下文。设置净宽达到700dp时采用240dp分组导航及最大640dp表单，较窄时逐页进入；输入草稿与分组滚动使用 Compose 保存状态，不自动保存业务配置或触发同步。
 - 编辑/出入库/立创导入共用 `AdaptiveFormSurface`：大屏 Dialog 在自身窗口消费系统栏与 IME inset，最大宽度760dp，顶部操作固定在可见区域，字段列表使用剩余高度；紧凑布局消费 Scaffold inset 后处理 IME。项目用料/迁移预览的说明、行和末尾操作共用一个 LazyColumn，标签纸张面板的确认按钮避让键盘。通用二级 Scaffold 不重复增加全局 IME padding。
-- `InventoryWorkbookService` 管理备份预览、恢复和恢复失败时的图片清理；`BomReleaseCommitter` 和 `ComponentHubImporter` 管理各自提交。`InventorySqlOps` 只提供接受现有连接的分配/队列辅助，不另开事务。数据库文件、schema v5、升级备份和历史数据格式保持不变。
+- `InventoryWorkbookService` 管理备份预览、恢复和恢复失败时的图片清理；`BomReleaseCommitter` 和 `ComponentHubImporter` 管理各自提交。`InventorySqlOps` 使用调用方的事务。Android schema v7 新增本地 `inventory_replay_history`，记录复核前的元件和待同步流水快照。它随应用数据库保留，Excel 备份和服务端同步不传输这张表。
 
 Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享库存状态。完整编辑器在应用根节点使用同一组合位置，紧凑全屏与宽屏对话框切换不另建草稿状态。完整编辑器的文字、数量、库位以及导入来源使用 Compose 保存状态；待提交扫码批次通过 `SavedStateHandle` 保存用户输入，重建时重新读取当前库存，恢复到复核状态，不自动执行库存写入。取消或成功后清理草稿，提交失败保留供修正。已采纳的本地图片随编辑会话恢复；明确取消（包括系统返回）才删除会话新建图片，保存成功保留采用的图片。系统保存状态恢复不等同于长期草稿备份，不保证强制停止或设备重启恢复；提交期间中断应先核对记录，避免手动重复入库/出库。
 

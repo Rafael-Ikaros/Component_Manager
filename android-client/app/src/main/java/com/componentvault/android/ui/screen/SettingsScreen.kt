@@ -194,6 +194,7 @@ internal fun SettingsContent(
     onClearImportLearningMappings: () -> Unit,
     onManageLocations: (() -> Unit)? = null,
     onBackupRestore: (() -> Unit)? = null,
+    onReviewSyncConflict: (() -> Unit)? = null,
     storageLocations: List<StorageLocationRecord> = emptyList(),
 ) {
     val strings = vaultStrings()
@@ -359,6 +360,17 @@ internal fun SettingsContent(
                         onClearImportLearningMappings = { showClearLearningConfirmation = true },
                     )
                     if (section == SettingsSection.Sync) {
+                        if (syncConfiguration.hasInventoryConflict && onReviewSyncConflict != null) {
+                            item {
+                                Button(
+                                    onClick = onReviewSyncConflict,
+                                    enabled = !isBusy,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(R.string.sync_conflict_review_title))
+                                }
+                            }
+                        }
                         item { SettingsSyncStatusPane(syncConfiguration) }
                     }
                 }

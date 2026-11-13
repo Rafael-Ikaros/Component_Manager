@@ -7,6 +7,7 @@ import com.componentvault.android.data.bom.BomParseResult
 import com.componentvault.android.data.bom.BomPreset
 import com.componentvault.android.data.bom.BomPresetStore
 import com.componentvault.android.data.bom.BomSheet
+import com.componentvault.android.model.InventoryConflictMovementEdit
 import com.componentvault.android.model.SyncConfiguration
 import java.io.File
 import java.net.ServerSocket
@@ -191,6 +192,111 @@ class SyncRecoveryTest {
         }
     }
 
+    @Test fun conflictReplayRequiresConfirmationAndPushesOnlyReviewedComponent(): Unit = runBlocking {
+        var reviewedPush: JSONObject? = null
+        val remoteVersion = "2026-10-22T03:00:00Z"
+        val remote = remoteComponent("part", "C100", 7)
+            .put("updated_at", remoteVersion).put("name", "Server name").put("inventory_unit_cost", "2")
+            .put("allocations", JSONArray().put(JSONObject().put("location_id", "B").put("quantity", 7)))
+        val snapshot = JSONObject(pullSnapshot(remote)).put("storage_locations", JSONArray().put(
+            JSONObject().put("id", "B").put("name", "Shelf B").put("deleted", false).put("updated_at", remoteVersion),
+        ))
+        withServer(cancelBom = false, requestCount = 18, respond = { index, request ->
+            when (index) {
+                2 -> "409 Conflict" to """{"detail":"Inventory conflict for C100: the server changed."}"""
+                5, 11, 14 -> "200 OK" to snapshot.toString()
+                8 -> {
+                    val changed = JSONObject(snapshot.toString())
+                    changed.getJSONArray("components").getJSONObject(0).put("updated_at", "2026-10-22T04:00:00Z")
+                    "200 OK" to changed.toString()
+                }
+                17 -> {
+                    reviewedPush = request
+                    "200 OK" to """{"accepted_components":1,"accepted_stock_movements":1}"""
+                }
+                else -> null
+            }
+        }) { service, settings, _, _ ->
+            val helper = InventoryDatabaseHelper(context)
+            try {
+                withDatabase { db ->
+                    ensureStorageLocation(db, "A", inventoryTime)
+                    db.execSQL(
+                        "INSERT INTO components(id, sku, name, category, package_name, location, quantity, min_stock, updated_at, base_updated_at) " +
+                            "VALUES ('part', 'C100', 'Local name', 'category', '0603', 'A', 9, 0, ?, ?), " +
+                            "('other', 'C200', 'Other', 'category', '0603', 'A', 0, 0, ?, NULL)",
+                        arrayOf(inventoryTime, "2026-10-22T01:00:00Z", inventoryTime),
+                    )
+                    setAllocationQuantity(db, "part", "A", 9)
+                    db.execSQL(
+                        "INSERT INTO stock_movements(id, component_id, movement_type, quantity, reason, happened_at, updated_at, location_id) " +
+                            "VALUES ('local-out', 'part', 'outbound', 1, 'Offline', ?, ?, 'A')",
+                        arrayOf(inventoryTime, inventoryTime),
+                    )
+                    enqueueEntity(db, "component", "part", inventoryTime)
+                    enqueueEntity(db, "component", "other", inventoryTime)
+                    enqueueEntity(db, "stock_movement", "local-out", inventoryTime)
+                }
+                preferences.edit().putLong(InventoryPreferenceKeys.SYNC_CURSOR, 7L).commit()
+                assertFalse(service.runSync { settings }.isSuccess)
+                assertEquals("Conflict", preferences.getString(InventoryPreferenceKeys.SYNC_RUN_STATE, ""))
+                val preview = service.loadConflictReview { settings }.components.single()
+                assertEquals(7, preview.serverQuantity)
+                assertEquals("Shelf B", preview.locations.single().name)
+                assertEquals("A", preview.movements.single().locationId)
+                withDatabase { db ->
+                    assertEquals(9, allocationQuantity(db, "part", "A"))
+                    assertEquals(0, scalar(db, "SELECT COUNT(*) FROM inventory_replay_history"))
+                }
+                val catalog = InventoryImportCatalog(context, helper, preferences, service)
+                val writer = InventoryWriteService(context, helper, catalog)
+                val stale = service.replayConflict({ settings }, preview,
+                    listOf(InventoryConflictMovementEdit("local-out", 2, "B")), writer)
+                assertFalse(stale.operation.isSuccess)
+                val insufficient = service.replayConflict({ settings }, preview,
+                    listOf(InventoryConflictMovementEdit("local-out", 8, "B")), writer)
+                assertFalse(insufficient.operation.isSuccess)
+                withDatabase { db ->
+                    assertEquals(9, allocationQuantity(db, "part", "A"))
+                    assertEquals(1, scalar(db, "SELECT quantity FROM stock_movements WHERE id = 'local-out'"))
+                    assertEquals(0, scalar(db, "SELECT COUNT(*) FROM inventory_replay_history"))
+                }
+                val replay = service.replayConflict({ settings }, preview,
+                    listOf(InventoryConflictMovementEdit("local-out", 2, "B")), writer)
+                assertTrue(replay.operation.isSuccess, replay.operation.message)
+                val upload = service.runSync(reviewedComponentId = preview.id, reviewedVersion = replay.savedVersion) { settings }
+                assertTrue(upload.isSuccess, upload.message)
+                val pushed = checkNotNull(reviewedPush)
+                assertEquals(0, pushed.getJSONArray("storage_locations").length())
+                assertEquals("part", pushed.getJSONArray("components").getJSONObject(0).getString("id"))
+                assertEquals(1, pushed.getJSONArray("components").length())
+                assertEquals(remoteVersion, pushed.getJSONArray("components").getJSONObject(0).getString("base_updated_at"))
+                val movement = pushed.getJSONArray("stock_movements").getJSONObject(0)
+                assertEquals("local-out", movement.getString("id"))
+                assertEquals("B", movement.getString("location_id"))
+                assertEquals(2, movement.getInt("quantity"))
+                assertEquals(1, pushed.getJSONArray("stock_movements").length())
+                withDatabase { db ->
+                    assertEquals(5, allocationQuantity(db, "part", "B"))
+                    assertEquals(0, allocationQuantity(db, "part", "A"))
+                    assertEquals(5, scalar(db, "SELECT quantity FROM components WHERE id = 'part' AND name = 'Server name'"))
+                    assertEquals(1, scalar(db, "SELECT COUNT(*) FROM stock_movements WHERE component_id = 'part'"))
+                    assertEquals(1, scalar(db, "SELECT COUNT(*) FROM sync_queue WHERE entity_id = 'other'"))
+                    assertEquals(1, scalar(db, "SELECT COUNT(*) FROM sync_queue"))
+                    db.rawQuery("SELECT local_snapshot FROM inventory_replay_history WHERE component_id = 'part'", null).use {
+                        assertTrue(it.moveToFirst())
+                        val saved = JSONObject(it.getString(0))
+                        assertEquals(9, saved.getJSONObject("component").getInt("quantity"))
+                        assertEquals(1, saved.getJSONArray("movements").getJSONObject(0).getInt("quantity"))
+                    }
+                }
+                assertEquals(7L, preferences.getLong(InventoryPreferenceKeys.SYNC_CURSOR, -1))
+            } finally {
+                helper.close()
+            }
+        }
+    }
+
     private fun withDatabase(block: (SQLiteDatabase) -> Unit) {
         val helper = InventoryDatabaseHelper(context)
         try { block(helper.writableDatabase) } finally { helper.close() }
@@ -211,6 +317,7 @@ class SyncRecoveryTest {
 
     private suspend fun withServer(cancelBom: Boolean, bomReply: (() -> String)? = null,
         pullReply: (() -> String)? = null, requestCount: Int = if (bomReply != null) 6 else 5,
+        respond: ((Int, JSONObject?) -> Pair<String, String>?)? = null,
         block: suspend (InventorySyncService, SyncConfiguration, CompletableFuture<Unit>, CompletableFuture<Unit>) -> Unit) {
         preferences.edit().clear().commit()
         File(context.filesDir, "bom-presets.json").delete()
@@ -230,22 +337,24 @@ class SyncRecoveryTest {
                         val reader = socket.getInputStream().bufferedReader()
                         val headers = generateSequence { reader.readLine() }.takeWhile { it.isNotEmpty() }.toList()
                         val length = headers.firstOrNull { it.startsWith("Content-Length:", true) }?.substringAfter(':')?.trim()?.toInt() ?: 0
-                        repeat(length) { reader.read() }
-                        val body = when (index) {
-                            0 -> JSONObject().put("inventory_protocol", 1).put("cost_protocol", 1).put("bom_preset_protocol", 1)
+                        val request = buildString { repeat(length) { append(reader.read().toChar()) } }
+                        val override = respond?.invoke(index, request.takeIf(String::isNotBlank)?.let(::JSONObject))
+                        val path = headers.firstOrNull()?.substringAfter(' ')?.substringBefore(' ').orEmpty()
+                        val body = override?.second ?: when (path) {
+                            "/auth/ping" -> JSONObject().put("inventory_protocol", 1).put("cost_protocol", 1).put("bom_preset_protocol", 1)
                                 .put("photo_protocol", if (bomReply != null) 1 else 0).toString()
-                            1 -> "{\"server_id\":\"server\",\"account_id\":\"account\",\"role\":\"admin\"}"
-                            2 -> "{}"
-                            3 -> pullReply?.invoke() ?: pullSnapshot()
-                            4 -> {
+                            "/auth/me" -> "{\"server_id\":\"server\",\"account_id\":\"account\",\"role\":\"admin\"}"
+                            "/sync/push" -> "{}"
+                            else -> if (path.startsWith("/sync/pull?")) {
+                                pullReply?.invoke() ?: pullSnapshot()
+                            } else if (index == 4) {
                                 bomStarted.complete(Unit)
                                 if (cancelBom) releaseBom.get(10, TimeUnit.SECONDS)
                                 bomReply?.invoke() ?: "{\"detail\":\"BOM unavailable\"}"
-                            }
-                            else -> "{\"photo_protocol\":1,\"photos\":[]}"
+                            } else "{\"photo_protocol\":1,\"photos\":[]}"
                         }
                         val bytes = body.toByteArray()
-                        val code = if (index == 4 && bomReply == null) "503 Unavailable" else "200 OK"
+                        val code = override?.first ?: if (path == "/sync/bom-presets" && bomReply == null) "503 Unavailable" else "200 OK"
                         runCatching {
                             socket.getOutputStream().apply {
                                 write("HTTP/1.1 $code\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())

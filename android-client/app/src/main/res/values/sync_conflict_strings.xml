@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_replay_required">Inventory changed on the server. Review pending stock movements before retrying.</string>
+    <string name="sync_replay_uploaded">Reviewed stock movements synced. Use Sync now for other pending data.</string>
+    <string name="sync_replay_saved">Reviewed stock movements were saved locally.</string>
+    <string name="sync_replay_deleted_component">This component was deleted on this device or on the server. Its pending changes are still saved on this device.</string>
+    <string name="sync_replay_legacy_component">The server record does not have a location allocation snapshot.</string>
+    <string name="sync_replay_unsupported_movement">This conflict includes changes outside unconfirmed inbound and outbound movements. Pending changes are still saved on this device.</string>
+    <string name="sync_replay_stale">Inventory or pending movements changed during review. Refresh the review and check the quantities and locations again.</string>
+    <string name="sync_replay_pending_changed">Pending stock changed after review. Sync again to check the latest changes.</string>
+    <string name="sync_replay_location_unavailable">The selected location is unavailable on the server.</string>
+    <string name="sync_replay_purchase_quantity">Keep the original quantity for inbound stock with a recorded purchase amount.</string>
+    <string name="sync_conflict_review_title">Review sync conflicts</string>
+    <string name="sync_conflict_review_description">Review the pending stock movements against current server stock. Confirming saves a copy of the previous local record, keeps the server’s component details, and applies the listed movements to the server’s stock. Any other edits require separate review.</string>
+    <string name="sync_conflict_load_failed">Could not load the sync review.</string>
+    <string name="sync_conflict_submit_failed">Could not apply the reviewed stock movements.</string>
+    <string name="sync_conflict_saved_pending">Reviewed stock movements were saved locally and are waiting to sync.</string>
+    <string name="sync_conflict_refresh">Refresh server stock</string>
+    <string name="sync_conflict_no_components">There are no components to review in this snapshot.</string>
+    <string name="sync_conflict_server_total">Server stock: %1$d</string>
+    <string name="sync_conflict_view_component">Review movements</string>
+    <string name="sync_conflict_inbound">Inbound</string>
+    <string name="sync_conflict_outbound">Outbound</string>
+    <string name="sync_conflict_movement_step">%1$d · %2$s</string>
+    <string name="sync_conflict_quantity">Quantity</string>
+    <string name="sync_conflict_check_movements">Choose a location and positive quantity for each movement. Check that each outbound movement has enough stock at its selected location.</string>
+    <string name="sync_conflict_purchase_fixed">Original purchase amount: CNY %1$s. Quantity is fixed to preserve the purchase record.</string>
+    <string name="sync_conflict_location">Location</string>
+    <string name="sync_conflict_confirm_action">Apply reviewed movements</string>
+    <string name="sync_conflict_confirm_commit">Confirm and sync</string>
+    <string name="sync_conflict_confirm_description">Apply the %2$d reviewed movements for %1$s using the server stock shown on this page? The app checks the server version again before saving.</string>
+</resources>

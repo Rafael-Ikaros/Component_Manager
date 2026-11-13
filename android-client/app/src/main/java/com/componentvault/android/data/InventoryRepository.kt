@@ -289,6 +289,7 @@ class InventoryRepository(
                 preferences.getString(InventoryPreferenceKeys.BOM_LAST_SYNCED_AT, "").orEmpty() else "",
             pendingInventory = pending.first,
             pendingBomPresets = pending.second,
+            hasInventoryConflict = pending.first > 0 && preferences.getBoolean(InventoryPreferenceKeys.SYNC_INVENTORY_CONFLICT, false),
             deviceId = preferences.getString(InventoryPreferenceKeys.DEVICE_ID, "") ?: "",
             serverBaseUrl = preferences.getString(InventoryPreferenceKeys.SERVER_BASE_URL, "") ?: "",
             externalServerBaseUrl = preferences.getString(InventoryPreferenceKeys.EXTERNAL_SERVER_BASE_URL, "") ?: "",
@@ -527,7 +528,8 @@ class InventoryRepository(
 
     fun observeSyncStatus(onChange: () -> Unit): () -> Unit {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == InventoryPreferenceKeys.SYNC_RUN_STATE || key == InventoryPreferenceKeys.SYNC_RUN_PHASE) onChange()
+            if (key == InventoryPreferenceKeys.SYNC_RUN_STATE || key == InventoryPreferenceKeys.SYNC_RUN_PHASE ||
+                key == InventoryPreferenceKeys.SYNC_INVENTORY_CONFLICT) onChange()
         }
         val photoPreferences = appContext.getSharedPreferences("photo-sync", Context.MODE_PRIVATE)
         val photoListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -544,7 +546,17 @@ class InventoryRepository(
 
     fun cancelSyncRequests() = syncService.cancelActiveRequests()
 
-    suspend fun runSync(): OperationResult = syncService.runSync(::loadSyncConfiguration)
+    suspend fun runSync(): OperationResult = syncService.runSync(configuration = ::loadSyncConfiguration)
+
+    internal suspend fun loadInventoryConflictReview() = syncService.loadConflictReview(::loadSyncConfiguration)
+
+    internal suspend fun replayInventoryConflict(
+        component: com.componentvault.android.model.InventoryConflictComponent,
+        edits: List<com.componentvault.android.model.InventoryConflictMovementEdit>,
+    ) = syncService.replayConflict(::loadSyncConfiguration, component, edits, writeService)
+
+    internal suspend fun syncReviewedInventory(componentId: String, savedVersion: String) =
+        syncService.runSync(reviewedComponentId = componentId, reviewedVersion = savedVersion, configuration = ::loadSyncConfiguration)
 
     suspend fun previewBomRelease(
         parsed: com.componentvault.android.data.bom.BomParseResult,
