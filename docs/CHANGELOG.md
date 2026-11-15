@@ -17,6 +17,8 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+- Android 批量嘉立创入库可从立创商城订单详情 XLS 读取数量和含税商品金额，与物料明细对账单共用复核和本机去重。切换总额和单价时保留原金额，非法金额或缺少有效数量的单价不能保存。
+
 ## [0.7.9-dev.26] - 2026-11-14
 
 ### Android 库存与同步

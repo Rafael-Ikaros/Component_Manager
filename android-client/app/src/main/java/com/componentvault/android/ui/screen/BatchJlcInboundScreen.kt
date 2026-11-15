@@ -155,7 +155,7 @@ internal fun BatchJlcInboundScreen(
             try {
                 val imported = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use(LcscOrderWorkbookParser::parse)
-                        ?: error("无法读取所选对账单。")
+                        ?: error(context.getString(R.string.lcsc_order_import_failed))
                 }
                 val receipts = repository.loadBatchJlcReceipts(draft.sessionId)
                 val known = draft.rows.mapTo(mutableSetOf()) { it.id }
@@ -253,9 +253,11 @@ internal fun BatchJlcInboundScreen(
                     processedCount++
                     continue
                 }
-                if (original.id.startsWith("order-")) {
-                    val complete = quantity.isNotBlank() && location.isNotBlank() &&
-                        original.name.isNotBlank() && original.category.isNotBlank() && original.packageName.isNotBlank()
+                val fromOrder = original.id.startsWith("order-")
+                val hasProductDetails = original.name.isNotBlank() &&
+                    original.category.isNotBlank() && original.packageName.isNotBlank()
+                if (fromOrder && hasProductDetails) {
+                    val complete = quantity.isNotBlank() && location.isNotBlank()
                     update(original.copy(
                         status = if (complete) BatchJlcStatus.Ready else BatchJlcStatus.Pending,
                         sku = sku, quantityText = quantity, location = location,
@@ -284,7 +286,8 @@ internal fun BatchJlcInboundScreen(
                 update(original.copy(
                     status = if (ready) BatchJlcStatus.Ready else BatchJlcStatus.Pending,
                     sku = sku, name = name, category = category, packageName = packageName,
-                    description = metadata?.toBatchDescription().orEmpty(), quantityText = quantity,
+                    description = if (fromOrder) original.description else metadata?.toBatchDescription().orEmpty(),
+                    quantityText = quantity,
                     location = location,
                     error = when {
                         !complete -> context.getString(R.string.batch_complete_required)
@@ -745,7 +748,10 @@ private fun BatchRowCard(row: BatchJlcRow, ready: Boolean, locations: List<Stora
             R.string.batch_row_summary, row.quantityText,
             locations.firstOrNull { it.id == row.location }?.name ?: row.location,
         ))
-        Text("实际采购总额（CNY）：${row.purchaseAmount ?: "成本未知"}")
+        Text(
+            row.purchaseAmount?.let { stringResource(R.string.lcsc_order_purchase_total, it) }
+                ?: stringResource(R.string.lcsc_order_purchase_unknown),
+        )
         if (row.error.isNotBlank()) Text(row.error, color = MaterialTheme.colorScheme.error)
         Row(Modifier.fillMaxWidth()) {
             TextButton(
@@ -767,11 +773,15 @@ private fun BatchRowCard(row: BatchJlcRow, ready: Boolean, locations: List<Stora
 @Composable
 private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRecord>, onDismiss: () -> Unit, onSave: (BatchJlcRow) -> Unit) {
     var purchaseIsUnit by rememberSaveable(row.id) { mutableStateOf(false) }
+    var purchaseEnteredAsUnit by rememberSaveable(row.id) { mutableStateOf(false) }
     var purchaseText by rememberSaveable(row.id) { mutableStateOf(row.purchaseAmount.orEmpty()) }
     var sku by rememberSaveable(row.id) { mutableStateOf(row.sku) }; var quantity by rememberSaveable(row.id) { mutableStateOf(row.quantityText) }
     var location by rememberSaveable(row.id) { mutableStateOf(row.location) }; var name by rememberSaveable(row.id) { mutableStateOf(row.name) }
     var category by rememberSaveable(row.id) { mutableStateOf(row.category) }; var packageName by rememberSaveable(row.id) { mutableStateOf(row.packageName) }
-    val valid = LcscPublicCatalog.normalizeSku(sku) != null && quantity.toIntOrNull()?.let { it > 0 } == true &&
+    val quantityValue = quantity.toIntOrNull()?.takeIf { it > 0 }
+    val purchase = BatchPurchaseInput(purchaseText, purchaseEnteredAsUnit)
+    val purchaseTotal = runCatching { purchase.total(quantityValue) }
+    val valid = LcscPublicCatalog.normalizeSku(sku) != null && quantityValue != null &&
         location.isNotBlank() && name.isNotBlank() && category.isNotBlank() && packageName.isNotBlank()
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(if (row.id.startsWith("order-")) R.string.lcsc_order_review_title else R.string.batch_edit_title)) }, text = {
         Column(
@@ -781,19 +791,35 @@ private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRec
         ) {
             OutlinedTextField(sku, { sku = it.uppercase() }, label = { Text(stringResource(R.string.batch_sku)) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(quantity, { quantity = it }, label = { Text(stringResource(if (row.id.startsWith("order-")) R.string.lcsc_order_quantity else R.string.batch_quantity)) }, modifier = Modifier.fillMaxWidth())
-            PurchaseCostFields(purchaseText,purchaseIsUnit,quantity.toIntOrNull(),{ purchaseText = it },{ purchaseIsUnit = it })
+            if (row.id.startsWith("order-")) Text(stringResource(R.string.lcsc_order_purchase_hint))
+            PurchaseCostFields(
+                text = purchase.display(purchaseIsUnit, quantityValue),
+                isUnit = purchaseIsUnit,
+                quantity = quantityValue,
+                onText = {
+                    purchaseText = it
+                    purchaseEnteredAsUnit = purchaseIsUnit
+                },
+                onMode = { purchaseIsUnit = it },
+                showConversion = purchaseEnteredAsUnit == purchaseIsUnit,
+            )
+            if (purchaseTotal.isFailure) {
+                val message = if (purchaseEnteredAsUnit && quantityValue == null) R.string.batch_positive_quantity
+                    else R.string.lcsc_order_purchase_invalid
+                Text(stringResource(message), color = MaterialTheme.colorScheme.error)
+            }
             LocationSelector(locations, location, true) { location = it }
             OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.field_name)) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(category, { category = it }, label = { Text(stringResource(R.string.field_category)) }, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(packageName, { packageName = it }, label = { Text(stringResource(R.string.field_package)) }, modifier = Modifier.fillMaxWidth())
         }
-    }, confirmButton = { Button(onClick = {
+    }, confirmButton = { Button(enabled = purchaseTotal.isSuccess, onClick = {
         val skuChanged = !sku.equals(row.sku, true)
         val savedName = if (skuChanged && name == row.name) "" else name
         val savedCategory = if (skuChanged && category == row.category) "" else category
         val savedPackage = if (skuChanged && packageName == row.packageName) "" else packageName
         val savedValid = !skuChanged && valid
-        onSave(row.copy(purchaseAmount = purchaseTotal(purchaseText,purchaseIsUnit,quantity.toIntOrNull() ?: 0), sku = sku, quantityText = quantity, location = location,
+        onSave(row.copy(purchaseAmount = purchaseTotal.getOrThrow(), sku = sku, quantityText = quantity, location = location,
             name = savedName, category = savedCategory, packageName = savedPackage,
             description = if (skuChanged) "" else row.description,
             status = if (savedValid) BatchJlcStatus.Ready else BatchJlcStatus.Pending,

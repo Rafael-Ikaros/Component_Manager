@@ -149,6 +149,7 @@ jobs:
           --tests 'com.componentvault.android.data.ComponentLocationEditTest'
           --tests 'com.componentvault.android.data.CategoryLearningStoreTest'
           --tests 'com.componentvault.android.data.LcscOrderWorkbookParserTest'
+          --tests 'com.componentvault.android.ui.screen.BatchPurchaseInputTest'
           --tests 'com.componentvault.android.model.LocalComponentSkuTest'
           --tests 'com.componentvault.android.ui.screen.ImportLocationPickerUiTest'
           --tests 'com.componentvault.android.ui.screen.ComponentPhotoSessionTest'

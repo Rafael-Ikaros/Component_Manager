@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="lcsc_order_import_action">Import LCSC order statement (.xls)</string>
+    <string name="lcsc_order_import_action">Import LCSC order (.xls)</string>
     <string name="lcsc_order_import_result">Added %1$d order lines; skipped %2$d already in the draft or committed; merged %3$d repeated order lines; excluded %4$d delivery fee rows. Review quantities and storage locations before inbound.</string>
-    <string name="lcsc_order_import_failed">Could not read the LCSC order statement.</string>
+    <string name="lcsc_order_import_failed">Could not read the LCSC order file.</string>
+    <string name="lcsc_order_purchase_total">Purchase amount for this receipt (CNY): %1$s</string>
+    <string name="lcsc_order_purchase_unknown">Purchase amount unknown</string>
+    <string name="lcsc_order_purchase_invalid">Enter a nonnegative amount with up to 8 decimal places.</string>
+    <string name="lcsc_order_purchase_hint">The order supplies the tax-inclusive product amount. Check the amount before receiving, especially if the quantity changed or the order had a discount.</string>
     <string name="lcsc_order_commit_action">Confirm selected inbound order lines</string>
     <string name="lcsc_order_review_title">Review order line</string>
     <string name="lcsc_order_quantity">Ordered quantity</string>
