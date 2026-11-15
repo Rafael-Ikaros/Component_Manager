@@ -215,6 +215,27 @@ class BatchJlcDatabaseTest {
         assertEquals(15, number("SELECT quantity FROM components WHERE sku='C70565'"))
         assertEquals(1, number("SELECT COUNT(*) FROM stock_movements"))
     }
+
+    @Test
+    fun codeListCanRestockAgainAfterStartingANewDraft() = runBlocking {
+        val rows = BatchCodeImportParser.text("C70565 5", "B", setOf("B"))
+        suspend fun submit(session: String) {
+            val draft = BatchJlcDraft(sessionId = session)
+            val receipts = repository.loadBatchJlcReceipts(session)
+            val (next, _) = BatchCodeImportParser.append(draft, rows, receipts)
+            if (next.rows.isNotEmpty()) {
+                val ready = next.rows.map { row(it.id, it.sku, it.quantityText, it.location) }
+                assertTrue(repository.commitBatchJlc(session, ready).isSuccess)
+            }
+        }
+
+        submit("first")
+        submit("first")
+        submit("restock")
+
+        assertEquals(2, number("SELECT COUNT(*) FROM batch_jlc_receipts"))
+        assertEquals(10, number("SELECT SUM(quantity) FROM stock_movements WHERE quantity > 0"))
+    }
     private fun row(id: String, sku: String, quantity: String, location: String) = BatchJlcRow(
         id = java.util.UUID.nameUUIDFromBytes(id.toByteArray()).toString(),
         raw = "{pc:$sku,qty:$quantity,pdi:sample-$id}", status = BatchJlcStatus.Ready,

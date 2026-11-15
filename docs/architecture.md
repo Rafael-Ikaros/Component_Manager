@@ -300,8 +300,9 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Navigation centers on four adaptive top-level destinations: `Home`,
   `Inventory`, `Records`, and `Settings`. Home presents the summary; settings
   has one main entry with section drill-down and direct sync-section routing.
-  Inventory's Import and scan bottom sheet has Add component, Batch JLC inbound
-  and Project materials. Add component includes lookup, scanning and manual entry;
+  Inventory's Import and scan bottom sheet has Add component, Batch inbound
+  and Project materials. Batch inbound uses one local draft for package scans,
+  C-code text or XLSX lists, and LCSC order XLS files. Add component includes lookup, scanning and manual entry;
   Project materials unifies BOM and manual picking. Data migration is not a
   separate Android menu item. Settings > Inventory
   and data owns location management and Excel backup/restore. These secondary

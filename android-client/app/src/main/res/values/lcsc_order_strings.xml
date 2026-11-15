@@ -5,6 +5,12 @@
     <string name="lcsc_order_import_failed">Could not read the LCSC order file.</string>
     <string name="lcsc_order_purchase_total">Purchase amount for this receipt (CNY): %1$s</string>
     <string name="lcsc_order_purchase_unknown">Purchase amount unknown</string>
+    <string name="lcsc_order_amount_from_subtotal">Order file subtotal (CNY): %1$s</string>
+    <string name="lcsc_order_amount_from_unit">Order file unit price × ordered quantity (CNY): %1$s</string>
+    <string name="lcsc_order_amount_from_mixed">Order file amount from multiple lines (CNY): %1$s</string>
+    <string name="batch_purchase_total">Selected purchase amount (CNY): %1$s</string>
+    <string name="batch_purchase_subtotal">Known amounts only (CNY): %1$s · %2$d unknown</string>
+    <string name="batch_purchase_all_unknown">Purchase amounts unknown for all %1$d selected lines</string>
     <string name="lcsc_order_purchase_invalid">Enter a nonnegative amount with up to 8 decimal places.</string>
     <string name="lcsc_order_purchase_hint">The order supplies the tax-inclusive product amount. Check the amount before receiving, especially if the quantity changed or the order had a discount.</string>
     <string name="lcsc_order_commit_action">Confirm selected inbound order lines</string>

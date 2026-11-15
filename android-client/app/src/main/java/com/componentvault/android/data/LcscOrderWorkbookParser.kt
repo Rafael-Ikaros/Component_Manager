@@ -147,22 +147,35 @@ internal object LcscOrderWorkbookParser {
             } catch (error: IllegalArgumentException) {
                 throw IllegalArgumentException("第 ${row + 1} 行采购金额无效：${error.message}", error)
             }
-            val amount = money(subtotalColumn) ?: money(unitPriceColumn)?.multiply(BigDecimal(quantity))
+            val subtotal = money(subtotalColumn)
+            val amount = if (subtotal != null) {
+                OrderPurchaseAmount(subtotal.stripTrailingZeros().toPlainString(), OrderAmountBasis.Subtotal)
+            } else {
+                money(unitPriceColumn)?.multiply(BigDecimal(quantity))?.let {
+                    OrderPurchaseAmount(it.stripTrailingZeros().toPlainString(), OrderAmountBasis.UnitPrice)
+                }
+            }
             val key = stableId(order, sku)
             val prior = grouped[key]
             if (prior == null) {
                 grouped[key] = OrderLine(
                     sku = sku, productName = productName, category = category, packageName = packageName,
-                    model = model, brand = brand, quantity = quantity, amount = InventoryCost.text(amount),
+                    model = model, brand = brand, quantity = quantity, amount = amount,
                 )
             } else {
                 require(
                     prior.sku == sku && prior.productName == productName && prior.category == category &&
                         prior.packageName == packageName && prior.model == model && prior.brand == brand,
                 ) { "第 ${row + 1} 行与同订单同料号的其他明细不一致，请先核对。" }
+                val priorAmount = prior.amount
+                val mergedAmount = if (priorAmount != null && amount != null) {
+                    val total = BigDecimal(priorAmount.amount).add(BigDecimal(amount.amount))
+                    val basis = priorAmount.basis.takeIf { it == amount.basis } ?: OrderAmountBasis.Mixed
+                    OrderPurchaseAmount(total.stripTrailingZeros().toPlainString(), basis)
+                } else null
                 grouped[key] = prior.copy(
                     quantity = Math.addExact(prior.quantity, quantity),
-                    amount = if (prior.amount == null || amount == null) null else InventoryCost.text(BigDecimal(prior.amount).add(amount)),
+                    amount = mergedAmount,
                 )
                 mergedLines++
             }
@@ -174,7 +187,8 @@ internal object LcscOrderWorkbookParser {
                     id = id, raw = "lcsc-order:$id", status = BatchJlcStatus.Ready,
                     sku = line.sku, name = displayName(line), category = line.category,
                     packageName = line.packageName, quantityText = line.quantity.toString(),
-                    purchaseAmount = line.amount,
+                    purchaseAmount = line.amount?.amount,
+                    originalOrderAmount = line.amount,
                     description = buildList {
                         line.model.takeIf(String::isNotBlank)?.let { add("型号：$it") }
                         line.brand.takeIf(String::isNotBlank)?.let { add("品牌：$it") }
@@ -217,6 +231,6 @@ internal object LcscOrderWorkbookParser {
         val model: String,
         val brand: String,
         val quantity: Int,
-        val amount: String? = null,
+        val amount: OrderPurchaseAmount?,
     )
 }

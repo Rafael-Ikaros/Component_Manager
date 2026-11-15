@@ -3,8 +3,8 @@
     <string name="import_menu_single">Add component</string>
     <string name="import_menu_single_hint">Scan a label, search the catalog, or enter details manually</string>
     <string name="import_manual_entry">Enter details manually</string>
-    <string name="import_menu_batch">Batch JLC inbound</string>
-    <string name="import_menu_batch_hint">Collect packages, resolve details, then confirm stock</string>
+    <string name="import_menu_batch">Batch inbound</string>
+    <string name="import_menu_batch_hint">Scan packages, enter C codes, or import an LCSC order</string>
     <string name="import_menu_bom">Project materials</string>
     <string name="import_menu_bom_hint">Import a BOM, open a saved preset or select stock, then review before release</string>
     <string name="import_menu_manual">Enter a component manually</string>

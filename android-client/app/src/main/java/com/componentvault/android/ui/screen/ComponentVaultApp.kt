@@ -105,7 +105,6 @@ fun ComponentVaultApp(
     var inventoryBackupVisible by rememberSaveable { mutableStateOf(false) }
     var syncConflictReviewVisible by rememberSaveable { mutableStateOf(false) }
     var batchJlcVisible by rememberSaveable { mutableStateOf(false) }
-    var batchCodeImport by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var componentEditorInitialDraft by rememberSaveable(stateSaver = ComponentDraftSaver) { mutableStateOf<ComponentDraft?>(null) }
@@ -502,7 +501,6 @@ fun ComponentVaultApp(
                 defaultLocation=uiState.appPreferences.suggestedImportLocation,
                 onDismiss={batchJlcVisible=false},
                 onCommitted=viewModel::onBatchJlcCommitted,
-                initialCodeImport = batchCodeImport,
             )
 
             labelToolPickerVisible -> LabelToolTemplatePicker(
@@ -805,12 +803,6 @@ fun ComponentVaultApp(
                 },
                 onBatchJlc = {
                     showAddEntrySheet = false
-                    batchCodeImport = false
-                    batchJlcVisible = true
-                },
-                onBatchCodes = {
-                    showAddEntrySheet = false
-                    batchCodeImport = true
                     batchJlcVisible = true
                 },
             )
@@ -876,7 +868,6 @@ internal fun AddComponentEntrySheet(
     onImportComponent: () -> Unit,
     onImportBom: () -> Unit,
     onBatchJlc: () -> Unit,
-    onBatchCodes: () -> Unit = onBatchJlc,
 ) {
     BackHandler(onBack = onDismiss)
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -888,7 +879,6 @@ internal fun AddComponentEntrySheet(
             )
             ImportMenuRow(R.string.import_menu_single, R.string.import_menu_single_hint, onImportComponent)
             ImportMenuRow(R.string.import_menu_batch, R.string.import_menu_batch_hint, onBatchJlc)
-            ImportMenuRow(R.string.batch_codes_title, R.string.batch_codes_menu_hint, onBatchCodes)
             ImportMenuRow(R.string.import_menu_bom, R.string.import_menu_bom_hint, onImportBom)
         }
     }

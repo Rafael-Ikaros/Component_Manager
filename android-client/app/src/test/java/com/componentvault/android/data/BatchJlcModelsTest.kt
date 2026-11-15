@@ -27,7 +27,11 @@ class BatchJlcModelsTest {
         assertEquals(2,draft.rows.size);assertEquals(1,duplicates)
     }
     @Test fun draftJsonRoundTripPreservesStableIdsRawAndSelection(){
-        val draft=BatchJlcDraft(rows=listOf(BatchJlcRow(raw="pc:C1,qty:2",selected=false,description="商品图片：https://assets.lcsc.com/a.png")))
+        val draft = BatchJlcDraft(rows = listOf(
+            BatchJlcRow(raw = "pc:C1,qty:2", selected = false, description = "商品图片：https://assets.lcsc.com/a.png"),
+            BatchJlcRow(raw = "lcsc-order:example", purchaseAmount = "8",
+                originalOrderAmount = OrderPurchaseAmount("10", OrderAmountBasis.Subtotal)),
+        ))
         assertEquals(draft,BatchJlcDraftCodec.decode(BatchJlcDraftCodec.encode(draft)))
     }
     @Test fun batchDescriptionContainsOnlyPublicMetadataNotPackagingPayload(){

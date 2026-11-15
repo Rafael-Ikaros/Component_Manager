@@ -150,7 +150,7 @@ LCSC_android_erp 迁移使用其原始 camelCase 表头、epoch millis 时间，
 
 ## 立创订单对账单导入
 
-Android 和 Windows 都可在“批量嘉立创入库”中导入立创商城的物料明细对账单和订单详情（`.xls`）。嘉立创 EDA 的 BOM 请从[项目用料](bom-and-migration.md#项目-bom)导入。
+Android 在“批量入库”、Windows 在“批量嘉立创入库”中选择立创商城的物料明细对账单或订单详情（`.xls`）。嘉立创 EDA 的 BOM 请从[项目用料](bom-and-migration.md#项目-bom)导入。
 
 1. 先选择已有库位（显示名称），或创建新库位。
 2. 选择导出的 .xls 文件，自动读取商品和订购数量以及商品行含税金额。订单详情有“订购数量（修改后）”时使用该列。配送费与汇总行忽略。

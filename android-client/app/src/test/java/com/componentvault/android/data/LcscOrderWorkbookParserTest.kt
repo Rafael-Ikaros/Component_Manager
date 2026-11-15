@@ -23,6 +23,7 @@ class LcscOrderWorkbookParserTest {
         assertEquals(182, parsed.rows.map { it.sku }.distinct().size)
         assertTrue(parsed.rows.all { it.quantityText.toInt() > 0 })
         assertTrue(parsed.rows.all { it.purchaseAmount != null })
+        assertTrue(parsed.rows.all { it.originalOrderAmount?.amount == it.purchaseAmount })
     }
 
     @Test
@@ -48,6 +49,7 @@ class LcscOrderWorkbookParserTest {
     @Test fun usesActualSubtotalBeforeUnitAndAggregatesAmounts() {
         val row = LcscOrderWorkbookParser.parse(ByteArrayInputStream(statement(priced=true))).rows.single()
         assertEquals("0.925", row.purchaseAmount)
+        assertEquals(OrderPurchaseAmount("0.925", OrderAmountBasis.Mixed), row.originalOrderAmount)
     }
 
     @Test fun importsPricedOrderDetailsWithPreambleAndKeepsStatementReceipt() {
@@ -55,6 +57,7 @@ class LcscOrderWorkbookParserTest {
         val row = parsed.rows.single()
         assertEquals("1002", row.quantityText)
         assertEquals("12.7", row.purchaseAmount)
+        assertEquals(OrderPurchaseAmount("12.7", OrderAmountBasis.Mixed), row.originalOrderAmount)
         assertEquals("Maker M-01", row.name)
         assertEquals("SMD", row.packageName)
         assertEquals("", row.category)
@@ -66,6 +69,7 @@ class LcscOrderWorkbookParserTest {
     @Test fun detailRowsWithoutAmountsStayUnknown() {
         val row = LcscOrderWorkbookParser.parse(ByteArrayInputStream(details(missingPrice = true))).rows.single()
         assertEquals(null, row.purchaseAmount)
+        assertEquals(null, row.originalOrderAmount)
     }
 
     @Test fun rejectsUnshippedOrderDetailsAndInvalidSubtotal() {

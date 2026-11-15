@@ -558,7 +558,7 @@
     <string name="feedback_url_too_long">The report exceeds the browser URL limit. The full report was copied and GitHub was opened without the body. Paste the report there.</string>
     <string name="feedback_browser_failed">Could not open a browser. The full report has been copied.</string>
     <string name="feedback_device_preview">Editable app and device information</string>
-    <string name="batch_title">Batch JLC inbound</string>
+    <string name="batch_title">Batch inbound</string>
     <string name="batch_tab_capture">Capture %1$d</string>
     <string name="batch_tab_review">Review %1$d</string>
     <string name="batch_tab_pending">Pending %1$d</string>

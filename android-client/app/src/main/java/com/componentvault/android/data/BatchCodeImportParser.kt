@@ -123,8 +123,10 @@ internal object BatchCodeImportParser {
         val added = rows.mapNotNull { row ->
             val matches = byKey[key(row)]
             if (replacing && matches != null) return@mapNotNull null
-            if (matches == null && row.id in receipts) return@mapNotNull null
-            val id = if (matches != null || row.id in known) "codes-${UUID.randomUUID()}" else row.id
+            val sessionRowId = "codes-${hash("${draft.sessionId}\u001f${row.id}")}"
+            // Older drafts used the unscoped ID. Their receipts are still returned for this session.
+            if (matches == null && (sessionRowId in receipts || row.id in receipts)) return@mapNotNull null
+            val id = if (matches != null || sessionRowId in known) "codes-${UUID.randomUUID()}" else sessionRowId
             require(known.add(id)) { "导入记录重复，请重新选择文件。" }
             row.copy(id = id)
         }

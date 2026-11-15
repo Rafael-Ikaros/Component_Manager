@@ -5,6 +5,12 @@
     <string name="lcsc_order_import_failed">无法读取立创商城订单文件。</string>
     <string name="lcsc_order_purchase_total">本次采购总额（CNY）：%1$s</string>
     <string name="lcsc_order_purchase_unknown">采购金额未知</string>
+    <string name="lcsc_order_amount_from_subtotal">原表含税小计（元）：%1$s</string>
+    <string name="lcsc_order_amount_from_unit">原表含税单价 × 订购数量（元）：%1$s</string>
+    <string name="lcsc_order_amount_from_mixed">原表多行含税金额合计（元）：%1$s</string>
+    <string name="batch_purchase_total">已选采购金额（元）：%1$s</string>
+    <string name="batch_purchase_subtotal">已知金额小计（元）：%1$s · %2$d 项金额未知</string>
+    <string name="batch_purchase_all_unknown">已选 %1$d 项的采购金额均未知</string>
     <string name="lcsc_order_purchase_invalid">请输入非负金额，最多 8 位小数。</string>
     <string name="lcsc_order_purchase_hint">采购金额按订单商品含税价填入。改动收货数量或订单有优惠时，请先核对金额。</string>
     <string name="lcsc_order_commit_action">确认入库选中订单明细</string>

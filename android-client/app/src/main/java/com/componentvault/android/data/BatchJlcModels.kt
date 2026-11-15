@@ -8,6 +8,10 @@ import java.util.UUID
 
 internal enum class BatchJlcStatus { Captured, Ready, Pending, Committed }
 
+internal enum class OrderAmountBasis { Subtotal, UnitPrice, Mixed }
+
+internal data class OrderPurchaseAmount(val amount: String, val basis: OrderAmountBasis)
+
 internal data class BatchJlcRow(
     val id: String = UUID.randomUUID().toString(),
     val raw: String,
@@ -22,6 +26,7 @@ internal data class BatchJlcRow(
     val selected: Boolean = true,
     val description: String = "",
     val purchaseAmount: String? = null,
+    val originalOrderAmount: OrderPurchaseAmount? = null,
 )
 
 internal data class BatchJlcDraft(
@@ -91,6 +96,12 @@ internal object BatchJlcDraftCodec {
                     .put("description", row.description)
                     .put("quantity", row.quantityText)
                     .put("purchase_amount", row.purchaseAmount ?: JSONObject.NULL)
+                    .apply {
+                        row.originalOrderAmount?.let { original ->
+                            put("original_order_amount", original.amount)
+                            put("order_amount_basis", original.basis.name)
+                        }
+                    }
                     .put("location", row.location)
                     .put("error", row.error)
                     .put("selected", row.selected))
@@ -111,6 +122,10 @@ internal object BatchJlcDraftCodec {
                 sku = row.optString("sku"), name = row.optString("name"),
                 category = row.optString("category"), packageName = row.optString("package_name"),
                 purchaseAmount = if (row.isNull("purchase_amount")) null else row.getString("purchase_amount"),
+                originalOrderAmount = OrderAmountBasis.entries
+                    .firstOrNull { it.name == row.optString("order_amount_basis") }
+                    ?.let { basis -> row.optString("original_order_amount").takeIf(String::isNotBlank)
+                        ?.let { OrderPurchaseAmount(it, basis) } },
                 description = row.optString("description"), quantityText = row.optString("quantity"),
                 location = row.optString("location"), error = row.optString("error"),
                 selected = row.optBoolean("selected", true),
@@ -139,6 +154,7 @@ internal object BatchJlcCommitPlanner {
         }.map { row ->
             val quantity = row.quantityText.trim()
             require(quantity.matches(Regex("[1-9][0-9]*")))
+            InventoryCost.decimal(row.purchaseAmount)
             BatchJlcPlannedRow(
                 row = row,
                 sku = requireNotNull(LcscPublicCatalog.normalizeSku(row.sku)),

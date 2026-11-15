@@ -540,7 +540,7 @@
     <string name="feedback_url_too_long">报告超过浏览器 URL 限制。已复制完整报告并打开不含正文的 GitHub 页面，请在页面中粘贴报告。</string>
     <string name="feedback_browser_failed">无法打开浏览器，完整报告已复制。</string>
     <string name="feedback_device_preview">可编辑的应用与设备信息</string>
-    <string name="batch_title">批量嘉立创入库</string>
+    <string name="batch_title">批量入库</string>
     <string name="batch_tab_capture">采集 %1$d</string>
     <string name="batch_tab_review">核对 %1$d</string>
     <string name="batch_tab_pending">待处理 %1$d</string>

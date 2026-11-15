@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import com.componentvault.android.R
 import com.componentvault.android.data.BatchJlcDraftStore
@@ -57,10 +59,13 @@ class BatchCodeImportUiTest {
         compose.setContent {
             MaterialTheme {
                 BatchJlcInboundScreen(AppPreferences(), SyncConfiguration("test", "", "", false, "", ""),
-                    "A", onDismiss = {}, onCommitted = { committed = true }, initialCodeImport = true)
+                    "A", onDismiss = {}, onCommitted = { committed = true })
             }
         }
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.batch_codes_parse))).fetchSemanticsNodes().isNotEmpty() }
+        val action = hasText(context.getString(R.string.batch_codes_title))
+        compose.onNodeWithTag("batch_inbound_list").performScrollToNode(action)
+        compose.waitUntil(10_000) { compose.onAllNodes(action and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(action).performClick()
     }
 
     private fun parse() {
@@ -90,6 +95,7 @@ class BatchCodeImportUiTest {
         assertEquals(10, runBlocking { repository.loadComponents().single().quantity })
         compose.onNodeWithText(context.getString(R.string.batch_commit)).performClick()
         compose.waitUntil(10_000) { committed }
+        compose.onNodeWithTag("batch_inbound_list").performScrollToIndex(0)
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasText(context.getString(R.string.batch_tab_review, 0)) and isEnabled())
                 .fetchSemanticsNodes().isNotEmpty()

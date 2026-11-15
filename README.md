@@ -111,7 +111,7 @@ API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管
 
 | 任务 | 文档 |
 | --- | --- |
-| 连续扫码、订单导入 | [批量入库](docs/batch-jlc-inbound.md) |
+| 连续扫码、C 编码清单、立创商城订单导入 | [批量入库](docs/batch-jlc-inbound.md) |
 | BOM、预设与配料 | [项目用料](docs/bom-and-migration.md) |
 | 采购金额、库存均价与 PCBA 材料成本 | [购买价格与材料成本](docs/inventory-cost.md) |
 | 库位、转移、Excel 备份和标签 Excel | [库存与备份](docs/storage-and-backup.md) |

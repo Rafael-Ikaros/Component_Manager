@@ -58,6 +58,8 @@ import com.componentvault.android.data.BatchJlcStatus
 import com.componentvault.android.data.InventoryRepository
 import com.componentvault.android.data.LcscPublicCatalog
 import com.componentvault.android.data.LcscOrderWorkbookParser
+import com.componentvault.android.data.InventoryCost
+import com.componentvault.android.data.OrderAmountBasis
 import com.componentvault.android.data.ComponentImportParser
 import com.componentvault.android.data.toBatchDescription
 import com.componentvault.android.model.AppPreferences
@@ -88,7 +90,6 @@ internal fun BatchJlcInboundScreen(
     defaultLocation: String,
     onDismiss: () -> Unit,
     onCommitted: () -> Unit,
-    initialCodeImport: Boolean = false,
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -120,7 +121,7 @@ internal fun BatchJlcInboundScreen(
     var processedCount by remember { mutableStateOf(0) }
     var processTotal by remember { mutableStateOf(0) }
     var summaryExpanded by rememberSaveable { mutableStateOf(false) }
-    var showCodeImport by rememberSaveable { mutableStateOf(initialCodeImport) }
+    var showCodeImport by rememberSaveable { mutableStateOf(false) }
     var codeImportError by remember { mutableStateOf<String?>(null) }
     var pendingCodeRows by remember { mutableStateOf<List<BatchJlcRow>?>(null) }
     var codeOverlaps by remember { mutableStateOf<List<CodeImportOverlap>>(emptyList()) }
@@ -186,6 +187,8 @@ internal fun BatchJlcInboundScreen(
                     R.string.lcsc_order_import_result,
                     added.size, skipped, imported.mergedLines, imported.skippedFees,
                 )
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Exception) {
                 message = error.message ?: context.getString(R.string.lcsc_order_import_failed)
             } finally {
@@ -394,8 +397,6 @@ internal fun BatchJlcInboundScreen(
         return
     }
     val selectedReady = draft.rows.filter { it.status == BatchJlcStatus.Ready && it.selected }
-    val selectedKnown = selectedReady.mapNotNull { it.purchaseAmount?.toBigDecimalOrNull() }
-    val selectedSubtotal = selectedKnown.fold(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
     val planResult = remember(selectedReady) { runCatching { BatchJlcCommitPlanner.plan(selectedReady, emptySet()) } }
     val visibleRows = draft.rows.filter {
         it.status == if (page == BatchPage.Review) BatchJlcStatus.Ready else BatchJlcStatus.Pending
@@ -460,7 +461,6 @@ internal fun BatchJlcInboundScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { Text("已选${if (selectedKnown.size == selectedReady.size) "采购金额" else "已知金额小计"}（CNY）：${selectedSubtotal.setScale(2,java.math.RoundingMode.HALF_EVEN)}；未知 ${selectedReady.size-selectedKnown.size} 项") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     BatchPage.entries.forEach { candidate ->
@@ -530,12 +530,6 @@ internal fun BatchJlcInboundScreen(
             when (page) {
                 BatchPage.Capture -> {
                     item {
-                        OutlinedButton(onClick = { codeImportError = null; showCodeImport = true },
-                            enabled = loaded && !busy, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.batch_codes_title))
-                        }
-                    }
-                    item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -549,6 +543,12 @@ internal fun BatchJlcInboundScreen(
                                 onClick = { showScannerSettings = true },
                                 enabled = !busy,
                             ) { Text(stringResource(R.string.batch_scanner_settings)) }
+                        }
+                    }
+                    item {
+                        OutlinedButton(onClick = { codeImportError = null; showCodeImport = true },
+                            enabled = loaded && !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.batch_codes_title))
                         }
                     }
                     item {
@@ -567,6 +567,9 @@ internal fun BatchJlcInboundScreen(
                 }
                 BatchPage.Review, BatchPage.Pending -> {
                     if (page == BatchPage.Review) {
+                        if (selectedReady.isNotEmpty() && planResult.isSuccess) {
+                            item(key = "purchase-summary") { BatchPurchaseSummary(selectedReady) }
+                        }
                         item(key = "review-summary-control") {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(stringResource(R.string.batch_layout_summary_count, selectedReady.size, reviewSkuCount))
@@ -738,6 +741,18 @@ private fun LocationSelector(locations: List<StorageLocationRecord>, value: Stri
 }
 
 @Composable
+private fun BatchPurchaseSummary(rows: List<BatchJlcRow>) {
+    val known = rows.mapNotNull { InventoryCost.decimal(it.purchaseAmount) }
+    val unknown = rows.size - known.size
+    val total = InventoryCost.text(known.reduceOrNull(java.math.BigDecimal::add))
+    Text(when {
+        total == null -> stringResource(R.string.batch_purchase_all_unknown, unknown)
+        unknown > 0 -> stringResource(R.string.batch_purchase_subtotal, total, unknown)
+        else -> stringResource(R.string.batch_purchase_total, total)
+    })
+}
+
+@Composable
 private fun BatchRowCard(row: BatchJlcRow, ready: Boolean, locations: List<StorageLocationRecord>, enabled: Boolean,
     onUpdate: (BatchJlcRow) -> Unit, onRemove: () -> Unit) {
     var editing by remember { mutableStateOf(false) }
@@ -752,6 +767,14 @@ private fun BatchRowCard(row: BatchJlcRow, ready: Boolean, locations: List<Stora
             row.purchaseAmount?.let { stringResource(R.string.lcsc_order_purchase_total, it) }
                 ?: stringResource(R.string.lcsc_order_purchase_unknown),
         )
+        row.originalOrderAmount?.let { original ->
+            val label = when (original.basis) {
+                OrderAmountBasis.Subtotal -> R.string.lcsc_order_amount_from_subtotal
+                OrderAmountBasis.UnitPrice -> R.string.lcsc_order_amount_from_unit
+                OrderAmountBasis.Mixed -> R.string.lcsc_order_amount_from_mixed
+            }
+            Text(stringResource(label, original.amount), style = MaterialTheme.typography.bodySmall)
+        }
         if (row.error.isNotBlank()) Text(row.error, color = MaterialTheme.colorScheme.error)
         Row(Modifier.fillMaxWidth()) {
             TextButton(
@@ -778,7 +801,7 @@ private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRec
     var sku by rememberSaveable(row.id) { mutableStateOf(row.sku) }; var quantity by rememberSaveable(row.id) { mutableStateOf(row.quantityText) }
     var location by rememberSaveable(row.id) { mutableStateOf(row.location) }; var name by rememberSaveable(row.id) { mutableStateOf(row.name) }
     var category by rememberSaveable(row.id) { mutableStateOf(row.category) }; var packageName by rememberSaveable(row.id) { mutableStateOf(row.packageName) }
-    val quantityValue = quantity.toIntOrNull()?.takeIf { it > 0 }
+    val quantityValue = quantity.trim().toIntOrNull()?.takeIf { it > 0 }
     val purchase = BatchPurchaseInput(purchaseText, purchaseEnteredAsUnit)
     val purchaseTotal = runCatching { purchase.total(quantityValue) }
     val valid = LcscPublicCatalog.normalizeSku(sku) != null && quantityValue != null &&
@@ -801,7 +824,7 @@ private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRec
                     purchaseEnteredAsUnit = purchaseIsUnit
                 },
                 onMode = { purchaseIsUnit = it },
-                showConversion = purchaseEnteredAsUnit == purchaseIsUnit,
+                showConversion = purchaseEnteredAsUnit == purchaseIsUnit && purchaseTotal.isSuccess,
             )
             if (purchaseTotal.isFailure) {
                 val message = if (purchaseEnteredAsUnit && quantityValue == null) R.string.batch_positive_quantity
@@ -819,7 +842,8 @@ private fun BatchEditDialog(row: BatchJlcRow, locations: List<StorageLocationRec
         val savedCategory = if (skuChanged && category == row.category) "" else category
         val savedPackage = if (skuChanged && packageName == row.packageName) "" else packageName
         val savedValid = !skuChanged && valid
-        onSave(row.copy(purchaseAmount = purchaseTotal.getOrThrow(), sku = sku, quantityText = quantity, location = location,
+        onSave(row.copy(purchaseAmount = purchaseTotal.getOrThrow(), sku = sku,
+            quantityText = quantityValue?.toString() ?: quantity.trim(), location = location,
             name = savedName, category = savedCategory, packageName = savedPackage,
             description = if (skuChanged) "" else row.description,
             status = if (savedValid) BatchJlcStatus.Ready else BatchJlcStatus.Pending,
