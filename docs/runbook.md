@@ -207,6 +207,7 @@ CI 与发布的处理方式：
 - 若只修改 `Unreleased` 或已有 Release，则跳过；新版本创建对应 tag，再调用 `release.yml` 构建产物。
 - 如果 tag 已创建但构建失败、尚无 Release，在 Actions 手动运行 `Release From Changelog` 可从原 tag 重试；不会将 tag 移到新提交。
 - dev 发布为 GitHub prerelease，保持稳定版本元数据和 Docker `latest` 不变。正式标题才同步稳定版本及发布正式镜像。
+- 只发 Android 开发版时，在新 dev 版本标题下加入 `<!-- release: android-only -->`。Changelog 工作流只构建并上传已签名的 APK，Windows、管理网页和 Docker 的构建和发布任务会跳过。
 
 Manual checks:
 

@@ -28,6 +28,7 @@ jobs:
       publish_release: ${{ steps.tag_state.outputs.publish_release }}
       version: ${{ steps.release_entry.outputs.version }}
       tag: ${{ steps.release_entry.outputs.tag }}
+      android_only: ${{ steps.release_entry.outputs.android_only }}
       source_ref: ${{ steps.tag_state.outputs.source_ref }}
       release_name: ${{ steps.tag_state.outputs.release_name }}
       release_notes: ${{ steps.release_notes.outputs.release_notes }}
@@ -140,19 +141,18 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import os
-          import re
+
+          from tools.versioning.changelog_release import ANDROID_ONLY_MARKER, parse_latest_release
 
           version = os.environ["VERSION"]
           output_path = Path(os.environ["GITHUB_OUTPUT"])
           changelog = Path("docs/CHANGELOG.md").read_text(encoding="utf-8")
-
-          header_pattern = re.compile(rf"^## \[{re.escape(version)}\](?: - .*)?$", re.MULTILINE)
-          header_match = header_pattern.search(changelog)
-          if header_match is None:
+          release = parse_latest_release(changelog)
+          if release is None or release.version != version:
               raise SystemExit(f"Unable to locate changelog section for {version}.")
-
-          next_header = re.compile(r"^## \[", re.MULTILINE).search(changelog, header_match.end())
-          section = changelog[header_match.start(): next_header.start() if next_header else len(changelog)].strip()
+          section = "\n".join(
+              line for line in release.section.splitlines() if line.strip() != ANDROID_ONLY_MARKER
+          )
 
           with output_path.open("a", encoding="utf-8", newline="\n") as handle:
               handle.write("release_notes<<EOF\n")
@@ -166,6 +166,7 @@ jobs:
     uses: ./.github/workflows/release.yml
     secrets: inherit
     with:
+      android_only: ${{ needs.sync-and-tag.outputs.android_only == 'true' }}
       source_ref: ${{ needs.sync-and-tag.outputs.source_ref }}
       release_tag: ${{ needs.sync-and-tag.outputs.tag }}
       release_name: ${{ needs.sync-and-tag.outputs.release_name }}
@@ -176,7 +177,7 @@ jobs:
     # GITHUB_TOKEN-created tags do not trigger push workflows. Call Docker
     # publishing directly, independently of the native artifact release.
     needs: sync-and-tag
-    if: needs.sync-and-tag.outputs.publish_release == 'true'
+    if: needs.sync-and-tag.outputs.publish_release == 'true' && needs.sync-and-tag.outputs.android_only != 'true'
     uses: ./.github/workflows/server-image.yml
     secrets: inherit
     with:

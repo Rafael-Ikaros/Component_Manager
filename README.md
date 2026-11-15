@@ -37,6 +37,7 @@ Android 和 Windows 将数据保存在本机 SQLite，**不用部署服务器，
 
 > [!NOTE]
 > 上方下载按钮提供正式版。下文也介绍 dev 功能，包含国内 EDA 查询、购买价格与材料成本、料盘识别和网页更新。正式版范围见[发布说明](docs/releases/0.7.8.md)，开发版见 [GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases)。
+> 部分开发版仅提供 Android APK。Windows 下载以对应版本的附件为准。
 
 ## 能做什么
 

@@ -9,6 +9,8 @@ from pathlib import Path
 from tools.versioning.release_channel import parse_release_tag
 from tools.versioning.sync_version import CHANGELOG_HEADER_RE, CHANGELOG_PATH
 
+ANDROID_ONLY_MARKER = "<!-- release: android-only -->"
+
 
 @dataclass(frozen=True)
 class ChangelogRelease:
@@ -16,6 +18,7 @@ class ChangelogRelease:
     tag: str
     prerelease: bool
     section: str
+    android_only: bool = False
 
 
 def parse_latest_release(text: str) -> ChangelogRelease | None:
@@ -38,7 +41,10 @@ def parse_latest_release(text: str) -> ChangelogRelease | None:
     channel = parse_release_tag(tag)
     end = headers[2][0] if len(headers) > 2 else len(lines)
     section = "".join(lines[start:end]).strip()
-    return ChangelogRelease(version, tag, channel.prerelease, section)
+    android_only = any(line.strip() == ANDROID_ONLY_MARKER for line in lines[start + 1:end])
+    if android_only and not channel.prerelease:
+        raise ValueError("Android-only releases must be prereleases")
+    return ChangelogRelease(version, tag, channel.prerelease, section, android_only)
 
 
 def release_section_changed(
@@ -77,6 +83,7 @@ def main() -> int:
         output.write(f"version={current.version}\n")
         output.write(f"tag={current.tag}\n")
         output.write(f"prerelease={'true' if current.prerelease else 'false'}\n")
+        output.write(f"android_only={'true' if current.android_only else 'false'}\n")
         output.write(f"section_changed={'true' if changed else 'false'}\n")
     return 0
 

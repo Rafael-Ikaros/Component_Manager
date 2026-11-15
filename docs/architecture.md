@@ -441,6 +441,9 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   admin-web and Windows metadata to that exact version. Changes limited to
   `Unreleased` do not publish. Existing releases are skipped; a manual run can
   retry a failed build from its existing tag when no release was created.
+- A concrete dev section with `<!-- release: android-only -->` publishes only
+  the signed Android APK. Windows and admin-web artifact builds and Docker image
+  publication are skipped for that release.
 - Android uses semver for `versionName` plus a monotonically increasing
   `versionCode`.
 - Windows package and assembly metadata use the same semver mapped to four-part

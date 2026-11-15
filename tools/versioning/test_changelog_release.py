@@ -28,6 +28,7 @@ class ChangelogReleaseTests(unittest.TestCase):
         release = parse_latest_release(text)
         self.assertEqual("v0.7.7-dev.1", release.tag)
         self.assertTrue(release.prerelease)
+        self.assertFalse(release.android_only)
         self.assertIn("Release candidate", release.section)
         self.assertNotIn("Work still in progress", release.section)
         self.assertNotIn("Previous stable", release.section)
@@ -57,6 +58,20 @@ class ChangelogReleaseTests(unittest.TestCase):
     def test_rejects_invalid_latest_heading(self) -> None:
         with self.assertRaises(ValueError):
             parse_latest_release("## [Unreleased]\n## [0.7.7-dev.0]\n")
+
+    def test_android_only_marker_applies_to_latest_release_section(self) -> None:
+        release = parse_latest_release(
+            "## [Unreleased]\n## [0.7.9-dev.27]\n<!-- release: android-only -->\n- Android.\n"
+        )
+        self.assertTrue(release.android_only)
+        later = parse_latest_release(
+            "## [Unreleased]\n## [0.7.9-dev.28]\n- All targets.\n" + release.section
+        )
+        self.assertFalse(later.android_only)
+
+    def test_stable_release_cannot_be_android_only(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must be prereleases"):
+            parse_latest_release("## [Unreleased]\n## [0.7.9]\n<!-- release: android-only -->\n")
 
     def test_only_unreleased_is_a_normal_no_release_state(self) -> None:
         current = parse_latest_release(

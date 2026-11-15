@@ -3,6 +3,10 @@ name: Release Artifacts
 on:
   workflow_call:
     inputs:
+      android_only:
+        description: Build and publish only the Android APK
+        type: boolean
+        default: false
       source_ref:
         description: Git ref or SHA to build from.
         required: true
@@ -253,6 +257,7 @@ jobs:
           if-no-files-found: error
 
   admin-web-release:
+    if: ${{ !inputs.android_only }}
     runs-on: ubuntu-latest
     needs: prepare
     defaults:
@@ -291,6 +296,7 @@ jobs:
           if-no-files-found: error
 
   windows-release:
+    if: ${{ !inputs.android_only }}
     runs-on: windows-latest
     needs: prepare
     env:
@@ -414,7 +420,14 @@ jobs:
           if-no-files-found: error
 
   github-release:
-    if: needs.prepare.outputs.publish_github_release == 'true'
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.prepare.outputs.publish_github_release == 'true' &&
+        needs.android-release.result == 'success' &&
+        (inputs.android_only ||
+          (needs.admin-web-release.result == 'success' && needs.windows-release.result == 'success'))
+      }}
     runs-on: ubuntu-latest
     needs:
       - prepare
@@ -434,12 +447,14 @@ jobs:
           path: release-assets/android
 
       - name: Download admin web artifact
+        if: ${{ !inputs.android_only }}
         uses: actions/download-artifact@v7
         with:
           name: admin-web-static
           path: release-assets/admin-web
 
       - name: Download Windows artifact
+        if: ${{ !inputs.android_only }}
         uses: actions/download-artifact@v7
         with:
           name: windows-portable-x64
@@ -454,7 +469,12 @@ jobs:
           RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
           PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
           COMPONENT_VERSION: ${{ needs.prepare.outputs.component_version }}
+          ANDROID_ONLY: ${{ inputs.android_only }}
         run: |
+          release_assets=(release-assets/android/component-vault-android-release.apk)
+          if [ "$ANDROID_ONLY" != "true" ]; then
+            release_assets+=(release-assets/admin-web/component-vault-admin-web.zip release-assets/windows/*)
+          fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           if [ -n "$RELEASE_NOTES" ]; then
             printf '%s\n' "$RELEASE_NOTES" > "$NOTES_FILE"
@@ -472,27 +492,17 @@ jobs:
             else
               gh release edit "$TAG_NAME" --title "$RELEASE_NAME" "$prerelease_flag"
             fi
-            gh release upload "$TAG_NAME" \
-              release-assets/android/component-vault-android-release.apk \
-              release-assets/admin-web/component-vault-admin-web.zip \
-              release-assets/windows/* \
-              --clobber
+            gh release upload "$TAG_NAME" "${release_assets[@]}" --clobber
           else
             prerelease_flag=""
             if [ "$PRERELEASE" = "true" ]; then prerelease_flag="--prerelease"; fi
             if [ -s "$NOTES_FILE" ]; then
-              gh release create "$TAG_NAME" \
-                release-assets/android/component-vault-android-release.apk \
-                release-assets/admin-web/component-vault-admin-web.zip \
-                release-assets/windows/* \
+              gh release create "$TAG_NAME" "${release_assets[@]}" \
                 --title "$RELEASE_NAME" \
                 $prerelease_flag \
                 --notes-file "$NOTES_FILE"
             else
-              gh release create "$TAG_NAME" \
-                release-assets/android/component-vault-android-release.apk \
-                release-assets/admin-web/component-vault-admin-web.zip \
-                release-assets/windows/* \
+              gh release create "$TAG_NAME" "${release_assets[@]}" \
                 --title "$RELEASE_NAME" \
                 $prerelease_flag \
                 --generate-notes
