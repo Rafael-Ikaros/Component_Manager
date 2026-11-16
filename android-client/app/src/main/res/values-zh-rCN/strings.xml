@@ -301,6 +301,8 @@
     <string name="settings_about_open_source">查看开源许可与说明</string>
     <string name="settings_update_check_action">手动检查更新</string>
     <string name="settings_update_title">应用更新</string>
+    <string name="settings_update_startup_prompt">启动时显示更新弹窗</string>
+    <string name="settings_update_startup_prompt_description">启动时发现新版本会弹窗。关闭后仍可手动检查更新。</string>
     <string name="settings_update_channel_title">更新通道</string>
     <string name="settings_update_channel_stable">正式版</string>
     <string name="settings_update_channel_dev">开发版</string>

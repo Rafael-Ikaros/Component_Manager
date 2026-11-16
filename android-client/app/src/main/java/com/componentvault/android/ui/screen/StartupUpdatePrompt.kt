@@ -27,7 +27,7 @@ import com.componentvault.android.data.GitHubReleaseInfo
 import com.componentvault.android.data.GitHubReleaseUpdateChecker
 import com.componentvault.android.data.ReleaseCheckResult
 import com.componentvault.android.data.UpdateChannel
-import com.componentvault.android.data.UpdateChannelPreferences
+import com.componentvault.android.data.UpdatePreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -37,11 +37,17 @@ internal class StartupUpdateSession(
 ) {
     private var checked = false
 
-    suspend fun checkOnce(installedVersion: String, channel: UpdateChannel): GitHubReleaseInfo? {
+    suspend fun checkOnce(
+        installedVersion: String,
+        channel: UpdateChannel,
+        shouldShowPrompt: () -> Boolean = { true },
+    ): GitHubReleaseInfo? {
         if (checked) return null
         checked = true
+        if (!shouldShowPrompt()) return null
         return try {
             (checkRelease(installedVersion, channel) as? ReleaseCheckResult.UpdateAvailable)?.release
+                ?.takeIf { shouldShowPrompt() }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -61,10 +67,12 @@ internal class StartupUpdateViewModel(
     init {
         if (savedStateHandle.get<Boolean>(checkStartedKey) != true) {
             savedStateHandle[checkStartedKey] = true
-            val channel = UpdateChannelPreferences.read(application)
+            val channel = UpdatePreferences.readChannel(application)
             val session = StartupUpdateSession(GitHubReleaseUpdateChecker()::check)
             viewModelScope.launch {
-                availableRelease = session.checkOnce(BuildConfig.VERSION_NAME, channel)
+                availableRelease = session.checkOnce(BuildConfig.VERSION_NAME, channel) {
+                    UpdatePreferences.showStartupPrompt(application)
+                }
             }
         }
     }

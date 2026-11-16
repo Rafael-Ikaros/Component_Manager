@@ -63,7 +63,7 @@ import com.componentvault.android.R
 import com.componentvault.android.data.GitHubReleaseUpdateChecker
 import com.componentvault.android.data.ReleaseCheckResult
 import com.componentvault.android.data.UpdateChannel
-import com.componentvault.android.data.UpdateChannelPreferences
+import com.componentvault.android.data.UpdatePreferences
 import com.componentvault.android.model.AppLanguage
 import com.componentvault.android.model.AppPreferences
 import com.componentvault.android.model.ImportLearningSummary
@@ -573,7 +573,10 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
     val updateChecker = remember { GitHubReleaseUpdateChecker() }
     val context = LocalContext.current
     var updateChannel by remember {
-        mutableStateOf(UpdateChannelPreferences.read(context))
+        mutableStateOf(UpdatePreferences.readChannel(context))
+    }
+    var showStartupUpdatePrompt by remember {
+        mutableStateOf(UpdatePreferences.showStartupPrompt(context))
     }
     var isChecking by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<ReleaseCheckResult?>(null) }
@@ -634,11 +637,20 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
         }
     }
     SectionPane(title = stringResource(R.string.settings_update_title)) {
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_update_startup_prompt),
+            subtitle = stringResource(R.string.settings_update_startup_prompt_description),
+            checked = showStartupUpdatePrompt,
+            onCheckedChange = { enabled ->
+                UpdatePreferences.setShowStartupPrompt(context, enabled)
+                showStartupUpdatePrompt = enabled
+            },
+        )
         Text(stringResource(R.string.settings_update_channel_title), fontWeight = FontWeight.SemiBold)
         Column {
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
               updateChannel = UpdateChannel.Stable
-              UpdateChannelPreferences.write(context, updateChannel)
+              UpdatePreferences.writeChannel(context, updateChannel)
               updateResult = null
           }) {
             RadioButton(
@@ -650,7 +662,7 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
           }
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
               updateChannel = UpdateChannel.Dev
-              UpdateChannelPreferences.write(context, updateChannel)
+              UpdatePreferences.writeChannel(context, updateChannel)
               updateResult = null
           }) {
             RadioButton(

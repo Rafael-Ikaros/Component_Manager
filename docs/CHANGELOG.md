@@ -17,6 +17,8 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+- Android「设置 → 关于 → 应用更新」新增启动更新弹窗开关。关闭后可继续手动检查更新。
+
 ## [0.7.9-dev.27] - 2026-11-16
 
 <!-- release: android-only -->

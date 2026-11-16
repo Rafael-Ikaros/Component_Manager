@@ -221,6 +221,7 @@ jobs:
           --tests 'com.componentvault.android.data.InventoryWorkbookServiceTest'
           --tests 'com.componentvault.android.data.LabelWorkbookExporterTest'
           --tests 'com.componentvault.android.data.GitHubReleaseUpdateTest'
+          --tests 'com.componentvault.android.ui.screen.StartupUpdateSessionTest'
           --tests 'com.componentvault.android.model.ComponentImportModelsTest'
           --tests 'com.componentvault.android.data.ServerOfficialDetailsTest'
           --tests 'com.componentvault.android.model.StockMovementRecordTest'

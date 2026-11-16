@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.componentvault.android.R
+import com.componentvault.android.data.UpdateChannel
+import com.componentvault.android.data.UpdatePreferences
 import com.componentvault.android.model.AppPreferences
 import com.componentvault.android.model.ImportLearningSummary
 import com.componentvault.android.model.SyncConfiguration
@@ -23,11 +26,50 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
 class SettingsDraftUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun startupUpdateSwitchPersistsAndManualCheckStaysAvailable() {
+        val context: Application = RuntimeEnvironment.getApplication()
+        UpdatePreferences.writeChannel(context, UpdateChannel.Dev)
+        val section = mutableStateOf<SettingsSection?>(SettingsSection.About)
+        compose.setContent {
+            MaterialTheme {
+                ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
+                    SettingsContent(
+                        contentPadding = PaddingValues(),
+                        syncConfiguration = SyncConfiguration("device", "", "", false, "", ""),
+                        appPreferences = AppPreferences(), importLearningSummary = ImportLearningSummary(),
+                        isBusy = false, statusMessage = "", layoutMode = CompactPreviewLayout,
+                        selectedSection = section.value, onSelectSection = { section.value = it },
+                        onSaveSyncSettings = { _, _, _, _ -> }, onSaveAppPreferences = {},
+                        onTestConnection = { _, _, _ -> }, onSyncNow = {},
+                        onClearImportLearningMappings = {},
+                    )
+                }
+            }
+        }
+        val settingsList = compose.onNodeWithTag("settings_detail_list")
+        settingsList.performScrollToNode(isToggleable())
+        compose.onNode(isToggleable()).assertIsOn().performClick().assertIsOff()
+        compose.runOnIdle {
+            assertFalse(UpdatePreferences.showStartupPrompt(context))
+            assertEquals(UpdateChannel.Dev, UpdatePreferences.readChannel(context))
+            section.value = null
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { section.value = SettingsSection.About }
+        settingsList.performScrollToNode(isToggleable())
+        compose.onNode(isToggleable()).assertIsOff()
+        val checkLabel = context.getString(R.string.settings_update_check_action)
+        settingsList.performScrollToNode(hasText(checkLabel))
+        compose.onNodeWithText(checkLabel).assertIsEnabled()
+    }
 
     @Test
     @Config(qualifiers = "w1000dp-h600dp")

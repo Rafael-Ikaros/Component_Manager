@@ -16,6 +16,27 @@ import kotlin.test.assertNull
 
 class StartupUpdateSessionTest {
     @Test
+    fun disabledStartupPromptSkipsTheAutomaticRequest() = runBlocking {
+        var requests = 0
+        val session = StartupUpdateSession { installed, channel ->
+            requests++
+            GitHubReleaseParser.compareWithInstalled(releaseJson(), installed, channel)
+        }
+        assertNull(session.checkOnce("0.7.7", UpdateChannel.Stable) { false })
+        assertEquals(0, requests)
+    }
+
+    @Test
+    fun disablingThePromptDuringARequestSuppressesTheResult() = runBlocking {
+        var showPrompt = true
+        val session = StartupUpdateSession { installed, channel ->
+            showPrompt = false
+            GitHubReleaseParser.compareWithInstalled(releaseJson(), installed, channel)
+        }
+        assertNull(session.checkOnce("0.7.7", UpdateChannel.Stable) { showPrompt })
+    }
+
+    @Test
     fun promptsOnlyWhenPublishedVersionIsNewer() = runBlocking {
         for ((installedVersion, expectedTag) in listOf(
             "0.7.7" to "v0.7.8",
