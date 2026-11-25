@@ -95,19 +95,18 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 
 ### 让手机与网页共用库存
 
-按照[Docker／群晖快速部署](docs/docker-quickstart.md)启动 API 与 Web。
-普通正式版部署可直接启动，开发版在 `.env` 中只需指定渠道。管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。
-API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管理镜像、分别运行在两个容器中。
+可在群晖界面[直接创建 API、Web 容器](docs/docker-manual.md)，无需 Compose、`.env` 或 SSH；也可使用[普通 Compose 模板](docs/docker-quickstart.md)。两种普通部署方式都不向应用挂载 Docker socket，不要求特权模式。
+管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。
+API 使用独立镜像，管理镜像默认运行 Web。库存、同步和检查更新均不依赖 Updater。
 首次访问 `http://服务器IP:8787/setup` 设置管理员密钥，再在管理台创建普通账户。
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。
 
-> [!IMPORTANT]
-> **0.7.8 可以保留数据升级 dev，但只换 API/Web 镜像不会自动启用网页更新。**
-> 需要网页切换更新渠道时，使用[网页更新单文件模板](docker-compose.hub-web-update.yml)，并在 `.env` 指定项目目录。群晖项目名由 Container Manager 传给 Compose。
-> 第一次升级与启用组件可以一起完成，见[服务端更新教程](docs/server-web-update.md)。
+> [!NOTE]
+> **网页一键更新是可选项。** 普通部署在群晖界面成对更新 API/Web 镜像，保留原数据挂载即可。
+> 只有希望网页代替你重建容器时，才启用[独立 Updater](docs/server-web-update.md)。该组件需要 Docker 管理权限，并额外运行一个容器；不启用不影响业务功能。
 
-普通部署默认不会自动安装新镜像。网页 updater 由管理员确认后执行；
-定时跟随当前渠道可选择[Watchtower](docs/docker-quickstart.md#watchtower-updates)，同一服务只使用一种更新方式。
+普通部署默认不会自动安装新镜像。可选的网页 Updater 由管理员确认后执行；
+定时跟随当前渠道可选 [Watchtower](docs/docker-quickstart.md#watchtower-updates)，它同样需要 Docker 管理访问。同一服务只使用一种更新方式。
 
 ## 找到你需要的指南
 

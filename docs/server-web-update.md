@@ -1,5 +1,7 @@
 # 在网页中更新服务端
 
+**网页一键更新是可选功能。** 普通部署、库存操作、客户端同步和检查版本都不需要 Updater，也不需要给应用挂载 Docker socket。不使用 Compose 或不愿授予 Docker 管理权限时，请使用[群晖手动部署与更新](docker-manual.md)。
+
 本页适用于官方 Docker Compose 和群晖 Container Manager 项目。
 启用 updater 后，管理员可在“设置 → 关于服务端”选择渠道、确认更新并查看进度。
 配置可采用[完整单文件模板](../docker-compose.hub-web-update.yml)。
@@ -119,6 +121,8 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 Docker socket 具有主机 Docker 管理能力，仅挂载到 updater；API、Web 不挂载 socket，
 updater 不映射主机端口。实际更新接口仅管理员可调用，普通账户没有更新入口。
 updater 在后续切换时读取原 Compose 文件，并在同一目录备份和更新 `.env` 中的镜像设置。
+
+这里的 Docker socket 权限不是“仅允许修改本项目”的权限。常见 root 模式下，控制 Docker 守护进程可获得主机级能力，见[官方说明](https://docs.docker.com/engine/security/)。更新器只操作指定项目是本程序的逻辑约束，不是 Docker 为该 socket 提供的项目级隔离。不接受这一授权时，保留普通 API/Web 并手动更新；无需为了使用业务功能启用更新器。
 
 ## 从独立 Updater 镜像迁移
 

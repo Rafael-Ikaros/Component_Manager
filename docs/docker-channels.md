@@ -3,13 +3,15 @@
 正式版使用 `latest / web-latest`，开发版使用 `dev / web-dev`。两组镜像由独立的
 **Docker Images** 工作流发布；开发版不会覆盖正式版标签。普通部署者无需 Docker Hub Token。
 
-从 `0.7.9-dev.8` 起，Web 和 updater 使用同一 `web-*` 管理镜像，仍为两个容器。
+普通部署可在群晖界面[手动创建和更新两个容器](docker-manual.md)，也可使用 Compose；均不需要向应用挂载 Docker socket。
+
+只有启用可选网页更新时，才另外部署 updater。从 `0.7.9-dev.8` 起，Web 和 updater 使用同一 `web-*` 管理镜像，仍为两个容器。
 网页更新只替换 API/Web；切换渠道不会重建正在执行任务的 updater。
 旧独立 updater 的迁移和后续维护见[网页更新教程](server-web-update.md#从独立-updater-镜像迁移)。
 
-服务端的渠道选择用于版本检查和更新目标，只有确认更新后才替换容器。
-群晖希望日常不使用 SSH，可一次配置[网页更新服务](server-web-update.md)。不启用该服务时，
-仍可用下方部署助手切换，不必手动记忆或编辑镜像标签。
+服务端的渠道选择用于版本检查，以及已启用网页更新时的目标渠道；切换选项本身不安装更新。
+直接创建的容器按[手动步骤](docker-manual.md#5-手动更新或切换渠道)成对选用镜像。Compose 用户也可使用下方部署助手。
+希望网页代替你重建容器时，可以另行配置[网页更新服务](server-web-update.md)，该选项需要授予 Docker 管理权限。
 
 **已有正式版可以直接升级到 dev，沿用原账户和库存。** 在原项目中成对切换 API/Web，
 保留 `/data` 后拉取并重新部署；应用设置随后在 Web 管理。升级不会自动创建 updater，

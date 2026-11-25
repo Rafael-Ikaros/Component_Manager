@@ -38,7 +38,7 @@ def about() -> dict:
         "revision": BUILD_REVISION,
         "deployment": "container" if Path("/.dockerenv").exists() else "source_or_service",
         "repository_url": REPOSITORY,
-        "deployment_guide_url": f"{REPOSITORY}/blob/master/docs/dockerhub.md",
+        "deployment_guide_url": f"{REPOSITORY}/blob/master/docs/docker-quickstart.md",
     }
 
 

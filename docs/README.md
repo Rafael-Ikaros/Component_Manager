@@ -26,12 +26,13 @@
 
 | 需要完成的操作 | 文档 |
 | --- | --- |
+| 群晖手动创建 API/Web，不使用 Compose、不授予 Docker 控制权限 | [手动部署与更新](docker-manual.md) |
 | Docker／群晖首次安装、Token 查找和排障 | [快速部署](docker-quickstart.md) |
 | 正式版升级 dev、选择更新渠道 | [渠道切换](docker-channels.md) |
 | 配置网页更新及了解一次性配置要求 | [网页更新](server-web-update.md) |
 | 维护者向 Docker Hub 发布镜像、核对发布结果 | [镜像发布](dockerhub.md) |
 
-已有 Docker 部署请在原项目中升级，保留数据挂载。希望以后在网页切换版本的管理员，可在同一次升级中启用 updater，详见[网页更新教程](server-web-update.md)。
+普通部署不挂 Docker socket；直接创建的容器或 Compose 项目都可以手动更新。已有部署沿用原数据挂载，不必为了更新改用新空项目。网页一键更新是另行授权的可选功能，需要 Docker 管理访问，详见[网页更新教程](server-web-update.md)。
 
 ## 开发和技术参考
 

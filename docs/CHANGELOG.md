@@ -17,6 +17,9 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+- 补充群晖手动创建 API/Web 容器的部署和更新教程，无需 Compose、`.env` 或向应用挂载 Docker socket。部署导航默认说明普通安装，网页 Updater 明确为另行授权的可选功能。
+- Web 未启用网页更新或旧 API 不提供该能力时，显示手动更新说明，保留版本检查并提供手动教程；不再将启用 Updater 作为正常部署的必需步骤。服务端的部署教程链接改指向用户安装指南。
+
 ## [0.7.9-dev.29] - 2026-11-25
 
 本版提供 Android APK、Web 静态包，以及配套的 API 和 Web Docker 开发镜像。Windows 不再提供新安装包。

@@ -44,7 +44,7 @@ export function ServerAboutCard() {
           <option value="stable">{t("正式版（推荐）")}</option>
           <option value="dev">{t("开发版（含预发布）")}</option>
         </select>
-        <p className="text-sm text-muted-foreground">{t("此选择用于版本检查和下方更新目标；只有确认更新才会替换容器。渠道偏好保存在此浏览器。")}</p>
+        <p className="text-sm text-muted-foreground">{t("此选择用于版本检查和已启用的网页更新目标；切换选项本身不会安装或更新。渠道偏好保存在此浏览器。")}</p>
       </div>
       <div className="flex flex-wrap gap-3">
         <Button disabled={busy} onClick={async () => {
@@ -57,7 +57,7 @@ export function ServerAboutCard() {
         <a className="self-center text-sm underline" href={`${info.data.repository_url}/releases`} target="_blank" rel="noreferrer">{t("发布记录")}</a>
         <a className="self-center text-sm underline" href={info.data.deployment_guide_url} target="_blank" rel="noreferrer">{t("部署与更新教程")}</a>
       </div>
-      <ServerUpdateCard currentVersion={info.data.version} channel={channel} onBusyChange={setUpdaterBusy} guideUrl={`${info.data.repository_url}/blob/master/docs/server-web-update.md`} />
+      <ServerUpdateCard currentVersion={info.data.version} channel={channel} onBusyChange={setUpdaterBusy} guideUrl={`${info.data.repository_url}/blob/master/docs/server-web-update.md`} manualGuideUrl={`${info.data.repository_url}/blob/master/docs/docker-manual.md`} />
     </> : <Button variant="outline" disabled={info.loading} onClick={() => void info.reload()}>{t("重新读取")}</Button>}
     {info.error || error ? <p role="alert" className="text-sm text-red-700">{info.error || error}</p> : null}
     {update ? <p role="status" className="text-sm">{update.update_available === null ? t("源码构建无法自动比较版本。所选渠道最新版本：") : update.update_available ? t("发现新版本：") : t("当前版本不低于所选渠道最新版本：")}<a className="underline" href={update.release_url} target="_blank" rel="noreferrer">{update.latest_version}</a></p> : null}

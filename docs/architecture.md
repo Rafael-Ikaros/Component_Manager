@@ -38,6 +38,8 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 
 ## 可选网页更新服务
 
+普通部署可手动创建 API/Web 容器或使用普通 Compose，两者均不向业务容器挂载 Docker socket、不要求特权模式。Web 由浏览器直连配置的 API 地址，不依赖 Compose 内部服务名；首次配置保存在 API 的 `/data`。手动部署见[操作指南](docker-manual.md)。
+
 从 `0.7.9-dev.8` 起，API 使用独立镜像，Web 与 updater 共用 `web-*` 管理镜像、保留独立容器。
 管理镜像默认启动 Nginx，`command: [updater]` 启动单 worker 更新服务；每个容器只运行对应角色。
 健康检查根据启动角色访问网页或更新接口。两者在 Compose 中共用 `COMPONENT_VAULT_WEB_IMAGE`；
@@ -45,6 +47,8 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 同一镜像产物不要求两个容器始终运行同一版本。旧独立 updater 的迁移见[部署教程](server-web-update.md#从独立-updater-镜像迁移)。
 
 网页更新是可选部署能力。首次启用时，将独立 updater 加入原 Compose 项目并共享原数据卷。完整模板从 Compose 取得项目名，管理员通过 `COMPONENT_VAULT_DEPLOY_DIR` 指定原项目目录。启用后由管理员选择渠道、确认并提交更新作业，版本检测仍是独立的只读操作。
+
+没有配置 updater 时，管理台正常展示手动更新说明及教程，上方版本检查仍可使用；不要求用户授权 Docker 管理权限。旧 API 没有更新能力接口时采用相同的手动路径。Docker socket 的管理权限不限于指定 Compose 项目，程序只更新本项目是逻辑约束，不是宿主机权限隔离。
 
 `docker-compose.hub-web-update.yml` 是网页更新的完整部署模板，默认启动 Web。CI 直接检查它与普通 Hub 部署使用相同的默认 API/Web 端口和数据卷，并核对 updater 的独立任务卷和同路径目录挂载。已有项目迁移时沿用自定义端口、数据来源和网络。SQLite 路径由 API 镜像提供，MQTT 与目录的高级环境覆盖仅在需要时由部署显式传入。
 

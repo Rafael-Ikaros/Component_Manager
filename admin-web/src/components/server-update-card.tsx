@@ -35,8 +35,8 @@ const updateMessages = {
   "Services are running the selected version.": "服务已运行所选版本。",
 } as const;
 
-export function ServerUpdateCard({ currentVersion, guideUrl, channel, onBusyChange }: {
-  currentVersion: string; guideUrl: string; channel: Channel; onBusyChange: (busy: boolean) => void;
+export function ServerUpdateCard({ currentVersion, guideUrl, manualGuideUrl, channel, onBusyChange }: {
+  currentVersion: string; guideUrl: string; manualGuideUrl: string; channel: Channel; onBusyChange: (busy: boolean) => void;
 }) {
   const { t } = useI18n();
   const { identity, session } = useAuth();
@@ -76,7 +76,7 @@ export function ServerUpdateCard({ currentVersion, guideUrl, channel, onBusyChan
         if (cancelled) return;
         if (error instanceof ApiError && error.status === 404) {
           setStatus({enabled: false, current_version: currentVersion, current_channel: "unknown", active_job: null, latest_job: null});
-          setMessage(t("此 API 或更新服务版本尚不支持网页更新，请先在群晖项目中配置配套版本。"));
+          setMessage(null);
           setReconnecting(false);
           return;
         }
@@ -126,9 +126,10 @@ export function ServerUpdateCard({ currentVersion, guideUrl, channel, onBusyChan
     <p className="text-sm text-muted-foreground">{t("当前运行：")}{status?.current_version ?? currentVersion} · {channelName(status?.current_channel ?? (currentVersion === "source" ? "unknown" : currentVersion.includes("-dev.") ? "dev" : "stable"))}</p>
     {reconnecting ? <p role="status" className="text-sm text-amber-800">{t("正在重新连接更新服务；已知任务会保留。更新重启期间请稍候。")}</p> : null}
     {status?.enabled === false ? <div className="space-y-2 text-sm">
-      <p>{t("此部署尚未启用网页更新。请在 Container Manager 或 Docker GUI 中按教程一次性添加 updater 服务，并为 API 配置 UPDATER_URL。")}</p>
-      <p>{t("更新服务配置完成后，即可在这里切换正式或开发渠道并更新 API 与 Web。源码或系统服务部署仍可使用上方版本检查。")}</p>
-      <a className="underline" href={guideUrl} target="_blank" rel="noreferrer">{t("配置网页更新教程")}</a>
+      <p>{t("可按手动部署教程更新；无需向管理台授予 Docker 管理权限。库存、同步和上方版本检查仍可照常使用。")}</p>
+      <a className="underline" href={manualGuideUrl} target="_blank" rel="noreferrer">{t("手动更新教程")}</a>
+      <p className="text-muted-foreground">{t("可选：配置网页一键更新。Updater 需要 Docker 管理权限。")}</p>
+      <a className="underline" href={guideUrl} target="_blank" rel="noreferrer">{t("可选：配置网页更新")}</a>
     </div> : status?.enabled ? <>
       <div className="space-y-2">
         <p className="text-sm font-medium">{t("目标更新渠道")}: {channelName(channel)}</p>

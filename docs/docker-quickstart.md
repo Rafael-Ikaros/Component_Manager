@@ -1,17 +1,25 @@
 # Docker 快速部署与 API Token 查找
 
-本指南说明 Docker／群晖的安装、持久化文件、账户密钥和常见故障。
+本指南说明 Docker／群晖的安装、持久化文件、账户密钥和常见故障。普通部署只运行 API 和按需的 Web，不向应用授予 Docker 守护进程控制权限，也不安装自动更新组件。
 公开镜像可直接拉取。首次配置页面由 API 提供，不需要先启动独立 Web。
 
-API 与管理台保持前后端分离。从 `0.7.9-dev.8` 起，只构建两种镜像：API 和管理镜像。
-管理镜像供 Web 与可选 updater 两个独立容器使用；启用网页更新时共三个容器，
-未启用时只需 API/Web。旧独立 updater 的迁移见[说明](server-web-update.md#从独立-updater-镜像迁移)。
+| 你希望怎样部署 | 使用哪份教程 | 是否向应用挂载 Docker socket |
+| --- | --- | --- |
+| 在群晖界面直接创建容器，不使用 Compose 或 SSH | [群晖手动部署](docker-manual.md) | 不需要 |
+| 用 Compose 保存容器配置，手动更新镜像 | 本页第 1 节与普通模板 | 不需要 |
+| 另行启用网页一键更新 | [可选 Updater](server-web-update.md) | 需要，仅授予更新组件 |
 
-已有正式版希望升级到 dev 并在网页管理，请直接看[保留数据升级与网页配置](server-web-update.md#已有正式版先升级到-dev)。
-API/Web 可以先成对升级，应用设置随后在网页修改；要连镜像更新也放进网页，需一次启用 updater。
-新部署需要这项能力时，按[群晖一次性配置](server-web-update.md#群晖一次性配置)直接使用完整单文件模板。共享管理镜像需使用 `0.7.9-dev.8` 或更新兼容版本。
+API 与管理台保持前后端分离。从 `0.7.9-dev.8` 起，只构建两种镜像：API 和管理镜像。
+管理镜像默认运行 Web；只有主动启用网页更新时，才另建 updater 容器，共三个容器。
+普通 API/Web 均不挂载 `/var/run/docker.sock`、不需特权模式。旧独立 updater 的迁移见[说明](server-web-update.md#从独立-updater-镜像迁移)。
+
+使用哪个部署方式，都可以在网页设置账户、库存操作和应用配置，检查新版本也无需 Updater。
+已有数据升级时，沿用原容器或项目的完整 `/data` 映射并成对更新 API/Web，见[渠道切换](docker-channels.md)。
+只有希望网页直接替你拉取镜像、重建容器时，才需按[可选配置](server-web-update.md#群晖一次性配置)启用 updater；共享管理镜像需使用 `0.7.9-dev.8` 或更新兼容版本。
 
 ## 1. 准备并启动
+
+本节使用 Compose；不使用 Compose 的群晖用户可直接按[手动部署](docker-manual.md)创建容器，两种方式均不要求 Docker socket 挂载。
 
 下载 [`docker-compose.hub.yml`](../docker-compose.hub.yml)，放进固定部署目录。正式版默认使用 `latest / web-latest`，可以直接启动。选择开发版时，在 Compose 同目录创建名为 `.env` 的文件，只需这一行：
 
@@ -50,6 +58,7 @@ docker compose -f docker-compose.hub.yml --profile web up -d
 
 Watchtower 适合自动跟随**当前镜像标签**更新，不负责在正式/dev之间切换。
 默认模板不启动它。它与网页 updater 二选一，不能同时管理同一 API/Web。
+Watchtower 同样需要访问 Docker 守护进程；不希望授予该权限时，继续手动更新即可。
 
 1. 一致备份整个 `/data`，保留原项目名称、目录和数据映射。
 2. 核对 API/Web 已选择同一渠道，例如 `latest / web-latest` 或 `dev / web-dev`。
