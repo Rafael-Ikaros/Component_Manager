@@ -37,4 +37,4 @@ Windows 也可使用 `scripts/android-gradle.ps1`。签名发布所需的四个 
 Compose 使用 Preview / Live Edit，不使用 XML 拖放设计器。
 
 涉及升级或同步的设备检查须保留应用数据。已记录的验证路径和未覆盖边界见
-[验证记录](../docs/history/verification.md)。M1 的纸张与设备限制见[打印指南](../docs/m1-printing-feature-matrix.md)，HM-A300E 需使用含对应 SDK 的构建，见[适配说明](../docs/hm-a300e.md)。
+[验证记录](../docs/history/verification.md)。公开 APK 为 M1 使用原驱动，为 HM-A300E 使用通用 CPCL。汉印 SDK 仅用于本地对照构建。纸张和已验证机型见[打印机兼容性](../docs/printer-compatibility.md)。

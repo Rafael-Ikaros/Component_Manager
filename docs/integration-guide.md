@@ -74,9 +74,7 @@ Examples in this document assume `http://localhost:8787`.
   `inventory_protocol`, plus build `version` and `revision` in new images. These
   two diagnostic fields are additive; older servers omit them. Protocol and
   `/auth/me` identity checks remain authoritative, not a version-string comparison.
-- All sync endpoints require `Authorization: Bearer <API_TOKEN>`.
-- `/admin-api/*` accepts native Bearer auth or the authenticated Web session described below.
-- The server also accepts `X-API-Token`, but the client uses bearer auth.
+- Native clients send `Authorization: Bearer <account key>`. Sync and admin endpoints also accept `X-API-Token` or an authenticated Web session, with CSRF validation on cookie-authenticated writes. Sync requests for ordinary accounts must also send the matching `X-Component-Vault-Account-Id`.
 - The setup token authenticates the administrator. Ordinary account keys resolve
   independent inventory databases and cannot access setup, logs, accounts or
   global MQTT configuration. Disabled accounts and replaced keys return 401.

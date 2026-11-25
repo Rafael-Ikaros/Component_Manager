@@ -1,6 +1,6 @@
-# Runbook
+# 开发与运维手册
 
-## Docker Hub image deployment
+## 已发布镜像的部署
 
 群晖可[在界面直接创建 API/Web 容器](docker-manual.md)，也可使用[普通 Compose](docker-quickstart.md)。两种普通部署都无需向应用挂载 Docker socket。重建 API 前先停机备份完整数据目录，保留原 `/data` 映射、端口和生效的自定义 API 环境变量。[容器启动排障](docker-manual.md#分阶段排障) · [正式版与开发版切换](docker-channels.md)
 
@@ -9,11 +9,6 @@
 ### 独立 Docker CI 与发布渠道
 
 `docker-ci.yml` 检查镜像构建和 Compose 配置。从 `0.7.9-dev.30` 起，`server-image.yml` 按固定版本发布统一镜像与默认 Web 的兼容标签，完成隔离项目验证后才推进对应渠道。旧版固定标签沿用发布时的镜像结构。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可用 `master` 上的独立工作流补发同一 tag，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
-
-### Optional Watchtower updates for the Hub deployment
-
-定时跟随当前镜像渠道可选择[Watchtower](docker-quickstart.md#watchtower-updates)。
-它不会自动跨渠道，且不与网页 updater 同时管理同一 API/Web。群晖安装该组件仍需一次原项目配置。
 
 ### 排查镜像与客户端账户接口不一致
 
@@ -34,11 +29,6 @@ Web/API 需同站点且精确允许 Web origin；网页保存的设置与非空�
 按[密钥查找步骤](docker-quickstart.md#4-api-token-在哪里)确定当前生效值。
 管理员密钥不是 Docker Hub 或 GitHub Token；普通用户需要自己的账户密钥。
 不要为了升级清空现有 API_TOKEN，也不要让旧客户端绕过账户绑定上传。
-
-### Upgrade from the HTTP 422 long-name failure
-
-服务端兼容最多4000字符的旧元件名称；新导入将型号与描述分开。
-同时更新服务端和客户端后重试同步，无需清空应用数据；用户名称不会被批量重写。
 
 ## Multi-location inventory upgrade
 
@@ -67,11 +57,7 @@ registry, `users/`, configuration and every `<account-database>.photos/` directo
 Downgrading to a version without account support prevents ordinary-user login;
 changing an image is not a database restore and cannot undo schema changes.
 
-Current native navigation and module boundaries are documented in
-[architecture.md](architecture.md). Android and Windows About pages
-show author Rafael-Ikaros and default to stable Releases, with an opt-in Dev channel.
-CI runs the native build checks, including UI timestamp regression coverage;
-the publication job identifies its repository through `GH_REPO`.
+Android 模块及同步边界见[架构](architecture.md)。
 
 ## Local Backend Development
 
@@ -100,7 +86,7 @@ The separated admin web console lives in `admin-web/`.
 
 ```powershell
 cd admin-web
-cmd /c npm install
+cmd /c npm ci
 cmd /c npm run dev
 ```
 
@@ -285,11 +271,9 @@ Main build and release workflows:
   on manual trigger, reusable workflow calls, and
   `v*` tag pushes.
 - `.github/workflows/docker-ci.yml`
-  Runs API/shared-management image, role startup and Compose checks for relevant changes.
+  Builds the unified image and checks role startup and Compose configuration on relevant changes.
 - `.github/workflows/server-image.yml` (`Docker Images`)
-  Builds/checks API and shared management images in all three container roles and, when publishing is requested, pushes the
-  selected channel and verifies a real isolated Compose update. Missing publishing
-  credentials fail this job; native release artifacts are reported independently.
+  Publishes the unified and Web-compatible fixed tags for AMD64 and ARM64. It verifies a real isolated Compose update before moving the selected channel. Native release artifacts are reported independently.
 
 ### Android Release Secrets
 
@@ -379,12 +363,6 @@ curl.exe -X POST http://localhost:8787/auth/ping `
   fall back to a repo-local `uv`-managed Python 3.12 when `uv` is available.
   If `uv` is not installed, repair or reinstall Python 3.12 first.
 
-### Flutter not found
-
-- Symptom: `flutter` is not recognized.
-- Impact: only the legacy reference client is affected.
-- Fix: install Flutter only if you need to inspect or compare the old prototype.
-
 ### Android SDK not configured
 
 - Symptom: `assembleDebug` fails with `SDK location not found`.
@@ -401,15 +379,6 @@ curl.exe -X POST http://localhost:8787/auth/ping `
   `org.gradle.java.home` override.
 - Fix: keep that property out of the repository and provide Java through
   `JAVA_HOME`, Android Studio, or the CI runner toolchain instead.
-
-### Android theme resource missing
-
-- Symptom: AAPT fails with `resource style/Theme.Material3.DayNight.NoActionBar
-  not found`.
-- Cause: the app theme inherits from the Android Material theme, but the
-  `com.google.android.material` dependency is missing.
-- Fix: keep `com.google.android.material:material` in
-  `android-client/app/build.gradle.kts`.
 
 ### Admin web cannot reach the API
 

@@ -8,8 +8,9 @@
 
 | 需要完成的操作 | 文档 |
 | --- | --- |
-| 安装客户端、检查和下载更新 | [安装与更新](app-updates.md) |
-| 连续扫码、订单 Excel 批量入库 | [嘉立创批量入库](batch-jlc-inbound.md) |
+| 首次下载并安装 Android | [开始使用](../README.md#只在本机管理库存) |
+| 检查和下载 Android 更新 | [应用更新](app-updates.md) |
+| 连续扫码、C 编码清单、立创商城订单 | [批量入库](batch-jlc-inbound.md) |
 | 导入 BOM、匹配库存、配料和确认出库 | [项目用料](bom-and-migration.md) |
 | 记录购买价格、补录库存成本及估算 PCBA 材料成本 | [购买价格与材料成本](inventory-cost.md) |
 | 管理库位、转移、备份恢复和标签 Excel 导出 | [库存与备份](storage-and-backup.md) |
@@ -18,7 +19,7 @@
 | 用商城订单修正已有元件资料 | [从订单更新资料](order-metadata-update.md) |
 | 扫描库存资料、跨页全选并应用更新 | [库存资料检查](parameter-enrichment.md) |
 | 编辑标签、模板和汉印 M1 打印 | [标签打印](m1-printing-feature-matrix.md) |
-| HM-A300E Android 实验适配与资料 | [HM-A300E](hm-a300e.md) |
+| HM-A300E 配对、纸张与通用 CPCL 打印 | [HM-A300E](hm-a300e.md) |
 | 反馈错误和附加诊断 | [扫码诊断与反馈](feedback-and-scan-diagnostics.md) |
 | 向 Home Assistant、看板发布库存变化 | [MQTT](mqtt.md) |
 
@@ -27,7 +28,7 @@
 | 需要完成的操作 | 文档 |
 | --- | --- |
 | 群晖手动创建 API/Web，不使用 Compose、不授予 Docker 控制权限 | [手动部署与更新](docker-manual.md) |
-| Docker／群晖首次安装、Token 查找和排障 | [快速部署](docker-quickstart.md) |
+| 使用 Compose 安装、配置账户密钥和排障 | [Docker Compose 部署](docker-quickstart.md) |
 | 正式版升级 dev、选择更新渠道 | [渠道切换](docker-channels.md) |
 | 配置网页更新及了解一次性配置要求 | [网页更新](server-web-update.md) |
 | 维护者向 Docker Hub 发布镜像、核对发布结果 | [镜像发布](dockerhub.md) |

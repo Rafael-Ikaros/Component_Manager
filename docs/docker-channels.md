@@ -42,7 +42,7 @@
    sh tools/deployment/switch-channel.sh --project-name component-warehouse --channel dev
    ```
 
-   省略 `--channel` 会提供正式版/开发版终端菜单。切回正式版使用同一助手：
+   省略 `--channel` 会提供正式版/开发版终端菜单。原项目为配套镜像布局，或正式渠道已经提供统一镜像时，可用同一助手切回正式版：
 
    ```sh
    sh tools/deployment/switch-channel.sh --project-name component-warehouse --channel stable
@@ -68,7 +68,7 @@ COMPONENT_VAULT_DOCKER_CHANNEL=dev
 ```
 
 已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，应清空，以便按渠道取镜像。
-按原模板选择镜像并重新部署**原项目**，沿用原挂载。若原 Compose 写死了镜像名，在原文件中同时修改 API 和 Web 的 `image`。使用单独容器时，参照[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换两个容器。
+保留原挂载。旧配套镜像模板可在两个渠道间切换并使用 `web-*` 兼容标签。统一镜像模板仅能选择提供统一镜像的渠道。当前切回 0.7.8 正式版，需要在原项目换回对应的配套镜像模板，再部署 `latest / web-latest`。如果去掉 Updater，同时从 API 配置移除 `UPDATER_URL`。使用单独容器时，参照[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换两个容器。
 
 ## Watchtower 与版本确认
 
