@@ -8,9 +8,9 @@
 
 以下发布凭据、补发和产物核对步骤供维护者使用。日常部署无需配置 Docker Hub Token。
 
-**统一镜像尚未发布。** 当前正式 `latest` 和 `0.7.9-dev.29` 等已发旧版本使用配套的 API、Web 标签。从 `0.7.9-dev.8` 起，旧开发版的 Web 与 updater 共用 `web-*` 管理镜像。
+当前正式版 `latest` 和 `0.7.9-dev.29` 等旧版本使用配套的 API、Web 标签。从 `0.7.9-dev.8` 起，旧开发版的 Web 与 updater 共用 `web-*` 管理镜像。
 
-统一镜像版本发布后，新部署只选择 `rafaelikaros/component_manager` 下的一个渠道或固定版本标签。API、Web 和可选 updater 分别运行在独立容器，使用 `api`、`web`、`updater` 命令，默认启动 API。`web-*` 标签继续为已有部署提供默认启动 Web 的兼容入口。
+从 `0.7.9-dev.30` 起，新建开发版部署选择 `rafaelikaros/component_manager:dev` 或固定版本标签。API、Web 和可选 updater 分别运行在独立容器，使用 `api`、`web`、`updater` 命令，默认启动 API。`web-*` 标签继续为已有部署提供默认启动 Web 的兼容入口。
 
 ## 先分清账号、仓库和两种 Token
 

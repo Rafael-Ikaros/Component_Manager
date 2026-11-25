@@ -8,7 +8,7 @@
 
 ### 独立 Docker CI 与发布渠道
 
-`docker-ci.yml` 检查镜像构建和 Compose 配置。统一镜像尚未发布。发布后，`server-image.yml` 按固定版本发布统一镜像与默认 Web 的兼容标签，完成隔离项目验证后才推进对应渠道。旧版固定标签沿用发布时的镜像结构。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可用 `master` 上的独立工作流补发同一 tag，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
+`docker-ci.yml` 检查镜像构建和 Compose 配置。从 `0.7.9-dev.30` 起，`server-image.yml` 按固定版本发布统一镜像与默认 Web 的兼容标签，完成隔离项目验证后才推进对应渠道。旧版固定标签沿用发布时的镜像结构。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可用 `master` 上的独立工作流补发同一 tag，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
 
 ### Optional Watchtower updates for the Hub deployment
 

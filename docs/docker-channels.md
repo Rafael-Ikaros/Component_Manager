@@ -1,8 +1,8 @@
 # Docker 正式版与开发版切换
 
-统一镜像尚未发布。当前正式版使用 `latest / web-latest`，旧布局的开发版使用 `dev / web-dev` 或成对固定标签，例如 `0.7.9-dev.29 / web-0.7.9-dev.29`。镜像由 **Docker Images** 工作流发布，开发版不会推进正式版标签。普通部署者无需 Docker Hub Token。
+当前正式版使用 `latest / web-latest`。开发版从 `0.7.9-dev.30` 起使用统一镜像。镜像由 **Docker Images** 工作流发布，开发版不会推进正式版标签。普通部署者无需 Docker Hub Token。
 
-统一镜像发布后，采用统一模板的项目从同一 `dev`、`latest` 或固定标签启动 API 和 Web，Web 显式指定 `command: [web]`。旧模板继续使用配套 `web-*` 兼容标签。新模板的部署和迁移见[快速部署](docker-quickstart.md#统一镜像版本发布后)；目标版本仍采用旧镜像布局时，回退使用该版本的部署模板。
+新建开发版项目从同一 `dev` 或固定标签启动 API 和 Web，Web 显式指定 `command: [web]`。旧模板继续使用配套 `web-*` 兼容标签。新模板的部署和迁移见[快速部署](docker-quickstart.md#使用统一镜像)；目标版本仍采用旧镜像布局时，回退使用该版本的部署模板。
 
 普通部署可在群晖界面[手动创建和更新两个容器](docker-manual.md)，也可使用 Compose；均不需要向应用挂载 Docker socket。
 

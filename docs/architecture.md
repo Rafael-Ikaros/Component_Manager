@@ -40,9 +40,9 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 
 普通部署可手动创建 API/Web 容器或使用普通 Compose，两者均不向业务容器挂载 Docker socket、不要求特权模式。Web 由浏览器直连配置的 API 地址，不依赖 Compose 内部服务名；首次配置保存在 API 的 `/data`。手动部署见[操作指南](docker-manual.md)。
 
-统一镜像（尚未发布）在同一镜像内提供 API、Nginx 管理台和单 worker 更新服务。启动命令分别为 `api`、`web`、`updater`，默认 `api`。每个容器运行一个角色；健康检查按该角色选择接口。现有 `web-*` 标签作为兼容入口，默认启动 Web。统一镜像发布前，`0.7.9-dev.8` 起的旧开发版仍由独立 API 镜像和 `web-*` 管理镜像组成，后者也可用 `command: [updater]` 启动更新服务。
+开发版从 `0.7.9-dev.30` 起在同一镜像内提供 API、Nginx 管理台和单 worker 更新服务。启动命令分别为 `api`、`web`、`updater`，默认 `api`。每个容器运行一个角色；健康检查按该角色选择接口。现有 `web-*` 标签作为兼容入口，默认启动 Web。`0.7.9-dev.8` 至 `0.7.9-dev.29` 的旧开发版仍由独立 API 镜像和 `web-*` 管理镜像组成，后者也可用 `command: [updater]` 启动更新服务。
 
-只给 updater 挂载 Docker socket、原部署目录和任务卷。更新 API/Web 时保留正在运行的 updater 容器，运行版本可因此暂时不同。升级部署结构见[部署教程](server-web-update.md#统一镜像版本发布后)。
+只给 updater 挂载 Docker socket、原部署目录和任务卷。更新 API/Web 时保留正在运行的 updater 容器，运行版本可因此暂时不同。升级部署结构见[部署教程](server-web-update.md#使用统一镜像)。
 
 网页更新是可选部署能力。首次启用时，将独立 updater 加入原 Compose 项目并共享原数据卷。完整模板从 Compose 取得项目名，管理员通过 `COMPONENT_VAULT_DEPLOY_DIR` 指定原项目目录。启用后由管理员选择渠道、确认并提交更新作业，版本检测仍是独立的只读操作。
 
@@ -127,7 +127,7 @@ Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享�
 - Android, Windows, and server all use SQLite in the current architecture, and
   each runtime is implemented against live storage.
 
-API and admin Web run in separate containers. The unreleased unified image
+API and admin Web run in separate containers. The unified image introduced in `0.7.9-dev.30`
 provides both roles and the optional updater in one artifact. The Hub Compose
 template exposes Web through the optional `web` profile and keeps SQLite under
 `/data`. Use the Compose template from the selected release for already

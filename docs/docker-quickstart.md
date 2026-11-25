@@ -15,20 +15,18 @@ API 和管理台分别运行在独立容器中。普通部署可在网页设置�
 
 本节使用 Compose；不使用 Compose 的群晖用户可直接按[手动部署](docker-manual.md)创建容器，两种方式均不要求 Docker socket 挂载。
 
-### 当前已发布版本
+### 使用统一镜像
 
-**统一镜像尚未发布。** 当前正式 `latest` 与 `0.7.9-dev.29` 使用配套的 API、Web 镜像。下载 [旧版普通 Compose 模板](https://github.com/Rafael-Ikaros/Component_Manager/blob/v0.7.9-dev.29/docker-compose.hub.yml)，保存为 `docker-compose.hub.yml`，放到固定部署目录。该模板默认使用 `latest / web-latest`。固定在 dev.29 时，在同目录的 `.env` 设置：
+下载统一版本的 [`docker-compose.hub.yml`](../docker-compose.hub.yml)。API 与可选的 Web 共用 `rafaelikaros/component_manager` 下的同一标签，模板已为 Web 指定 `command: [web]`，API 使用默认命令。新建开发版部署时，在 `.env` 设置 `COMPONENT_VAULT_DOCKER_CHANNEL=dev`。如需固定首个统一版本，改用 `COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9-dev.30`。若从旧模板迁移，清理旧的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖值以共用同一标签，并保留原项目名、端口、网络、应用环境变量和 `/data` 挂载。旧 `web-*` 标签为已有部署保留默认 Web 入口。
+
+### 正式版与旧开发版
+
+当前正式 `latest` 与 `0.7.9-dev.29` 使用配套的 API、Web 镜像。下载 [旧版普通 Compose 模板](https://github.com/Rafael-Ikaros/Component_Manager/blob/v0.7.9-dev.29/docker-compose.hub.yml)，保存为 `docker-compose.hub.yml`，放到固定部署目录。该模板默认使用 `latest / web-latest`。固定在 dev.29 时，在同目录的 `.env` 设置：
 
 ```dotenv
 COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9-dev.29
 COMPONENT_VAULT_WEB_IMAGE=rafaelikaros/component_manager:web-0.7.9-dev.29
 ```
-
-若希望跟随仍发布旧结构的开发渠道，可用 `COMPONENT_VAULT_DOCKER_CHANNEL=dev` 选择 `dev / web-dev`。固定版和渠道标签的实际版本以 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 为准。
-
-### 统一镜像版本发布后
-
-下载统一版本的 [`docker-compose.hub.yml`](../docker-compose.hub.yml)。API 与可选的 Web 共用 `rafaelikaros/component_manager` 下的同一标签，模板已为 Web 指定 `command: [web]`，API 使用默认命令。统一正式镜像发布后可用默认的 `latest`；使用已发布的统一开发镜像时，在 `.env` 设 `COMPONENT_VAULT_DOCKER_CHANNEL=dev`。固定版本只需设置 `COMPONENT_VAULT_IMAGE` 为该统一镜像完整名称。若从旧模板迁移，清理旧的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖值以共用同一标签，并保留原项目名、端口、网络、应用环境变量和 `/data` 挂载。旧 `web-*` 标签为已有部署保留默认 Web 入口。
 
 ### 启动并完成首次配置
 

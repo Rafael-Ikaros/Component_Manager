@@ -33,7 +33,7 @@ Vite 构建参数只影响源码构建，不会在已构建的 Hub 镜像中随�
 
 ## 部署与接口
 
-统一镜像尚未发布。当前已发布的 dev.29 使用配套的 API 和 `web-*` 标签，后者默认启动 Web。
+开发版从 `0.7.9-dev.30` 起使用统一镜像。当前正式版和 dev.29 使用配套的 API 和 `web-*` 标签，后者默认启动 Web。
 统一镜像包含 API、Web 和可选 Updater，默认启动 API。Web 容器通过 `command: [web]` 启动 Nginx，Updater 容器通过 `command: [updater]` 启动更新服务。只有 Updater 容器挂载 Docker socket、更新任务卷及原 Compose 部署目录。
 
 从仓库根目录运行 `docker build -t component-vault:local .`，使用根目录的 Dockerfile 构建统一镜像。

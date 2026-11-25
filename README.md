@@ -97,7 +97,7 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 
 可在群晖界面[直接创建 API、Web 容器](docs/docker-manual.md)，无需 Compose、`.env` 或 SSH；也可使用[普通 Compose 模板](docs/docker-quickstart.md)。两种普通部署方式都不向应用挂载 Docker socket，不要求特权模式。
 管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。
-当前已发布版本按版本使用配套 API、Web 标签。统一镜像版本发布后，从 `rafaelikaros/component_manager` 选择同一标签创建两个容器，API 使用默认命令，Web 明确指定 `web`。库存、同步和检查更新均不依赖 Updater。
+开发版从 `0.7.9-dev.30` 起使用统一镜像。从 `rafaelikaros/component_manager` 选择 `dev` 或固定版本标签，分别创建 API 和 Web 容器。API 使用默认命令，Web 指定 `web`。当前正式版仍使用 `latest` 与 `web-latest` 配套标签。库存、同步和检查更新均不依赖 Updater。
 首次访问 `http://服务器IP:8787/setup` 设置管理员密钥，再在管理台创建普通账户。
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。
 

@@ -2,7 +2,7 @@
 
 在群晖 Container Manager 中分别创建 API 和 Web 容器，即可使用库存、账户、同步、资料补全和版本检查。整个过程在 DSM 界面完成，无需项目 YAML、`.env`、SSH 或 Updater。
 
-本文 10 张 DSM 实机截图使用 `0.7.9-dev.29` 的配套镜像。**截图中的 Web 从 `web-*` 镜像创建，命令框留空。统一镜像发布后，Web 改用与 API 相同的镜像，命令框明确填入 `web`。** 截图中的名称、目录和 IP 请按实际部署替换。拓扑与备份流程图标为示意图。
+本文 10 张 DSM 实机截图使用 `0.7.9-dev.29` 的配套镜像。**从 dev.30 起，API 和 Web 使用同一个镜像。API 命令留空，Web 命令填 `web`，并将宿主 Web 端口映射到容器端口 `80`。** 截图中的旧版 Web 使用 `web-*` 标签和默认命令。名称、目录和 IP 请按实际部署替换。
 
 **已有部署请先备份并记录原 `/data` 映射。** 替换 API 时沿用原数据来源和生效的环境变量。新建 `data` 目录仅适用于新安装。[备份与替换步骤](#5-手动更新或切换渠道)
 
@@ -10,24 +10,19 @@
 
 ## 1. 选择镜像
 
-**统一镜像尚未发布。** 现有正式版 `latest` 和 `0.7.9-dev.29` 等已发旧版沿用下表的配套镜像。
+在 Container Manager 的「镜像仓库」（旧版称「注册表」）搜索 `rafaelikaros/component_manager`，按下表下载标签。新装开发版只需下载一个标签，随后用它分别创建 API 和 Web。
 
 | 渠道 | API 镜像 | Web 镜像 |
 | --- | --- | --- |
+| 开发版（统一镜像） | `rafaelikaros/component_manager:dev`，或固定为 `0.7.9-dev.30` | 与 API 使用同一标签 |
 | 正式版 | `rafaelikaros/component_manager:latest` | `rafaelikaros/component_manager:web-latest` |
-| 开发渠道仍指向旧布局时 | `rafaelikaros/component_manager:dev` | `rafaelikaros/component_manager:web-dev` |
 | 固定 dev.29（截图所用） | `rafaelikaros/component_manager:0.7.9-dev.29` | `rafaelikaros/component_manager:web-0.7.9-dev.29` |
 
-1. 打开 Container Manager 的「镜像仓库」（旧版称「注册表」），搜索 `rafaelikaros/component_manager`，下载表中同一行的两个标签。
-2. 在侧栏「映像」确认两个镜像都已下载。下图使用固定版本 `0.7.9-dev.29` 和 `web-0.7.9-dev.29` 举例，按上表选择你要部署的配套标签即可。
+在侧栏「映像」确认所选标签已下载。下图显示旧版 dev.29 的两个镜像。
 
-   ![DSM 映像列表显示已下载的同版本 API 和 Web 镜像。](images/docker-manual/01-images.jpg)
+![DSM 映像列表显示已下载的同版本 API 和 Web 镜像。](images/docker-manual/01-images.jpg)
 
-固定旧版时，选择实际存在且版本号相同的 API、`web-` 标签。下载新镜像后，现有容器仍使用创建时的镜像。[GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases) · [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)
-
-### 统一镜像版本发布后
-
-从原仓库 `rafaelikaros/component_manager` 选择一个包含三个角色的标签。开发版使用已推进的 `dev`，正式版在统一正式镜像发布后使用 `latest`，也可固定到实际存在的统一镜像版本。只下载所选标签一次，用它分别创建 API 和 Web 容器。原 `web-*` 标签用于兼容已有部署。
+统一版本提供的 `web-*` 标签供旧配置兼容。下载新镜像后，现有容器仍使用创建时的镜像。[GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases) · [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)
 
 ## 2. 创建 API 容器
 
@@ -49,7 +44,7 @@
 
 ## 3. 创建 Web 容器
 
-1. **常规设置。** 已发旧版选中配套的 `web-*` 镜像。统一镜像版本发布后，选中与 API 相同的镜像及标签。点击「运行」。容器名可填 `component-vault-web`，自动重启按需开启，保持「通过 Web Station 设置网页门户」未勾选。
+1. **常规设置。** 统一镜像选中与 API 相同的标签，旧版选中配套的 `web-*` 标签。点击「运行」。容器名可填 `component-vault-web`，自动重启按需开启，保持「通过 Web Station 设置网页门户」未勾选。
 2. **高级设置。** 只保留本地 `8081` → 容器 `80`（TCP）。如果向导预填了 `8790` 或 `8787`，删掉这些行，并手动添加容器端口 `80`。Web 的存储映射留空，API 的 `/data` 只挂在 API 容器。保留镜像继承的 `PATH`、NGINX 等默认环境变量。
 
    ![DSM Web 高级设置页，仅保留 TCP 8081 到 80，没有 8790 行和存储挂载。](images/docker-manual/05-web-ports.jpg)
