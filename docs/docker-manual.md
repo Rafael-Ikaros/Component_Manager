@@ -20,6 +20,8 @@
 
 在侧栏「映像」确认所选标签已下载。下图显示旧版 dev.29 的两个镜像。
 
+如果「镜像仓库」搜索提示无法连接，但 Docker Hub 可以访问，可在「映像 → 操作 → 导入 → 从 URL 添加」输入 `https://hub.docker.com/r/rafaelikaros/component_manager`，选择 `dev`（或目标固定版本）下载。公开镜像不需要填写 Docker Hub 用户名和密码，也不需要勾选信任自签名证书。下载成功后仍须在「映像」确认标签和 Image ID；这个入口不能解决 NAS 本身的网络或 Registry 连接故障。
+
 ![DSM 映像列表显示已下载的同版本 API 和 Web 镜像。](images/docker-manual/01-images.jpg)
 
 统一版本提供的 `web-*` 标签供旧配置兼容。下载新镜像后，现有容器仍使用创建时的镜像。[GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases) · [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)
@@ -71,6 +73,8 @@
 ![DSM 容器列表中，两个独立容器均显示运行状态，项目一栏为短横线。](images/docker-manual/07-running-containers.jpg)
 
 先访问 `http://NAS地址:8081/`，确认能打开 Web 登录页。再访问 `http://NAS地址:8787/health`，确认 API 已启动。
+
+dev.30 已在 DSM Container Manager 中用同一个 `dev` 镜像、按以上独立容器步骤验证：API 默认命令启动，Web 使用 `web` 命令，Web 登录页可访问，API 健康检查返回 `v0.7.9-dev.30`。此结果不代表所有 NAS 上的网络和旧容器配置都相同；发生故障时仍需按下方排障步骤收集实际配置。
 
 ## 4. 在网页保存配置
 
