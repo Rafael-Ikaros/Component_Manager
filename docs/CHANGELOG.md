@@ -17,7 +17,8 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
-- 补充群晖手动创建 API/Web 容器的部署和更新教程，无需 Compose、`.env` 或向应用挂载 Docker socket。部署导航默认说明普通安装，网页 Updater 明确为另行授权的可选功能。
+- 补充群晖界面创建 API/Web 容器的逐页设置与示意图、备份替换和分阶段排障说明。可从镜像发布指南直接进入手动部署，无需 Compose、`.env` 或向应用挂载 Docker socket。
+- 明确容器设置导出与数据备份的区别，以及迁移到独立容器时不再沿用旧 Updater 地址。
 - Web 未启用网页更新或旧 API 不提供该能力时，显示手动更新说明，保留版本检查并提供手动教程；不再将启用 Updater 作为正常部署的必需步骤。服务端的部署教程链接改指向用户安装指南。
 
 ## [0.7.9-dev.29] - 2026-11-25

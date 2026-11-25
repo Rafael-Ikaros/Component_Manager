@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://github.com/Rafael-Ikaros/Component_Manager/releases/latest/download/component-vault-android-release.apk"><img src="docs/design/readme/download-android.svg" width="250" height="84" alt="下载 Android 正式版 APK" /></a>
-  <a href="docs/docker-quickstart.md"><img src="docs/design/readme/deploy-docker.svg" width="250" height="84" alt="查看 Docker 与群晖部署教程" /></a>
+  <a href="docs/docker-manual.md"><img src="docs/design/readme/deploy-docker.svg" width="250" height="84" alt="查看群晖界面部署教程" /></a>
 </p>
 
 ---
@@ -102,7 +102,7 @@ API 使用独立镜像，管理镜像默认运行 Web。库存、同步和检查
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。
 
 > [!NOTE]
-> **网页一键更新是可选项。** 普通部署在群晖界面成对更新 API/Web 镜像，保留原数据挂载即可。
+> **网页一键更新是可选项。** 普通部署在群晖界面成对更新 API/Web 镜像。替换前停 API 并备份完整数据目录，保留原 `/data` 映射。[备份与替换](docs/docker-manual.md#5-手动更新或切换渠道)
 > 只有希望网页代替你重建容器时，才启用[独立 Updater](docs/server-web-update.md)。该组件需要 Docker 管理权限，并额外运行一个容器；不启用不影响业务功能。
 
 普通部署默认不会自动安装新镜像。可选的网页 Updater 由管理员确认后执行；

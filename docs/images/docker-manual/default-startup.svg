@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="361" viewBox="0 0 720 361" role="img" aria-labelledby="title description">
+  <title id="title">关闭网页门户并保留默认启动命令</title>
+  <desc id="description">取消勾选通过 Web Station 设置网页门户，命令输入框保持空白。API 默认使用 uvicorn，共享 Web 镜像入口是 /usr/local/bin/componentvault-entrypoint，默认命令是 web。</desc>
+  <rect width="720" height="361" rx="20" fill="#f1f5f9"/>
+  <g font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" fill="#13283e">
+    <text x="28" y="44" font-size="28" font-weight="700">保留默认启动命令</text>
+    <text x="692" y="42" text-anchor="end" font-size="17" fill="#4b627a">设置示意</text>
+
+    <rect x="28" y="67" width="664" height="89" rx="14" fill="white" stroke="#b9c9d8"/>
+    <text x="48" y="98" font-size="21" font-weight="700">常规设置</text>
+    <rect x="49" y="115" width="20" height="20" rx="4" fill="white" stroke="#536980" stroke-width="2"/>
+    <text x="81" y="133" font-size="20">通过 Web Station 设置网页门户</text>
+    <text x="672" y="133" text-anchor="end" font-size="19" font-weight="700" fill="#204478">取消勾选</text>
+
+    <rect x="28" y="170" width="664" height="163" rx="14" fill="white" stroke="#b9c9d8"/>
+    <text x="48" y="202" font-size="21" font-weight="700">执行命令</text>
+    <rect x="48" y="215" width="511" height="36" rx="6" fill="#f8fafc" stroke="#a9bdce"/>
+    <text x="672" y="240" text-anchor="end" font-size="19" font-weight="700" fill="#204478">输入框留空</text>
+    <text x="48" y="283" font-size="20">API 默认</text>
+    <text x="137" y="283" font-family="Consolas, monospace" font-size="21" fill="#204478">uvicorn</text>
+    <text x="309" y="283" font-size="20">共享 Web 默认</text>
+    <text x="458" y="283" font-family="Consolas, monospace" font-size="21" fill="#174c47">web</text>
+    <text x="48" y="312" font-size="18" fill="#405870">Web 入口由镜像提供</text>
+    <text x="226" y="312" font-family="Consolas, monospace" font-size="18" fill="#405870">/usr/local/bin/componentvault-entrypoint</text>
+  </g>
+</svg>

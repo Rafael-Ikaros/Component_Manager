@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="332" viewBox="0 0 720 332" role="img" aria-labelledby="title description">
+  <title id="title">备份数据后替换容器</title>
+  <desc id="description">先导出容器设置，再暂停写入并停止 API，备份整个数据目录。用配套镜像创建替代容器并沿用原 /data 映射，最后核对版本、登录和库存。</desc>
+  <rect width="720" height="332" rx="20" fill="#f1f5f9"/>
+  <g font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" fill="#13283e">
+    <text x="28" y="44" font-size="28" font-weight="700">备份数据后替换容器</text>
+    <text x="692" y="42" text-anchor="end" font-size="17" fill="#4b627a">设置示意</text>
+
+    <rect x="28" y="68" width="664" height="235" rx="14" fill="white" stroke="#b9c9d8"/>
+    <path d="M68 98v172" fill="none" stroke="#b9c9d8" stroke-width="2"/>
+
+    <circle cx="68" cy="103" r="16" fill="#eaf0fb" stroke="#7795ba"/>
+    <text x="68" y="110" text-anchor="middle" font-size="19" font-weight="700" fill="#204478">1</text>
+    <text x="101" y="110" font-size="22" font-weight="700">导出容器设置</text>
+
+    <circle cx="68" cy="157" r="16" fill="#eaf0fb" stroke="#7795ba"/>
+    <text x="68" y="164" text-anchor="middle" font-size="19" font-weight="700" fill="#204478">2</text>
+    <text x="101" y="153" font-size="22" font-weight="700">停止 API，备份完整数据目录</text>
+    <text x="101" y="178" font-size="18" fill="#405870">数据库、用户数据、配置、照片和 SQLite 辅助文件</text>
+
+    <circle cx="68" cy="217" r="16" fill="#eaf0fb" stroke="#7795ba"/>
+    <text x="68" y="224" text-anchor="middle" font-size="19" font-weight="700" fill="#204478">3</text>
+    <text x="101" y="213" font-size="22" font-weight="700">下载配套镜像，重建容器</text>
+    <text x="101" y="238" font-size="18" fill="#405870">新 API 沿用原数据目录 → /data</text>
+
+    <circle cx="68" cy="272" r="16" fill="#e6f4f2" stroke="#6b9e97"/>
+    <text x="68" y="279" text-anchor="middle" font-size="19" font-weight="700" fill="#174c47">4</text>
+    <text x="101" y="279" font-size="22" font-weight="700">核对版本、登录和已有库存</text>
+  </g>
+</svg>

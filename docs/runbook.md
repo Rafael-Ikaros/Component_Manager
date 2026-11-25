@@ -2,7 +2,9 @@
 
 ## Docker Hub image deployment
 
-普通部署不向应用挂载 Docker socket：群晖可[直接创建 API/Web 容器](docker-manual.md)，也可使用[普通 Compose](docker-quickstart.md)。正式版与 dev 切换见[渠道指南](docker-channels.md)。网页一键更新是另行授权的可选项，使用 `docker-compose.hub-web-update.yml` 并填写原部署目录；它需要 Docker 管理访问。旧部署保留原项目名、端口、完整 `/data` 和生效的自定义 API 环境变量。[网页更新与旧配置迁移](server-web-update.md#群晖一次性配置)
+群晖可[在界面直接创建 API/Web 容器](docker-manual.md)，也可使用[普通 Compose](docker-quickstart.md)。两种普通部署都无需向应用挂载 Docker socket。重建 API 前先停机备份完整数据目录，保留原 `/data` 映射、端口和生效的自定义 API 环境变量。[容器启动排障](docker-manual.md#分阶段排障) · [正式版与开发版切换](docker-channels.md)
+
+可选的网页一键更新使用 `docker-compose.hub-web-update.yml`，需要保留原项目名及部署目录，并向 Updater 提供 Docker 管理访问。[网页更新与旧配置迁移](server-web-update.md#群晖一次性配置)
 
 ### 独立 Docker CI 与发布渠道
 

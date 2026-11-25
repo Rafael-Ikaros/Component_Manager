@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="312" viewBox="0 0 720 312" role="img" aria-labelledby="title description">
+  <title id="title">浏览器访问两个独立容器</title>
+  <desc id="description">浏览器分别访问同一 NAS 上的 Web 8081 端口和 API 8787 端口。Web 容器端口是 80，API 容器端口是 8787。</desc>
+  <rect width="720" height="312" rx="20" fill="#f1f5f9"/>
+  <g font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" fill="#13283e">
+    <text x="28" y="44" font-size="28" font-weight="700">浏览器访问 NAS</text>
+    <text x="692" y="42" text-anchor="end" font-size="17" fill="#4b627a">设置示意</text>
+
+    <rect x="28" y="132" width="208" height="122" rx="14" fill="white" stroke="#b9c9d8"/>
+    <rect x="49" y="151" width="34" height="26" rx="3" fill="none" stroke="#536980" stroke-width="2"/>
+    <path d="M49 158h34" stroke="#536980" stroke-width="2"/>
+    <text x="96" y="173" font-size="23" font-weight="700">浏览器</text>
+    <text x="49" y="217" font-size="19" fill="#405870">手机或电脑</text>
+
+    <rect x="350" y="70" width="342" height="214" rx="14" fill="white" stroke="#b9c9d8"/>
+    <text x="370" y="102" font-size="20" font-weight="700">同一台 NAS</text>
+    <g fill="none" stroke="#536980" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M236 190h53v-40h76m-7-6 7 6-7 6"/>
+      <path d="M289 190v39h76m-7-6 7 6-7 6"/>
+    </g>
+
+    <rect x="370" y="116" width="302" height="66" rx="9" fill="#e6f4f2"/>
+    <text x="387" y="143" font-size="22" font-weight="700" fill="#174c47">Web 容器</text>
+    <text x="387" y="166" font-size="19" fill="#244d4c">宿主 8081 → 容器 80</text>
+
+    <rect x="370" y="196" width="302" height="66" rx="9" fill="#eaf0fb"/>
+    <text x="387" y="223" font-size="22" font-weight="700" fill="#204478">API 容器</text>
+    <text x="387" y="246" font-size="19" fill="#2e4e75">宿主 8787 → 容器 8787</text>
+  </g>
+</svg>

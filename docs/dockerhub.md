@@ -1,8 +1,12 @@
 # Docker Hub 镜像发布与验证
 
-本文供仓库维护者配置 Actions 发布凭据、补发镜像和核对产物。
-安装服务端请看[快速部署](docker-quickstart.md)；在网页更新请看[网页更新](server-web-update.md)。
-普通部署者无需配置下方 Docker Hub Token。
+## 部署者入口
+
+- **[群晖界面直接部署 API 和 Web](docker-manual.md)**。按 DSM 向导创建两个独立容器，包含备份、替换和启动排障步骤。
+- [可选的 Compose 部署](docker-quickstart.md)。包含端口、挂载、首次配置和账户密钥说明。
+- [切换正式版与开发版](docker-channels.md) · [可选的网页一键更新](server-web-update.md)。
+
+以下发布凭据、补发和产物核对步骤供维护者使用。日常部署无需配置 Docker Hub Token。
 
 从 `0.7.9-dev.8` 起，工作流只构建 API 和共享管理镜像。管理镜像默认运行 Web，
 以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
@@ -139,12 +143,6 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 docker buildx imagetools inspect rafaelikaros/component_manager:dev
 docker buildx imagetools inspect rafaelikaros/component_manager:web-dev
 ```
-
-## 部署者入口
-
-安装、密钥、挂载及故障排查见[快速部署](docker-quickstart.md)。
-正式/dev切换见[渠道指南](docker-channels.md)；网页操作更新见[网页更新](server-web-update.md)。
-这些步骤不需要本页的发布凭据。
 
 ## 历史镜像摘要
 
