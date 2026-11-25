@@ -207,7 +207,7 @@ CI 与发布的处理方式：
 - 若只修改 `Unreleased` 或已有 Release，则跳过；新版本创建对应 tag，再调用 `release.yml` 构建产物。
 - 如果 tag 已创建但构建失败、尚无 Release，在 Actions 手动运行 `Release From Changelog` 可从原 tag 重试；不会将 tag 移到新提交。
 - dev 发布为 GitHub prerelease，保持稳定版本元数据和 Docker `latest` 不变。正式标题才同步稳定版本及发布正式镜像。
-- 只发 Android 开发版时，在新 dev 版本标题下加入 `<!-- release: android-only -->`。Changelog 工作流只构建并上传已签名的 APK，Windows、管理网页和 Docker 的构建和发布任务会跳过。
+- 只发 Android 开发版时，在新 dev 版本标题下加入 `<!-- release: android-only -->`。Changelog 工作流只构建并上传已签名的 APK，管理网页和 Docker 的构建和发布任务会跳过。Windows 不再参与任何新版本的构建或发布。
 
 Manual checks:
 
@@ -243,7 +243,7 @@ Windows 也可用 `scripts/android-gradle.ps1 assembleDebug`。该脚本优先�
 
 ### Windows
 
-The Windows client is a WinUI 3 project in `windows-client/`.
+Windows 独立客户端自 2026-11-25 起停止更新、CI 测试/构建和发布；后续 Windows 功能计划集成到贴片机上位机项目。`windows-client/` 保留历史 WinUI 3 源码，以下命令仅用于按需本地检查，不属于当前发版流程。
 
 Basic check:
 
@@ -273,14 +273,14 @@ Main build and release workflows:
 
 - `.github/workflows/ci.yml`
   Runs server tests, admin-web build validation, Android debug compilation,
-  Windows build validation, and changelog/version validation.
+  and changelog/version validation. Windows jobs have been removed.
 - `.github/workflows/release-from-changelog.yml`
   Watches `docs/CHANGELOG.md` on the default branch, applies version sync if
   needed, pushes the release tag, and then invokes the reusable release
   workflow in the same orchestration chain.
 - `.github/workflows/release.yml`
-  Runs Android release packaging, admin-web static bundle packaging, and
-  Windows self-contained portable ZIP packaging on manual trigger, reusable workflow calls, and
+  Runs Android release packaging and admin-web static bundle packaging
+  on manual trigger, reusable workflow calls, and
   `v*` tag pushes.
 - `.github/workflows/docker-ci.yml`
   Runs API/shared-management image, role startup and Compose checks for relevant changes.
@@ -312,16 +312,15 @@ The workflow decodes the keystore into a runner-local temp file and exports:
 
 - `component-vault-android-release.apk`
 - `component-vault-admin-web.zip`
-- `component-vault-windows-portable-x64.zip`
 
 On changelog-driven releases, reusable workflow calls, and `v*` tag runs that
-publish a release, the workflow attaches the Windows portable ZIP, the Android APK, and the
-`admin-web` static bundle to the
-GitHub Release.
+publish a release, the workflow attaches the Android APK and the `admin-web`
+static bundle to the GitHub Release. Android-only prereleases contain only the
+APK. Windows attachments remain in historical releases and are no longer generated.
 
-### Installing The Windows Release
+### Installing A Historical Windows Release
 
-GitHub Release ships a self-contained WinUI 3 ZIP, without an MSIX package.
+历史 GitHub Release 中的 Windows 附件是自包含 WinUI 3 ZIP，不是 MSIX。请从实际含该附件的旧版本下载；不要使用新版本的 `releases/latest/download` 地址查找 Windows 安装包。
 
 Portable zip:
 
@@ -475,7 +474,9 @@ curl.exe -X POST http://localhost:8787/auth/ping `
 - If all platform builds succeed but publication is skipped, inspect the prepare
   job's resolved tag and publish flag. Reusable workflows inherit the caller's
   event context; supplied release inputs must take precedence over branch-push
-  event handling. A tag page without APK/portable ZIP assets is not a completed release.
+  event handling. A tag page without the required Android APK (and Web ZIP for
+  a non-Android-only release) is not a completed release. Windows ZIP is no
+  longer a required release asset.
 - Fix: verify that `.github/workflows/release.yml` supports `workflow_call`,
   confirm all Android signing secrets are configured, and rerun the workflow
   after inspecting the failing build job.
@@ -592,9 +593,9 @@ and the [verification history](history/verification.md).
 
 #### Client behavior
 
-Android 和 Windows 启动时按当前渠道检查一次，有可用更新时显示提示。设置的“关于”仍可手动检查。默认渠道为正式版，开发渠道也检查公开预发布版本。切换渠道不会自动降级或安装。
-The APK and portable ZIP filenames must match the
-release workflow. A missing package, HTTP 404, rate limit or network failure is
+Android 启动时按当前渠道检查一次，有可用更新时显示提示；dev.28 起可在设置中关闭启动弹窗。设置的“关于”仍可手动检查。默认渠道为正式版，开发渠道也检查公开预发布版本。切换渠道不会自动降级或安装。旧 Windows 客户端保留原有检查界面，但新版本不再提供 Windows 安装包。
+The Android APK filename must match the release workflow.
+A missing package, HTTP 404, rate limit or network failure is
 shown in the UI; users can still open the fixed release page. Applications do
 not silently install or import signing certificates. See [application updates](app-updates.md)
 for installation and Debug/Release signing boundaries.
@@ -620,9 +621,9 @@ Actions 的 `android-check` 先运行库存扫码与数量边界的直接测试�
 
 API 和 Web 应成对更新。启用照片同步前核对 `/auth/ping` 的 `photo_protocol: 1`，并保留完整 `/data` 挂载。各账户原图保存在对应的 `.db.photos/` 目录，应与数据库和配置一起备份。详见[照片同步与恢复](photo-sync.md)。
 
-### Windows 订单与更新日志检查
+### 历史 Windows 代码的本地检查
 
-Windows CI 明确执行以下三个测试项目；发布候选构建执行新增的后两个独立测试项目：
+Windows 已停止维护。下列测试项目保留供迁移或排查历史代码时按需执行，CI 和发布流程不再运行它们：
 
 ```powershell
 dotnet test windows-client/ComponentVault.WinUI.CoreTests/ComponentVault.WinUI.CoreTests.csproj -c Release
@@ -630,7 +631,7 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/JlcOrderImport/JlcOrderImp
 dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/ReleaseNotesMarkdown.Tests.csproj -c Release
 ```
 
-只有改动相关部分时才需在本地运行对应项目。候选构建可通过 `Release Artifacts` 的 `workflow_dispatch` 设置 `source_ref` 为完整提交 SHA、`release_tag` 为拟验证的 dev 标签，并将 `publish_github_release` 设为 `false`；这样只生成验证附件，不创建公开 Release。桌面验收通过后再写具体版本的 CHANGELOG 标题触发发布；仅编辑 Unreleased 不发布。dev 不推送 Docker 稳定标签。
+仅在确需验证历史 Windows 代码时运行对应项目。`Release Artifacts` 不再生成 Windows 候选包；Android/Web 候选仍可设置完整 `source_ref` 和 `publish_github_release: false` 生成验证附件。仅编辑 Unreleased 不发布，Windows 版本文件也不再跟随版本工具更新。dev 不推送 Docker 稳定标签。
 
 订单更新操作见[订单资料指南](order-metadata-update.md)，历史验证边界见[验证记录](history/verification.md)。
 

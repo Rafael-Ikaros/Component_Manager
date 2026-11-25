@@ -100,6 +100,8 @@ public sealed partial class SyncApiClient
                 return SyncRunResult.Failure("服务器无法确认账户身份。请先升级服务器；本地库存和同步进度已保留。");
             var identityError = validateAndBindIdentity?.Invoke(identity);
             if (identityError is not null) return SyncRunResult.Failure(identityError);
+            if (capability.OrderSourceProtocol != 1 && pushRequest.StockMovements.Any(movement => movement.SourceRef is not null))
+                return SyncRunResult.Failure("请升级服务器以支持订单来源去重；本地库存和待同步内容已保留。");
             var pushResponse = await PushAsync(settings, serverBaseUrl, pushRequest, identity.AccountId, cancellationToken);
             if (pushResponse.Result is not null)
             {
@@ -316,6 +318,10 @@ public sealed partial class SyncApiClient
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         try
         {
+            using var error = JsonDocument.Parse(body);
+            if (error.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.Object &&
+                detail.TryGetProperty("code", out var code) && code.GetString() == "duplicate_order_source")
+                return "此订单商品已在另一设备入库。此批未上传，本地待同步内容已保留；请先核对重复记录，不要再次追加。";
             var payload = JsonSerializer.Deserialize<ApiErrorResponse>(body, _jsonOptions);
             if (!string.IsNullOrWhiteSpace(payload?.Detail))
             {

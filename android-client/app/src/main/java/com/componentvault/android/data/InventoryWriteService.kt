@@ -21,6 +21,9 @@ import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 
+private const val ORDER_SOURCE_PREFIX = "lcsc-order:v1:"
+private val ORDER_ROW_ID = Regex("order-[0-9a-f]{64}")
+
 internal class InventoryWriteService(
     private val appContext: Context,
     private val databaseHelper: InventoryDatabaseHelper,
@@ -316,6 +319,7 @@ internal class InventoryWriteService(
                             put("quantity", quantity)
                             put("purchase_amount", InventoryCost.text(InventoryCost.decimal(row.purchaseAmount)))
                             put("cost_amount", InventoryCost.text(InventoryCost.decimal(row.purchaseAmount)))
+                            put("source_ref", orderSourceRef(row.id))
                             put("reason", if (row.id.startsWith("order-")) {
                                 "LCSC order statement inbound"
                             } else {
@@ -352,9 +356,16 @@ internal class InventoryWriteService(
         }.getOrElse { OperationResult(false, it.message ?: "批量入库失败。") }
     }
 
+    private fun orderSourceRef(rowId: String): String? = rowId.takeIf { ORDER_ROW_ID.matches(it) }
+        ?.let { ORDER_SOURCE_PREFIX + it.removePrefix("order-") }
+
     private fun readBatchJlcReceipts(db: SQLiteDatabase, sessionId: String): Set<String> =
         db.rawQuery(
-            "SELECT row_id FROM batch_jlc_receipts WHERE session_id = ? OR row_id LIKE 'order-%'",
+            """
+            SELECT row_id FROM batch_jlc_receipts WHERE session_id = ? OR row_id LIKE 'order-%'
+            UNION SELECT 'order-' || SUBSTR(source_ref, ${ORDER_SOURCE_PREFIX.length + 1}) FROM stock_movements
+                WHERE source_ref LIKE '$ORDER_SOURCE_PREFIX%'
+            """.trimIndent(),
             arrayOf(sessionId),
         ).use { cursor -> buildSet { while (cursor.moveToNext()) add(cursor.getString(0)) } }
 
@@ -687,6 +698,7 @@ internal class InventoryWriteService(
                 put("id", movementId)
                 put("component_id", draft.componentId)
                 put("movement_type", draft.movementType.lowercase(Locale.US))
+                previous?.takeUnless { it.isNull("source_ref") }?.let { put("source_ref", it.getString("source_ref")) }
                 put("purchase_amount", InventoryCost.text(InventoryCost.decimal(draft.purchaseAmount)))
                 put("cost_amount", if (draft.movementType == "inbound") InventoryCost.text(InventoryCost.decimal(draft.purchaseAmount)) else if (draft.movementType == "transfer") null else InventoryCost.amount(component.inventoryUnitCost, draft.quantity))
                 put("quantity", normalizeMovementQuantity(draft.movementType, draft.quantity))

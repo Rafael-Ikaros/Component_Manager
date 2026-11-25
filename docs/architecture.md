@@ -116,7 +116,7 @@ Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享�
 ## Topology
 
 - `android-client/` is the Android Jetpack Compose client.
-- `windows-client/` is the WinUI 3 Windows desktop client.
+- `windows-client/` retains the discontinued WinUI 3 Windows desktop client as reference source. It no longer participates in CI, releases, or version synchronization; future Windows integration is planned in the pick-and-place host project.
 - `admin-web/` is a separated React + `shadcn/ui` operations console.
 - `client/` remains as a legacy Flutter reference only.
 - `server/` is a FastAPI service for account-isolated self-hosted sync and
@@ -437,40 +437,45 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   `Unreleased` or generate a stable version automatically.
 - On changelog pushes to the default branch, `release-from-changelog.yml` reads
   the latest concrete version heading via `tools/versioning/changelog_release.py`.
-  A `-dev.N` suffix selects prerelease; a stable heading synchronizes Android,
-  admin-web and Windows metadata to that exact version. Changes limited to
+  A `-dev.N` suffix selects prerelease; a stable heading synchronizes Android
+  and admin-web metadata to that exact version. Windows metadata is frozen and
+  excluded from synchronization and version validation. Changes limited to
   `Unreleased` do not publish. Existing releases are skipped; a manual run can
   retry a failed build from its existing tag when no release was created.
 - A concrete dev section with `<!-- release: android-only -->` publishes only
-  the signed Android APK. Windows and admin-web artifact builds and Docker image
+  the signed Android APK. Admin-web artifact builds and Docker image
   publication are skipped for that release.
 - Android uses semver for `versionName` plus a monotonically increasing
   `versionCode`.
-- Windows package and assembly metadata use the same semver mapped to four-part
-  versions as `major.minor.patch.0`.
+- Windows retains its historical package and assembly metadata without following
+  subsequent repository versions.
 - The release path is:
   `docs/CHANGELOG.md latest heading -> changelog_release.py -> stable metadata sync if needed -> version tag -> reusable release.yml build and GitHub Release publish`
 - Dev tags (`vX.Y.Z-dev.N`) build the same `master` code as prereleases, injecting
   artifact version names and monotonically ordered Android version codes. They
   do not advance stable metadata or move stable Docker tags. The separate Docker
   workflow publishes dev/web-dev and matching fixed tags; Web and updater share
-  the web image, while existing updater tags remain historical. Windows
-  displays the informational version, including the dev suffix, while keeping
-  numeric assembly metadata. See [release channels](runbook.md#stable-and-dev-publishing).
+  the web image, while existing updater tags remain historical. New releases
+  contain no Windows build or attachment. See [release channels](runbook.md#stable-and-dev-publishing).
 - CI explicitly includes branch pushes alongside pull requests. The reusable
   release workflow prioritizes supplied inputs because its event context comes
   from the caller; it must not require an event name of `workflow_call`.
 
 ## Windows Client
 
+Maintenance, CI tests/builds, packaging, and release distribution stopped on
+2026-11-25. Source and existing data remain available; future Windows functionality
+is planned for the pick-and-place host project. The following describes the
+retained historical implementation, not an actively maintained client.
+
 - Built with WinUI 3 and Windows App SDK.
 - Current implementation is a native desktop client backed by local SQLite in
   the user's local app data directory.
 - User-facing copy is organized around Chinese-first WinUI pages while
   retaining Windows-native layout and interaction patterns.
-- Release distribution uses a self-contained unpackaged WinUI 3 ZIP; no MSIX
-  signing or certificate installation is required. CI checks actual window
-  startup as well as compilation, including the archived release layout.
+- Historical releases use a self-contained unpackaged WinUI 3 ZIP; no MSIX
+  signing or certificate installation is required. Windows build and window
+  startup checks are no longer run in this repository's CI.
 - Navigation uses `NavigationView` with `Home`, `Inventory`, `Records`, and
   `Project BOM` in the main list and one `Settings` footer destination.
 - `Home` is the summary landing page. `Inventory` uses a dense desktop workspace
@@ -511,10 +516,13 @@ catalog lookup. A separate pending screen retains failed or incomplete rows.
 Reviewed rows commit component totals, allocations, inbound movements, sync
 queue entries and local row receipts in one SQLite transaction. Android uses
 `batch_jlc_receipts` (database v5), Windows uses `batch_inbound_receipts`.
-Receipts reconcile drafts after interrupted commits and prevent local replay;
-they do not synchronize between devices. Draft payloads and receipts are absent
-from server/MQTT payloads and inventory Excel exports. See
-[batch inbound contract](batch-jlc-inbound.md).
+Receipts reconcile drafts after interrupted commits and prevent local replay.
+Drafts and local receipt tables do not synchronize. New identified order movements
+carry an optional `source_ref` in local SQLite and sync, with an account-local
+unique index on the server (including deleted movements). The server rejects the
+entire conflicting push rather than dropping a movement while accepting its
+inventory snapshot. Excel backup schema 2 does not carry order sources. See the
+[batch inbound contract](batch-jlc-inbound.md) and [sync protocol](integration-guide.md).
 
 ### components
 
@@ -924,7 +932,7 @@ CI 在原有回归组前单独运行 `MovementLabelResolutionTest`、`QuantitySt
 - Android / Windows 编辑元件时，主库位变更会在原有短事务中清零其他 allocations，并将 draft.quantity 写入目标 allocation；总量与各库位之和保持一致。显式部分转移语义不变，不新增 schema。
 - Android 库位选择只显示 name，内部持久化 id；选择与创建分开，创建生成内部码且拒绝重复名称。无供应商 SKU 的编辑草稿保存前生成 CV-UUID，不改变已有 SKU。
 - Android CategoryLearningStore 按官方完整分类路径保存用户修正，跨 SKU 复用；User/Learned 字段仍优先。清空学习记录同时清理该映射，不依品牌猜分类。
-- 立创订单 BIFF .xls 使用 JExcelAPI 解析，提取 C 料号、品牌、型号、商品分类、封装、订购数量。配送费/汇总不入库。订单号与 SKU 构成稳定 order- 回执键，复用 batch_jlc_receipts 跨本机导入会话去重；不传输原始订单表，不构建跨设备订单账本。
+- 立创订单 BIFF .xls 使用 JExcelAPI 解析，提取 C 料号、品牌、型号、商品分类、封装、订购数量。配送费/汇总不入库。订单号与源 SKU 构成稳定 order- 回执键。Android 继续使用本地 batch_jlc_receipts，Android 和 Windows 另可通过已同步入库流水的来源键防重；不传输原始订单表，不构建采购履约账本。
 - 手工照片复用 InventoryImageStore 的本地图片标记与 Excel 图片工作簿能力。父编辑器管理暂存图片生命周期，取消清理新图，成功保存保留引用；description 同步照片关联，图片二进制通过下文照片协议独立交换。
 - Web DELETE /admin-api/components/{id} 复用账户数据库、Web 写入开关、版本检查和请求回执，在事务内保存删除墓碑；下次同步传播删除，流水保留。
 
@@ -976,7 +984,7 @@ dev18 直接验收记录：真实 Windows 服务将共享预设发送到隔离 F
 
 `BatchInboundReviewState` 独立处理订单资料身份、来源警告和草稿恢复。`BatchScanItem` 追加 `MetadataSku`、`SourceWarning`、`SourceWarningConfirmed` 可选状态；旧 JSON 草稿按已有资料和错误恢复，不清空用户草稿、不修改 SQLite schema。可编辑行修改 SKU 时清空旧名称/分类/封装/描述并撤销旧确认，查询只补齐资料，明确的人工确认才解除来源警告。
 
-`.github/workflows/ci.yml` 明确运行 `ComponentVault.WinUI.CoreTests`、`Tests/JlcOrderImport`、`Tests/ReleaseNotesMarkdown`；`release.yml` 发布候选增加后两个独立测试，各项目测试职责不同；生产项目排除 `Tests/**`。Markdown 根目录 `README.md` 链接按仓库根目录解析，既有 `dockerhub.md` 等文档链接保持 docs 语义。
+历史 Windows 测试项目 `ComponentVault.WinUI.CoreTests`、`Tests/JlcOrderImport`、`Tests/ReleaseNotesMarkdown` 保留供按需本地验证，已从 CI 和发布候选流程移除；生产项目仍排除 `Tests/**`。Markdown 根目录 `README.md` 链接按仓库根目录解析，既有 `dockerhub.md` 等文档链接保持 docs 语义。
 
 Issue #25 已实现为 `server/app/admin/order_metadata.py` 与 Web 库存页 `OrderMetadataPanel`。预览使用 xlrd 读取 BIFF `.xls`；按精确 SKU 匹配认证账户库存，无原始文件持久化。应用接口仅接受分类、封装和参数字典，逐项短事务重读当前行、校验 `expected_updated_at`，复用现有幂等收据及同步写入。保留名称、数量、库位、分配、图片和未选备注；参数只替换选定键的中英文同义参数行。没有新增库存表或同步协议版本；原生客户端按现有增量同步取得修改，受管库存并发冲突语义不变。详见 [使用与边界](order-metadata-update.md)。
 

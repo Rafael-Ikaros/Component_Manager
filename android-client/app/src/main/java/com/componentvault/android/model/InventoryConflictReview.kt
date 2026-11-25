@@ -12,6 +12,7 @@ internal data class InventoryConflictComponent(
     val blockedReason: String?,
     val serverVersion: String,
     val localVersion: String,
+    val acceptServerDuplicate: Boolean = false,
 )
 
 internal data class InventoryConflictLocation(val id: String, val name: String, val quantity: Int)

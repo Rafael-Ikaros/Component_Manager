@@ -34,6 +34,7 @@ from .repositories import (
     pull_sync_snapshot,
     save_sync_payload,
 )
+from .storage import DuplicateOrderSource
 from .sync_observability import record_pull, record_push, record_rejected_managed_conflicts
 from .schemas import (
     HealthResponse,
@@ -203,7 +204,7 @@ def create_app() -> FastAPI:
                 log_event("sync_audit_failed", error_type=type(audit_error).__name__)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=str(error),
+                detail=error.detail if isinstance(error, DuplicateOrderSource) else str(error),
             ) from error
         if settings.mqtt_enabled and account.role == "admin" and accepted_components:
             app.state.mqtt_publisher.notify()

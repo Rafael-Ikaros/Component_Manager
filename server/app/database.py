@@ -195,6 +195,7 @@ def init_db(settings: Settings, *, initialize_accounts: bool = True) -> None:
         for statement in SCHEMA_STATEMENTS:
             connection.execute(statement)
         _migrate_costs(connection)
+        _migrate_order_source(connection)
         _migrate_storage(connection)
         _migrate_sync_revisions(connection)
         _migrate_sync_observability(connection)
@@ -238,6 +239,13 @@ def _migrate_costs(connection: sqlite3.Connection) -> None:
         columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
         if column not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+
+
+def _migrate_order_source(connection: sqlite3.Connection) -> None:
+    if not any(row["name"] == "source_ref" for row in connection.execute("PRAGMA table_info(stock_movements)")):
+        connection.execute("ALTER TABLE stock_movements ADD COLUMN source_ref TEXT")
+    connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_movement_source_ref "
+                       "ON stock_movements(source_ref) WHERE source_ref IS NOT NULL")
 
 
 def _migrate_storage(connection: sqlite3.Connection) -> None:

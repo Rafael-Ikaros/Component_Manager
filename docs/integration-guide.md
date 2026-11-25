@@ -28,6 +28,20 @@
 Web 入库 `POST /admin-api/components/{id}/movements` 可提供 `purchase_amount` 商品总额字符串；
 留空为未知，明确 `"0"` 为赠品，出库不能携带采购金额。
 
+## 立创订单来源协议（order_source_protocol=1）
+
+`/health`、`/auth/ping`、`/sync/push` 响应和 `/sync/pull` 声明 `order_source_protocol:1`。
+新客户端发现旧服务器不支持时，不上传包含已知订单来源的批次，并保留本地库存和队列；无来源批次仍可按现有库存及成本协议同步。
+
+启用该协议的客户端在 push 根对象送 `order_source_protocol:1`，仅对已识别的订单入库流水送 `source_ref`：
+`lcsc-order:v1:` 加小写十六进制 SHA-256，输入为 UTF-8 的「订单号 + U+001F + 原始 C 料号（大写）」。
+未知来源**省略**字段；旧客户端重试省略时保留已存字段，显式清除或改键会被拒绝。
+
+服务端按账户保持来源键唯一，软删除不释放键。原样重试保留同一流水；同源异流水返回 HTTP 409，
+`detail` 含 `code: duplicate_order_source`、`message`、`source_ref` 和 `movement_id`（已有或同包先出现的流水）。
+拒绝整包，不接受已包含重复增量的库存快照。客户端应保留本地待同步记录并拉取复核，不能把 409 当作成功回执。
+启用该协议时，完全等价的组件快照不能顺带新增非零库存流水。新版本净零操作、零数量估值仍按原规则处理；补传更早的无来源历史时，必须明确以已确认的同一组件版本为基线（`base_updated_at == updated_at`）。
+
 ## 网页更新作业（管理员）
 
 按[部署说明](server-web-update.md)将独立 updater 加入原 Compose 项目，指定原项目目录并挂载同一数据卷。Compose 项目名用于定位原服务。启用后由管理员选择渠道并明确创建作业。未部署 updater 时，由部署者更新配套 API/Web 镜像。

@@ -4,7 +4,7 @@
 
 <h1 align="center">Component Vault</h1>
 <p align="center"><strong>元件有处可放，项目有料可用。</strong></p>
-<p align="center">面向电子爱好者的元器件库存管理 · Android / Windows · 离线可用 · 可选自托管同步</p>
+<p align="center">面向电子爱好者的元器件库存管理 · Android · 离线可用 · 可选自托管 Web 与同步</p>
 
 <p align="center">
   <a href="https://github.com/Rafael-Ikaros/Component_Manager/releases/latest"><img src="https://img.shields.io/github/v/release/Rafael-Ikaros/Component_Manager?label=Stable&amp;color=0d9488&amp;labelColor=102d3b" alt="最新正式版" /></a>
@@ -24,7 +24,6 @@
 
 <p align="center">
   <a href="https://github.com/Rafael-Ikaros/Component_Manager/releases/latest/download/component-vault-android-release.apk"><img src="docs/design/readme/download-android.svg" width="250" height="84" alt="下载 Android 正式版 APK" /></a>
-  <a href="https://github.com/Rafael-Ikaros/Component_Manager/releases/latest/download/component-vault-windows-portable-x64.zip"><img src="docs/design/readme/download-windows.svg" width="250" height="84" alt="下载 Windows 自包含 ZIP" /></a>
   <a href="docs/docker-quickstart.md"><img src="docs/design/readme/deploy-docker.svg" width="250" height="84" alt="查看 Docker 与群晖部署教程" /></a>
 </p>
 
@@ -32,12 +31,14 @@
 
 Component Vault 把包装袋里的元件整理成可查找的库存：扫描入库、记录存放位置，
 需要组装时导入 BOM 或逐项选料，复核后再出库。
-Android 和 Windows 将数据保存在本机 SQLite，**不用部署服务器，也可以完整管理本地库存**。
+Android 将数据保存在本机 SQLite，**不用部署服务器，也可以完整管理本地库存**。
 需要多设备使用时，再连接自己的服务端。
 
 > [!NOTE]
 > 上方下载按钮提供正式版。下文也介绍 dev 功能，包含国内 EDA 查询、购买价格与材料成本、料盘识别和网页更新。正式版范围见[发布说明](docs/releases/0.7.8.md)，开发版见 [GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases)。
-> 部分开发版仅提供 Android APK。Windows 下载以对应版本的附件为准。
+> 部分开发版仅提供 Android APK。
+>
+> **Windows 独立客户端已停止维护。** 自 2026-11-25 起不再构建、更新或发布 Windows 安装包，版本工具也不再改写其版本号。源码和[历史版本附件](https://github.com/Rafael-Ikaros/Component_Manager/releases)保留，后续 Windows 功能计划集成到贴片机上位机项目。
 
 ## 能做什么
 
@@ -77,7 +78,7 @@ Web 管理台在手机上使用底部导航。库存列表优先显示名称、�
 每台原生客户端先保存本地修改，再按需同步。服务端为不同账户使用独立数据库，
 可管理用户、设备、同步审计和冲突记录；Web 库存写入由管理员决定是否开启。
 MQTT 可把已同步的库存变化发布给 Home Assistant 或看板。
-跨设备离线库存变更不会无条件自动合并，详见[同步边界](docs/architecture.md)。
+跨设备离线库存变更不会无条件自动合并。支持订单来源协议的 Android、Windows 和服务端可按同账户的立创订单号与源料号防重；历史无来源流水无法自动识别。详见[同步边界](docs/architecture.md)。
 Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保留本地库存和同步进度。
 同一元件在两端同时发生出入库时，Android 可在「设置 → 同步 → 复核同步冲突」查看服务端库存。核对数量和库位并确认后，才会重新应用所列出入库。
 
@@ -85,14 +86,14 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 
 ### 只在本机管理库存
 
-1. 下载上方 Android APK 或 Windows ZIP；Windows 解压完整目录后运行程序。
+1. 下载上方 Android APK 并安装。
 2. 从库存的“导入与扫码”添加元件，选择已有库位或创建库位。
 3. 按需使用项目用料、标签和备份。同步可以暂不配置。
 
 正式版适合日常使用；希望提前体验新功能，可选择[开发版](https://github.com/Rafael-Ikaros/Component_Manager/releases)。
 客户端在“设置 → 关于”选择自己的更新通道。安装和保留数据更新见[应用更新指南](docs/app-updates.md)。
 
-### 让手机、电脑和网页共用库存
+### 让手机与网页共用库存
 
 按照[Docker／群晖快速部署](docs/docker-quickstart.md)启动 API 与 Web。
 普通正式版部署可直接启动，开发版在 `.env` 中只需指定渠道。管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。
@@ -125,7 +126,7 @@ API 使用独立镜像；从 `0.7.9-dev.8` 起，Web 与可选 Updater 共用管
 | 模块 | 技术 |
 | --- | --- |
 | [Android](android-client/) | Kotlin · Jetpack Compose · Material 3 |
-| [Windows](windows-client/) | C# · WinUI 3 · SQLite |
+| [Windows 历史源码](windows-client/) | C# · WinUI 3 · SQLite；停止维护，不再参与 CI 或发布 |
 | [管理 Web](admin-web/) | React · Vite · shadcn/ui |
 | [服务端](server/) | Python · FastAPI · 按账户隔离的 SQLite |
 

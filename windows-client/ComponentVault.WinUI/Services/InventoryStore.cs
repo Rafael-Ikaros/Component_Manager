@@ -66,7 +66,7 @@ public sealed class InventoryStore
 
     public IReadOnlyList<StockMovementRecord> GetMovements(int limit = 200) => _queries.GetMovements(limit);
 
-    public bool IsBatchReceiptCommitted(string receiptId) => _batch.IsBatchReceiptCommitted(receiptId);
+    public bool IsBatchReceiptCommitted(string receiptId, string raw = "") => _batch.IsBatchReceiptCommitted(receiptId, raw);
     public static IReadOnlyList<BatchInboundSummary> SummarizeBatchInbound(IEnumerable<BatchInboundLine> lines) => InventoryBatchWriter.SummarizeBatchInbound(lines);
     public OperationResult CommitBatchInbound(BatchInboundCommitRequest request) => _batch.CommitBatchInbound(request);
     public OperationResult AppendCatalogInbound(string sku, int quantity, string locationId, string expectedUpdatedAt, string? newLocationName = null, string? purchaseAmount = null) =>

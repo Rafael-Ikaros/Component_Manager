@@ -49,7 +49,7 @@ public sealed partial class BatchJlcInboundView:Page
         {
             foreach (var item in _drafts.Load())
             {
-                if (ViewModel.IsBatchReceiptCommitted(item.ReceiptId) || item.Status == "captured") continue;
+                if (ViewModel.IsBatchReceiptCommitted(item.ReceiptId, item.Raw) || item.Status == "captured") continue;
                 var restored = BatchInboundReviewState.Restore(item);
                 var row = FromDraft(restored, ViewModel.StorageLocations.ToArray());
                 (item.Status == "ready" && ReadyForReview(row) ? _ready : _pending).Add(row);
@@ -97,18 +97,18 @@ public sealed partial class BatchJlcInboundView:Page
 
             CountText.Text = "正在读取立创商城表格…";
             var import = await Task.Run(() => JlcOrderSpreadsheetParser.ParseFile(file.Path));
-            var merged = _drafts.MergeImported(import.Rows, ViewModel.IsBatchReceiptCommitted);
+            var merged = _drafts.MergeImported(import.Rows, isReceived: row => ViewModel.IsBatchReceiptCommitted(row.ReceiptId, row.Raw));
             // Explicitly reimporting a removed, uncommitted order should restore it to the draft.
             _removed.ExceptWith(merged.Items.Select(item => item.ReceiptId));
             var shown = _ready.Concat(_pending).Select(row => row.ReceiptId).ToHashSet(StringComparer.Ordinal);
             await ParseAsync(merged.Items.Where(item => !shown.Contains(item.ReceiptId)
-                && !ViewModel.IsBatchReceiptCommitted(item.ReceiptId)));
+                && !ViewModel.IsBatchReceiptCommitted(item.ReceiptId, item.Raw)));
             CountText.Text += $"；表格新增 {merged.Added} 条，重复或已入库 {merged.Duplicates} 条，忽略运费 {import.SkippedFees} 行、汇总 {import.SkippedSummaries} 行。";
         }
         catch (Exception exception) { await ShowBatchErrorAsync("表格导入失败", exception.Message); }
         finally { SetBusy(false); }
     }
-    private async void OnParse(object sender,RoutedEventArgs e){if(_busy)return;SetBusy(true);try{Collect();var shown=_ready.Concat(_pending).Select(x=>x.ReceiptId).ToHashSet();await ParseAsync(_drafts.Load().Where(x=>!shown.Contains(x.ReceiptId)&&!ViewModel.IsBatchReceiptCommitted(x.ReceiptId)));}catch(Exception ex){await ShowBatchErrorAsync("批量解析失败",ex.Message);}finally{SetBusy(false);}}
+    private async void OnParse(object sender,RoutedEventArgs e){if(_busy)return;SetBusy(true);try{Collect();var shown=_ready.Concat(_pending).Select(x=>x.ReceiptId).ToHashSet();await ParseAsync(_drafts.Load().Where(x=>!shown.Contains(x.ReceiptId)&&!ViewModel.IsBatchReceiptCommitted(x.ReceiptId,x.Raw)));}catch(Exception ex){await ShowBatchErrorAsync("批量解析失败",ex.Message);}finally{SetBusy(false);}}
     private async Task ParseAsync(IEnumerable<BatchScanItem> scans)
     {
         _lookupCancellation?.Cancel();
@@ -424,7 +424,7 @@ public sealed partial class BatchJlcInboundView:Page
         if (await dialog.ShowAsync()!=ContentDialogResult.Primary) return;
         _generation++;_lookupCancellation?.Cancel();_drafts.Clear();_draftLoadFailed=false;_removed.Clear();_ready.Clear();_pending.Clear();RefreshCount();
     }
-    private void SaveRemaining(){var shown=_ready.Concat(_pending).Select(x=>x.ReceiptId).ToHashSet();var captured=_drafts.Load().Where(x=>!shown.Contains(x.ReceiptId)&&!_removed.Contains(x.ReceiptId)&&!ViewModel.IsBatchReceiptCommitted(x.ReceiptId));_drafts.Save(captured.Concat(_ready.Concat(_pending).Select(ToDraft)).ToArray());}
+    private void SaveRemaining(){var shown=_ready.Concat(_pending).Select(x=>x.ReceiptId).ToHashSet();var captured=_drafts.Load().Where(x=>!shown.Contains(x.ReceiptId)&&!_removed.Contains(x.ReceiptId)&&!ViewModel.IsBatchReceiptCommitted(x.ReceiptId,x.Raw));_drafts.Save(captured.Concat(_ready.Concat(_pending).Select(ToDraft)).ToArray());}
     private void RefreshCount()=>CountText.Text=$"草稿 {_drafts.Load().Count}/500 条 · 待核对 {_ready.Count} · 待处理 {_pending.Count}";
     private void OnUnloaded(object sender,RoutedEventArgs e){EndReadyPointerSelection(false);EndPendingPointerSelection();CancelLookupButton.IsEnabled=false;_generation++;_lookupCancellation?.Cancel();if(_draftLoadFailed)return;try{SaveRemaining();}catch(Exception ex){CountText.Text=ex.Message;}}
     private static BatchScanItem ToDraft(BatchInboundEditableRow x)=>new(x.ReceiptId,x.Raw){PurchaseAmount=x.PurchaseAmount,MetadataSku=x.Sku,Status=x.Reason.Length==0&&ReadyForReview(x)?"ready":"pending",Selected=x.Selected,SourceWarning=x.SourceWarning,SourceWarningConfirmed=x.SourceWarningConfirmed,Sku=x.Sku,QuantityText=x.Quantity?.ToString()??"",LocationId=x.LocationId,Name=x.Name,Category=x.Category,PackageName=x.PackageName,Description=x.Description,Error=x.Reason};

@@ -295,145 +295,19 @@ jobs:
           path: artifacts/admin-web/component-vault-admin-web.zip
           if-no-files-found: error
 
-  windows-release:
-    if: ${{ !inputs.android_only }}
-    runs-on: windows-latest
-    needs: prepare
-    env:
-      DOTNET_CLI_HOME: ${{ github.workspace }}\.dotnet-cli
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare.outputs.source_ref }}
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Run Windows JLC order import regressions
-        run: dotnet test windows-client/ComponentVault.WinUI/Tests/JlcOrderImport/JlcOrderImport.Tests.csproj -c Release
-
-      - name: Run Windows release notes Markdown tests
-        run: dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/ReleaseNotesMarkdown.Tests.csproj -c Release
-
-      - name: Publish Windows portable bundle
-        shell: pwsh
-        env:
-          COMPONENT_VERSION: ${{ needs.prepare.outputs.component_version }}
-        run: |
-          $portablePublishDir = Join-Path $env:RUNNER_TEMP 'component-vault-portable-x64'
-
-          if (Test-Path $portablePublishDir) {
-            Remove-Item -LiteralPath $portablePublishDir -Recurse -Force
-          }
-
-          $versionArgs = @()
-          if ($env:COMPONENT_VERSION) {
-            $numericVersion = ($env:COMPONENT_VERSION -split '-')[0] + '.0'
-            $versionArgs += "-p:Version=$env:COMPONENT_VERSION"
-            $versionArgs += "-p:InformationalVersion=$env:COMPONENT_VERSION"
-            $versionArgs += "-p:AssemblyVersion=$numericVersion"
-            $versionArgs += "-p:FileVersion=$numericVersion"
-          }
-
-          dotnet publish windows-client\ComponentVault.WinUI\ComponentVault.WinUI.csproj `
-            -c Release `
-            -r win-x64 `
-            -p:PublishProfile= `
-            -p:WindowsPackageType=None `
-            -p:GenerateAppxPackageOnBuild=false `
-            -p:AppxPackageSigningEnabled=false `
-            -p:WindowsAppSDKSelfContained=true `
-            -p:SelfContained=true `
-            -p:PublishSingleFile=false `
-            @versionArgs `
-            -o $portablePublishDir
-
-      - name: Package and smoke test Windows portable archive
-        shell: pwsh
-        run: |
-          $artifactDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts\windows'
-          $portablePublishDir = Join-Path $env:RUNNER_TEMP 'component-vault-portable-x64'
-          $portableStageDir = Join-Path $env:RUNNER_TEMP 'component-vault-windows-portable-x64'
-          $portableZipPath = Join-Path $artifactDir 'component-vault-windows-portable-x64.zip'
-          $smokeDir = Join-Path $env:RUNNER_TEMP 'component-vault-portable-smoke'
-          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-
-          if (!(Test-Path $portablePublishDir)) {
-            throw 'Windows portable publish output was not generated.'
-          }
-
-          if (Test-Path $portableStageDir) {
-            Remove-Item -LiteralPath $portableStageDir -Recurse -Force
-          }
-
-          New-Item -ItemType Directory -Force -Path $portableStageDir | Out-Null
-          Copy-Item (Join-Path $portablePublishDir '*') $portableStageDir -Recurse -Force
-
-          if (Test-Path $portableZipPath) {
-            Remove-Item -LiteralPath $portableZipPath -Force
-          }
-
-          Compress-Archive -Path $portableStageDir -DestinationPath $portableZipPath
-          if (Test-Path $smokeDir) {
-            Remove-Item -LiteralPath $smokeDir -Recurse -Force
-          }
-          Expand-Archive -LiteralPath $portableZipPath -DestinationPath $smokeDir
-
-          $executable = Join-Path $smokeDir 'component-vault-windows-portable-x64\ComponentVault.WinUI.exe'
-          $marker = Join-Path $env:RUNNER_TEMP 'component-vault-startup-ready'
-          if (!(Test-Path -LiteralPath $executable)) {
-            throw "Portable archive is missing ComponentVault.WinUI.exe: $executable"
-          }
-          Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
-          $env:COMPONENT_VAULT_STARTUP_SMOKE_FILE = $marker
-          $process = Start-Process -FilePath $executable -WorkingDirectory (Split-Path $executable) -WindowStyle Hidden -PassThru
-          try {
-            if (-not $process.WaitForExit(30000)) {
-              throw 'Windows portable startup smoke timed out before the app reported ready.'
-            }
-            if ($process.ExitCode -ne 0) {
-              throw "Windows portable startup smoke exited with code $($process.ExitCode)."
-            }
-            if (!(Test-Path -LiteralPath $marker)) {
-              throw 'Windows portable app exited without completing MainWindow startup.'
-            }
-          } catch {
-            $startupLog = Join-Path $env:LOCALAPPDATA 'ComponentVault\logs\startup.log'
-            if (Test-Path -LiteralPath $startupLog) {
-              Get-Content -LiteralPath $startupLog
-            }
-            throw
-          } finally {
-            if (!$process.HasExited) {
-              Stop-Process -Id $process.Id -Force
-            }
-          }
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-portable-x64
-          path: artifacts/windows/component-vault-windows-portable-x64.zip
-          if-no-files-found: error
-
   github-release:
     if: >-
       ${{
         !cancelled() &&
         needs.prepare.outputs.publish_github_release == 'true' &&
         needs.android-release.result == 'success' &&
-        (inputs.android_only ||
-          (needs.admin-web-release.result == 'success' && needs.windows-release.result == 'success'))
+        (inputs.android_only || needs.admin-web-release.result == 'success')
       }}
     runs-on: ubuntu-latest
     needs:
       - prepare
       - android-release
       - admin-web-release
-      - windows-release
     steps:
       - name: Checkout release notes
         uses: actions/checkout@v6
@@ -453,13 +327,6 @@ jobs:
           name: admin-web-static
           path: release-assets/admin-web
 
-      - name: Download Windows artifact
-        if: ${{ !inputs.android_only }}
-        uses: actions/download-artifact@v7
-        with:
-          name: windows-portable-x64
-          path: release-assets/windows
-
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -473,7 +340,7 @@ jobs:
         run: |
           release_assets=(release-assets/android/component-vault-android-release.apk)
           if [ "$ANDROID_ONLY" != "true" ]; then
-            release_assets+=(release-assets/admin-web/component-vault-admin-web.zip release-assets/windows/*)
+            release_assets+=(release-assets/admin-web/component-vault-admin-web.zip)
           fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           if [ -n "$RELEASE_NOTES" ]; then

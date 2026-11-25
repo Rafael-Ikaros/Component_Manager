@@ -175,6 +175,10 @@ internal sealed class InventoryDatabase
         EnsureColumnExists(connection, "stock_movements", "destination_location_id", "TEXT");
         EnsureColumnExists(connection, "components", "inventory_unit_cost", "TEXT");
         EnsureColumnExists(connection, "stock_movements", "purchase_amount", "TEXT");
+        EnsureColumnExists(connection, "stock_movements", "source_ref", "TEXT");
+        using var sourceIndex = connection.CreateCommand();
+        sourceIndex.CommandText = "CREATE INDEX IF NOT EXISTS idx_movements_source_ref ON stock_movements(source_ref) WHERE source_ref IS NOT NULL";
+        sourceIndex.ExecuteNonQuery();
         EnsureColumnExists(connection, "stock_movements", "cost_amount", "TEXT");
         if (needsLegacyMigration) MigrateLegacyAllocations(connection);
     }

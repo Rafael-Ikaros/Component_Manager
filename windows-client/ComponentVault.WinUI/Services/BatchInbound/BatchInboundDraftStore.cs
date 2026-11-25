@@ -11,7 +11,8 @@ public sealed class BatchInboundDraftStore
     { var list = Normalize(current ?? Load()).ToList(); var seen = list.Select(x => x.Raw).ToHashSet(StringComparer.Ordinal); var duplicates = 0; foreach (var candidate in raws) { var raw = candidate.Trim(); if (raw.Length == 0) continue; if (!seen.Add(raw)) { duplicates++; continue; } if (list.Count >= MaxItems) throw new InvalidOperationException("批次最多收集 500 个包装。"); list.Add(new(Guid.NewGuid().ToString("D"), raw)); } Save(list); return (list, duplicates); }
     public void Save(IReadOnlyList<BatchScanItem> items) { var normalized = Normalize(items); Directory.CreateDirectory(Path.GetDirectoryName(_path)!); var temp = _path + "." + Guid.NewGuid().ToString("N") + ".tmp"; try { File.WriteAllText(temp, JsonSerializer.Serialize(normalized)); File.Move(temp, _path, true); } finally { if (File.Exists(temp)) File.Delete(temp); } }
     public (IReadOnlyList<BatchScanItem> Items, int Added, int Duplicates) MergeImported(
-        IEnumerable<BatchScanItem> rows, Func<string, bool>? isCommitted = null)
+        IEnumerable<BatchScanItem> rows, Func<string, bool>? isCommitted = null,
+        Func<BatchScanItem, bool>? isReceived = null)
     {
         var items = Load().ToList();
         var receipts = items.Select(item => item.ReceiptId).ToHashSet(StringComparer.Ordinal);
@@ -20,7 +21,7 @@ public sealed class BatchInboundDraftStore
         var duplicates = 0;
         foreach (var row in rows)
         {
-            if (receipts.Contains(row.ReceiptId) || raws.Contains(row.Raw.Trim()) || isCommitted?.Invoke(row.ReceiptId) == true)
+            if (receipts.Contains(row.ReceiptId) || raws.Contains(row.Raw.Trim()) || isCommitted?.Invoke(row.ReceiptId) == true || isReceived?.Invoke(row) == true)
             {
                 duplicates++;
                 continue;

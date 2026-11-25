@@ -206,6 +206,10 @@ internal class InventorySyncService(
                     val queued = pushPayload.queuedEntities.firstOrNull { it.entityType == "component" }
                     check(queued != null && queued.entityUpdatedAt == reviewedVersion) { text(R.string.sync_replay_pending_changed) }
                 }
+                val movements = pushPayload.payload.getJSONArray("stock_movements")
+                check(endpoint.probe.optInt("order_source_protocol") == 1 ||
+                    (0 until movements.length()).none { !movements.getJSONObject(it).isNull("source_ref") }
+                ) { text(R.string.sync_order_source_upgrade) }
                 val pushResponse = try {
                     callJson(
                         settings = endpoint.configuration,
@@ -381,7 +385,8 @@ internal class InventorySyncService(
         val version = withConflictSnapshot(configuration) { db, snapshot ->
             conflictReplay.replay(db, snapshot, component, edits, writeService)
         }
-        InventoryConflictReplayResult(OperationResult(true, text(R.string.sync_replay_saved)), version)
+        val message = if (version == null) R.string.sync_duplicate_order_reconciled else R.string.sync_replay_saved
+        InventoryConflictReplayResult(OperationResult(true, text(message)), version)
     } catch (error: kotlinx.coroutines.CancellationException) {
         throw error
     } catch (error: Exception) {
@@ -505,6 +510,7 @@ internal class InventorySyncService(
             put("device_id", deviceId)
             put("cost_protocol", 1)
             put("inventory_protocol", 1)
+            put("order_source_protocol", 1)
             put("components", JSONArray())
             put("stock_movements", JSONArray())
             // Review only accepts existing server locations. Leave unrelated local location changes queued for normal sync.
@@ -608,7 +614,8 @@ internal class InventorySyncService(
                 location_id,
                 destination_location_id,
                 purchase_amount,
-                cost_amount
+                cost_amount,
+                source_ref
             FROM stock_movements
             WHERE id = ?
             """.trimIndent(),
@@ -622,6 +629,7 @@ internal class InventorySyncService(
                 put("component_id", cursor.getString(cursor.getColumnIndexOrThrow("component_id")))
                 put("purchase_amount", cursor.getString(cursor.getColumnIndexOrThrow("purchase_amount")) ?: JSONObject.NULL)
                 put("cost_amount", cursor.getString(cursor.getColumnIndexOrThrow("cost_amount")) ?: JSONObject.NULL)
+                cursor.getString(cursor.getColumnIndexOrThrow("source_ref"))?.let { put("source_ref", it) }
                 put("movement_type", cursor.getString(cursor.getColumnIndexOrThrow("movement_type")))
                 put("quantity", cursor.getInt(cursor.getColumnIndexOrThrow("quantity")))
                 put("reason", cursor.getString(cursor.getColumnIndexOrThrow("reason")))
@@ -687,11 +695,14 @@ internal class InventorySyncService(
                     throw IllegalStateException(text(R.string.sync_identity_route_unavailable))
                 }
                 val detail = runCatching { JSONObject(responseText).optString("detail") }.getOrDefault("")
+                val duplicateOrder = path == "/sync/push" && responseCode == 409 &&
+                    runCatching { JSONObject(responseText).optJSONObject("detail")?.optString("code") == "duplicate_order_source" }.getOrDefault(false)
                 val inventoryConflict = path == "/sync/push" && (
-                    detail.startsWith("Inventory conflict for ") ||
+                    duplicateOrder || detail.startsWith("Inventory conflict for ") ||
                         detail.startsWith("A changed inventory snapshot")
                     )
-                throw SyncHttpException(responseCode, buildErrorMessage(responseCode, responseText), inventoryConflict)
+                val message = if (duplicateOrder) text(R.string.sync_duplicate_order_review) else buildErrorMessage(responseCode, responseText)
+                throw SyncHttpException(responseCode, message, inventoryConflict)
             }
             if (responseText.isBlank()) {
                 JSONObject()
@@ -893,16 +904,18 @@ internal class InventorySyncService(
         }
     }
 
-    private fun upsertRemoteMovement(
+    internal fun upsertRemoteMovement(
         db: SQLiteDatabase,
         movement: JSONObject,
     ) {
+        var storedSource: String? = null
         db.rawQuery(
-            "SELECT updated_at FROM stock_movements WHERE id = ?",
+            "SELECT updated_at,source_ref FROM stock_movements WHERE id = ?",
             arrayOf(movement.getString("id")),
         ).use { cursor ->
             if (cursor.moveToFirst()) {
                 val existingUpdatedAt = cursor.getString(cursor.getColumnIndexOrThrow("updated_at"))
+                storedSource = cursor.getString(cursor.getColumnIndexOrThrow("source_ref"))
                 if (
                     !SyncProtocol.isRemoteAtLeastAsNew(
                         localUpdatedAt = existingUpdatedAt,
@@ -918,6 +931,7 @@ internal class InventorySyncService(
             put("id", movement.getString("id"))
             put("component_id", movement.getString("component_id"))
             put("movement_type", movement.getString("movement_type"))
+            put("source_ref", if (movement.isNull("source_ref")) storedSource else movement.getString("source_ref"))
             put("purchase_amount", if (movement.isNull("purchase_amount")) null else movement.getString("purchase_amount"))
             put("cost_amount", if (movement.isNull("cost_amount")) null else movement.getString("cost_amount"))
             put("quantity", movement.getInt("quantity"))

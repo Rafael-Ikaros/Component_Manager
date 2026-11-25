@@ -14,6 +14,33 @@ public sealed class InventoryStoreSyncTests : IDisposable
     );
 
     [Fact]
+    public void PulledOrderSourcePreventsReceivingTheSameOrderAgain()
+    {
+        var store = CreateStore();
+        var digest = new string('a', 64);
+        var receipt = new Guid(Convert.FromHexString(digest[..32])).ToString();
+        var raw = "lcsc-order:order-" + digest;
+        var at = "2026-09-15T00:00:00Z";
+        var result = new SyncRunResult { IsSuccess = true, Message = "ok", PullResponse = new SyncPullResponse
+        {
+            ServerTime = at, SyncCursor = 1,
+            StorageLocations = [new() { Id = "A", Name = "Shelf A", UpdatedAt = at, Deleted = false }],
+            Components = [new() { Id = "part", Sku = "C12345", Name = "Part", Category = "IC", PackageName = "SMD",
+                Location = "A", Quantity = 10, MinStock = 0, UpdatedAt = at, Deleted = false, InventoryUnitCost = "3",
+                Allocations = [new() { LocationId = "A", Quantity = 10 }] }],
+            StockMovements = [new() { Id = "remote-order", ComponentId = "part", MovementType = "inbound", Quantity = 10,
+                Reason = "Order", HappenedAt = at, UpdatedAt = at, Deleted = false, LocationId = "A",
+                PurchaseAmount = "30", CostAmount = "30", SourceRef = "lcsc-order:v1:" + digest }],
+        } };
+        store.ApplySyncResult(result, [], string.Empty);
+        Assert.True(store.IsBatchReceiptCommitted(receipt, raw));
+        Assert.False(store.IsBatchReceiptCommitted(Guid.NewGuid().ToString(), raw));
+        var duplicate = new ComponentVault.WinUI.Services.BatchInbound.BatchInboundLine(receipt, raw, "C12345", 10, "A", "Part", "IC", "SMD", "", "30");
+        Assert.True(store.CommitBatchInbound(new([duplicate])).IsSuccess);
+        Assert.Empty(store.CreateSyncEnvelope().QueuedEntities);
+    }
+
+    [Fact]
     public void ApplySyncResult_PreservesQueueEntryEditedAfterSnapshot()
     {
         var store = CreateStore();

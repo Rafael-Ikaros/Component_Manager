@@ -43,7 +43,6 @@ class ChangelogVersionBaselineTests(unittest.TestCase):
             ),
             patch.object(sync_version, "update_android_build") as android,
             patch.object(sync_version, "update_admin_web") as web,
-            patch.object(sync_version, "update_windows") as windows,
             patch.object(sync_version, "stage_version_files") as stage,
             patch.object(sync_version, "write_text") as write,
         ):
@@ -51,9 +50,66 @@ class ChangelogVersionBaselineTests(unittest.TestCase):
 
         android.assert_called_once_with(sync_version.SemVer(0, 7, 7), increment_code=True)
         web.assert_called_once_with(sync_version.SemVer(0, 7, 7))
-        windows.assert_called_once_with(sync_version.SemVer(0, 7, 7))
         stage.assert_called_once()
         write.assert_not_called()
+
+    def test_stable_sync_leaves_retired_windows_metadata_untouched(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {
+                "CHANGELOG_PATH": root / "docs" / "CHANGELOG.md",
+                "ANDROID_BUILD_PATH": root / "android-client" / "app" / "build.gradle.kts",
+                "ADMIN_PACKAGE_PATH": root / "admin-web" / "package.json",
+                "ADMIN_LOCK_PATH": root / "admin-web" / "package-lock.json",
+            }
+            contents = {
+                "CHANGELOG_PATH": "## [Unreleased]\nbump: patch\n\n## [0.7.7]\n- Stable.\n",
+                "ANDROID_BUILD_PATH": 'versionCode = 6\nversionName = "0.7.6"\n',
+                "ADMIN_PACKAGE_PATH": '{"version": "0.7.6"}',
+                "ADMIN_LOCK_PATH": '{"version": "0.7.6", "packages": {"": {"version": "0.7.6"}}}',
+            }
+            for name, path in paths.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(contents[name], encoding="utf-8")
+
+            windows = root / "windows-client" / "ComponentVault.WinUI"
+            windows.mkdir(parents=True)
+            frozen_files = {
+                windows / "ComponentVault.WinUI.csproj": (
+                    b"<Project><PropertyGroup><Version>0.7.6</Version>"
+                    b"<InformationalVersion>0.7.6</InformationalVersion>"
+                    b"<AssemblyVersion>0.7.6.0</AssemblyVersion>"
+                    b"<FileVersion>0.7.6.0</FileVersion></PropertyGroup></Project>\r\n"
+                ),
+                windows / "Package.appxmanifest": b'<Package><Identity Version="0.7.6.0"/></Package>\r\n',
+                windows / "app.manifest": b'<assembly><assemblyIdentity version="0.7.6.0"/></assembly>\r\n',
+            }
+            for path, original in frozen_files.items():
+                path.write_bytes(original)
+
+            with (
+                patch.multiple(sync_version, ROOT=root, **paths),
+                patch.multiple(
+                    sync_version,
+                    create=True,
+                    WINDOWS_CSPROJ_PATH=windows / "ComponentVault.WinUI.csproj",
+                    WINDOWS_MSIX_PATH=windows / "Package.appxmanifest",
+                    WINDOWS_APP_MANIFEST_PATH=windows / "app.manifest",
+                ),
+                patch.object(sync_version, "find_git_root", return_value=root),
+                patch.object(sync_version.subprocess, "run") as git,
+            ):
+                sync_version.sync_latest_stable_metadata()
+                sync_version.check_version_sync()
+                self.assertEqual("7", sync_version.read_current_versions()["android.versionCode"])
+
+            for path, original in frozen_files.items():
+                self.assertEqual(original, path.read_bytes())
+            git.assert_called_once_with(
+                ["git", "add", *(path.relative_to(root).as_posix() for path in paths.values())],
+                cwd=root,
+                check=True,
+            )
 
     def test_dev_heading_cannot_sync_stable_metadata(self) -> None:
         state = sync_version.ChangelogState(
@@ -86,7 +142,6 @@ class ChangelogVersionBaselineTests(unittest.TestCase):
             ),
             patch.object(sync_version, "update_android_build") as android,
             patch.object(sync_version, "update_admin_web"),
-            patch.object(sync_version, "update_windows"),
             patch.object(sync_version, "stage_version_files"),
         ):
             sync_version.sync_latest_stable_metadata()

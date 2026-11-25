@@ -16,9 +16,6 @@ CHANGELOG_PATH = ROOT / "docs" / "CHANGELOG.md"
 ANDROID_BUILD_PATH = ROOT / "android-client" / "app" / "build.gradle.kts"
 ADMIN_PACKAGE_PATH = ROOT / "admin-web" / "package.json"
 ADMIN_LOCK_PATH = ROOT / "admin-web" / "package-lock.json"
-WINDOWS_CSPROJ_PATH = ROOT / "windows-client" / "ComponentVault.WinUI" / "ComponentVault.WinUI.csproj"
-WINDOWS_MSIX_PATH = ROOT / "windows-client" / "ComponentVault.WinUI" / "Package.appxmanifest"
-WINDOWS_APP_MANIFEST_PATH = ROOT / "windows-client" / "ComponentVault.WinUI" / "app.manifest"
 
 CHANGELOG_HEADER_RE = re.compile(
     r"^## \[(?P<version>[^\]]+)\](?: - (?P<release_date>\d{4}-\d{2}-\d{2}))?\s*$",
@@ -55,9 +52,6 @@ class SemVer:
         if bump_kind == "patch":
             return SemVer(self.major, self.minor, self.patch + 1)
         raise VersionSyncError(f"Unsupported bump kind: {bump_kind}")
-
-    def to_windows(self) -> str:
-        return f"{self.major}.{self.minor}.{self.patch}.0"
 
     def __str__(self) -> str:
         return f"{self.major}.{self.minor}.{self.patch}"
@@ -261,51 +255,6 @@ def update_admin_web(version: SemVer) -> None:
     normalize_json_file(ADMIN_LOCK_PATH, lock_payload)
 
 
-def replace_or_insert_tag(text: str, tag_name: str, value: str) -> str:
-    tag_pattern = re.compile(rf"<{tag_name}>[^<]*</{tag_name}>")
-    if tag_pattern.search(text):
-        return tag_pattern.sub(f"<{tag_name}>{value}</{tag_name}>", text, count=1)
-
-    property_group_end = text.find("</PropertyGroup>")
-    if property_group_end == -1:
-        raise VersionSyncError(f"Unable to locate insertion point for <{tag_name}>.")
-
-    insertion = f"    <{tag_name}>{value}</{tag_name}>\n"
-    return text[:property_group_end] + insertion + text[property_group_end:]
-
-
-def update_windows(version: SemVer) -> None:
-    version_text = str(version)
-    windows_version = version.to_windows()
-
-    csproj_text = read_text(WINDOWS_CSPROJ_PATH)
-    csproj_text = replace_or_insert_tag(csproj_text, "Version", version_text)
-    csproj_text = replace_or_insert_tag(csproj_text, "AssemblyVersion", windows_version)
-    csproj_text = replace_or_insert_tag(csproj_text, "FileVersion", windows_version)
-    csproj_text = replace_or_insert_tag(csproj_text, "InformationalVersion", version_text)
-    write_text(WINDOWS_CSPROJ_PATH, csproj_text)
-
-    msix_text = read_text(WINDOWS_MSIX_PATH)
-    msix_text = replace_pattern(
-        msix_text,
-        r'Version="[^"]+"',
-        f'Version="{windows_version}"',
-        "Windows MSIX version",
-    )
-    write_text(WINDOWS_MSIX_PATH, msix_text)
-
-    app_manifest_text = read_text(WINDOWS_APP_MANIFEST_PATH)
-    app_manifest_text, count = re.subn(
-        r'(<assemblyIdentity[^>]*\bversion=")[^"]+(")',
-        rf'\g<1>{windows_version}\2',
-        app_manifest_text,
-        count=1,
-    )
-    if count != 1:
-        raise VersionSyncError("Unable to update Windows app manifest version.")
-    write_text(WINDOWS_APP_MANIFEST_PATH, app_manifest_text)
-
-
 def read_current_versions() -> dict[str, str]:
     android_text = read_text(ANDROID_BUILD_PATH)
     android_name_match = re.search(r'versionName\s*=\s*"([^"]+)"', android_text)
@@ -319,63 +268,25 @@ def read_current_versions() -> dict[str, str]:
     if not isinstance(lock_root, dict):
         raise VersionSyncError("admin-web/package-lock.json is missing the root package entry.")
 
-    csproj_text = read_text(WINDOWS_CSPROJ_PATH)
-    msix_text = read_text(WINDOWS_MSIX_PATH)
-    app_manifest_text = read_text(WINDOWS_APP_MANIFEST_PATH)
-
     versions = {
         "android.versionName": android_name_match.group(1),
         "android.versionCode": android_code_match.group(1),
         "admin-web.package": str(package_payload.get("version", "")),
         "admin-web.lock": str(lock_payload.get("version", "")),
         "admin-web.lockRoot": str(lock_root.get("version", "")),
-        "windows.csproj.version": extract_xml_tag(csproj_text, "Version"),
-        "windows.csproj.informational": extract_xml_tag(csproj_text, "InformationalVersion"),
-        "windows.csproj.assembly": extract_xml_tag(csproj_text, "AssemblyVersion"),
-        "windows.csproj.file": extract_xml_tag(csproj_text, "FileVersion"),
-        "windows.msix": extract_attribute(msix_text, "Version"),
-        "windows.appManifest": extract_windows_app_manifest_version(app_manifest_text),
     }
     return versions
-
-
-def extract_xml_tag(text: str, tag_name: str) -> str:
-    match = re.search(rf"<{tag_name}>([^<]+)</{tag_name}>", text)
-    if match is None:
-        raise VersionSyncError(f"Missing <{tag_name}> in Windows project file.")
-    return match.group(1)
-
-
-def extract_attribute(text: str, attribute_name: str) -> str:
-    match = re.search(rf'{attribute_name}="([^"]+)"', text)
-    if match is None:
-        raise VersionSyncError(f"Missing attribute '{attribute_name}'.")
-    return match.group(1)
-
-
-def extract_windows_app_manifest_version(text: str) -> str:
-    match = re.search(r'<assemblyIdentity[^>]*\bversion="([^"]+)"', text)
-    if match is None:
-        raise VersionSyncError("Missing assemblyIdentity version in Windows app manifest.")
-    return match.group(1)
 
 
 def validate_synced_versions(expected_version: SemVer) -> None:
     versions = read_current_versions()
     expected = str(expected_version)
-    expected_windows = expected_version.to_windows()
 
     checks = {
         "android.versionName": expected,
         "admin-web.package": expected,
         "admin-web.lock": expected,
         "admin-web.lockRoot": expected,
-        "windows.csproj.version": expected,
-        "windows.csproj.informational": expected,
-        "windows.csproj.assembly": expected_windows,
-        "windows.csproj.file": expected_windows,
-        "windows.msix": expected_windows,
-        "windows.appManifest": expected_windows,
     }
 
     mismatches = [
@@ -401,9 +312,6 @@ def stage_version_files() -> None:
         ANDROID_BUILD_PATH.relative_to(ROOT),
         ADMIN_PACKAGE_PATH.relative_to(ROOT),
         ADMIN_LOCK_PATH.relative_to(ROOT),
-        WINDOWS_CSPROJ_PATH.relative_to(ROOT),
-        WINDOWS_MSIX_PATH.relative_to(ROOT),
-        WINDOWS_APP_MANIFEST_PATH.relative_to(ROOT),
     ]
 
     command = ["git", "add", *[str(path).replace("\\", "/") for path in relative_paths]]
@@ -473,7 +381,6 @@ def apply_version_sync(output_path: Path | None = None) -> None:
     write_text(CHANGELOG_PATH, render_released_changelog(next_version))
     update_android_build(next_version, increment_code=True)
     update_admin_web(next_version)
-    update_windows(next_version)
     stage_version_files()
     write_github_outputs(
         output_path,
@@ -504,7 +411,6 @@ def sync_latest_stable_metadata() -> None:
 
     update_android_build(version, increment_code=version > current_version)
     update_admin_web(version)
-    update_windows(version)
     stage_version_files()
     print(f"Synchronized explicit stable heading {version} without consuming Unreleased.")
 

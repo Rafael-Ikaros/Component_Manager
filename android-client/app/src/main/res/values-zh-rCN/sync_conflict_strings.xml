@@ -29,4 +29,10 @@
     <string name="sync_conflict_confirm_action">确认重新应用</string>
     <string name="sync_conflict_confirm_commit">确认并同步</string>
     <string name="sync_conflict_confirm_description">要按本页显示的服务端库存重新应用 %1$s 的 %2$d 条复核流水吗？保存前会再次核对服务端版本。</string>
+    <string name="sync_order_source_upgrade">请升级服务器以同步带来源去重的订单。本地库存和待同步内容已保留。</string>
+    <string name="sync_duplicate_order_review">此订单商品已入库。请刷新同步冲突复核，再决定如何处理。</string>
+    <string name="sync_duplicate_order_mixed">服务端已有本批次中的订单商品，但当前本地改动无法安全校准。待同步记录已保留，需单独核对。</string>
+    <string name="sync_duplicate_order_accept_server">保留服务端入库记录</string>
+    <string name="sync_duplicate_order_accept_explanation">确定归档本地重复记录并保留服务端库存和流水？此操作不会再次上传库存。</string>
+    <string name="sync_duplicate_order_reconciled">已归档本地重复记录并保留服务端流水。可使用「立即同步」刷新库存。</string>
 </resources>

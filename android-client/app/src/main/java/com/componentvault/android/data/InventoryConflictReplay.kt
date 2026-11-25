@@ -23,20 +23,43 @@ internal class InventoryConflictReplay(
         val remoteComponents = snapshot.objects("components").associateBy { it.getString("id") }
         val remoteMovements = snapshot.objects("stock_movements").associateBy { it.getString("id") }
         val locations = snapshot.objects("storage_locations").filterNot { it.getBoolean("deleted") }
+        val remoteOrders = remoteMovements.values.mapNotNull { movement ->
+            movement.nullableString("source_ref")?.let { it to movement }
+        }.toMap()
         val queued = db.rawQuery(
             "SELECT entity_id FROM sync_queue WHERE entity_type = 'component' ORDER BY created_at, entity_id",
             null,
         ).use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
         return InventoryConflictReview(queued.mapNotNull { id ->
             val local = sync.getComponentJson(db, id) ?: return@mapNotNull null
-            val remote = remoteComponents[id] ?: return@mapNotNull null
+            val movements = pendingMovements(db, id)
+            val unsent = movements.filterNot { it.getString("id") in remoteMovements }
+            val duplicateOrders = unsent.mapNotNull { entry ->
+                entry.nullableString("source_ref")?.let(remoteOrders::get)?.let { entry to it }
+            }
+            val sameIdRemote = remoteComponents[id]
+            val remote = sameIdRemote ?: duplicateOrders.firstOrNull()?.second?.getString("component_id")
+                ?.let(remoteComponents::get) ?: return@mapNotNull null
             val serverVersion = remote.getString("updated_at")
             val base = local.nullableString("base_updated_at")
             val localVersion = local.getString("updated_at")
             val sameBase = base != null && SyncProtocol.timestampsEqual(base, serverVersion)
-            if (sameBase && !SyncProtocol.timestampsEqual(localVersion, serverVersion)) return@mapNotNull null
-            val movements = pendingMovements(db, id)
-            val unsent = movements.filterNot { it.getString("id") in remoteMovements }
+            if (duplicateOrders.isEmpty() && sameBase && !SyncProtocol.timestampsEqual(localVersion, serverVersion)) return@mapNotNull null
+            // Only reconcile the narrow case where discarding duplicate local rows cannot change
+            // any inventory facts, and there is nothing else queued to preserve or replay.
+            val acceptDuplicate = sameIdRemote != null && !sameBase && !local.getBoolean("deleted") &&
+                !remote.getBoolean("deleted") && duplicateOrders.isNotEmpty() && duplicateOrders.size == movements.size &&
+                sameInventory(local, remote) && movements.any {
+                    SyncProtocol.timestampsEqual(it.getString("updated_at"), localVersion)
+                } && duplicateOrders.all { (pending, accepted) ->
+                    !pending.getBoolean("deleted") && !accepted.getBoolean("deleted") &&
+                        pending.getString("movement_type") == "inbound" &&
+                        listOf("component_id", "movement_type", "quantity", "location_id", "purchase_amount", "cost_amount").all {
+                            pending.nullableString(it) == accepted.nullableString(it)
+                        }
+                } && db.rawQuery("SELECT COUNT(*) FROM sync_queue", null).use {
+                    it.moveToFirst() && it.getInt(0) == movements.size + 1
+                }
             val acknowledged = movements.filter { it.getString("id") in remoteMovements }
             val acknowledgedMatch = acknowledged.all {
                 sameMovement(it, remoteMovements.getValue(it.getString("id")))
@@ -44,6 +67,9 @@ internal class InventoryConflictReplay(
             // A committed push whose reply was lost remains an ordinary idempotent retry.
             if (unsent.isEmpty() && acknowledgedMatch && sameComponent(local, remote)) return@mapNotNull null
             val blocked = when {
+                snapshot.optInt("order_source_protocol") != 1 && unsent.any { !it.isNull("source_ref") } ->
+                    R.string.sync_order_source_upgrade
+                duplicateOrders.isNotEmpty() -> if (acceptDuplicate) null else R.string.sync_duplicate_order_mixed
                 remote.getBoolean("deleted") || local.getBoolean("deleted") -> R.string.sync_replay_deleted_component
                 remote.optJSONArray("allocations") == null -> R.string.sync_replay_legacy_component
                 unsent.isEmpty() || !acknowledgedMatch || unsent.any {
@@ -70,6 +96,7 @@ internal class InventoryConflictReplay(
                 blockedReason = blocked?.let(::text),
                 serverVersion = serverVersion,
                 localVersion = localVersion,
+                acceptServerDuplicate = acceptDuplicate,
             )
         })
     }
@@ -80,16 +107,31 @@ internal class InventoryConflictReplay(
         preview: InventoryConflictComponent,
         edits: List<InventoryConflictMovementEdit>,
         writer: InventoryWriteService,
-    ): String {
+    ): String? {
         val current = review(db, snapshot).components.firstOrNull { it.id == preview.id }
         check(current != null && current.serverVersion == preview.serverVersion &&
             current.localVersion == preview.localVersion && current.movements == preview.movements &&
-            current.locations == preview.locations
+            current.locations == preview.locations && current.acceptServerDuplicate == preview.acceptServerDuplicate
         ) { text(R.string.sync_replay_stale) }
         check(current.blockedReason == null) { requireNotNull(current.blockedReason) }
         val queued = pendingMovements(db, current.id)
         val unsentIds = current.movements.mapTo(mutableSetOf()) { it.id }
         val pending = queued.filter { it.getString("id") in unsentIds }
+        if (current.acceptServerDuplicate) {
+            check(edits.isEmpty()) { text(R.string.sync_replay_stale) }
+            val remote = snapshot.objects("components").first { it.getString("id") == current.id }
+            archive(db, current.id, checkNotNull(sync.getComponentJson(db, current.id)), queued)
+            sync.upsertRemoteComponent(db, remote)
+            val sources = pending.mapTo(mutableSetOf()) { it.getString("source_ref") }
+            snapshot.objects("stock_movements").filter { it.optString("source_ref") in sources }
+                .forEach { sync.upsertRemoteMovement(db, it) }
+            for (id in unsentIds) {
+                db.delete("stock_movements", "id = ?", arrayOf(id))
+                db.delete("sync_queue", "entity_type = 'stock_movement' AND entity_id = ?", arrayOf(id))
+            }
+            db.delete("sync_queue", "entity_type = 'component' AND entity_id = ?", arrayOf(current.id))
+            return null // No duplicate stock or movements should be pushed after adopting the server state.
+        }
         val editsById = edits.associateBy { it.id }
         check(edits.size == pending.size && editsById.keys == pending.mapTo(mutableSetOf()) { it.getString("id") }) {
             text(R.string.sync_replay_stale)
@@ -115,12 +157,7 @@ internal class InventoryConflictReplay(
 
         val remote = snapshot.objects("components").first { it.getString("id") == current.id }
         val local = checkNotNull(sync.getComponentJson(db, current.id))
-        // Preserve prior metadata, quantities, cost and movement history for audit.
-        db.insertOrThrow("inventory_replay_history", null, ContentValues().apply {
-            put("component_id", current.id)
-            put("created_at", utcNow())
-            put("local_snapshot", JSONObject().put("component", local).put("movements", JSONArray(queued)).toString())
-        })
+        archive(db, current.id, local, queued)
         val neededLocations = remote.objects("allocations").mapTo(mutableSetOf()) { it.getString("location_id") }
         drafts.mapNotNullTo(neededLocations) { it.locationId }
         snapshot.objects("storage_locations").filter { it.getString("id") in neededLocations }.forEach {
@@ -156,8 +193,18 @@ internal class InventoryConflictReplay(
             }.sortedBy { Instant.parse(it.getString("happened_at")) }
         }
 
-    private fun sameComponent(local: JSONObject, remote: JSONObject): Boolean {
-        if (!SyncProtocol.timestampsEqual(local.getString("updated_at"), remote.getString("updated_at"))) return false
+    private fun archive(db: SQLiteDatabase, id: String, local: JSONObject, movements: List<JSONObject>) {
+        db.insertOrThrow("inventory_replay_history", null, ContentValues().apply {
+            put("component_id", id)
+            put("created_at", utcNow())
+            put("local_snapshot", JSONObject().put("component", local).put("movements", JSONArray(movements)).toString())
+        })
+    }
+
+    private fun sameComponent(local: JSONObject, remote: JSONObject): Boolean =
+        SyncProtocol.timestampsEqual(local.getString("updated_at"), remote.getString("updated_at")) && sameInventory(local, remote)
+
+    private fun sameInventory(local: JSONObject, remote: JSONObject): Boolean {
         val fields = listOf("sku", "name", "category", "package_name", "location", "description", "quantity",
             "min_stock", "inventory_unit_cost", "deleted")
         return fields.all { local.nullableString(it) == remote.nullableString(it) } &&

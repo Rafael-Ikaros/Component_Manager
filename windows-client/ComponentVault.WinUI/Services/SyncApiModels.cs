@@ -36,6 +36,8 @@ public sealed class SyncStockMovementDto
 {
     public string? PurchaseAmount { get; init; }
     public string? CostAmount { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? SourceRef { get; init; }
     public required string Id { get; init; }
     public required string ComponentId { get; init; }
     public required string MovementType { get; init; }
@@ -52,6 +54,7 @@ public sealed class SyncStockMovementDto
 public sealed class SyncPushRequest
 {
     public int CostProtocol { get; init; } = 1;
+    public int OrderSourceProtocol { get; init; } = 1;
     public int InventoryProtocol { get; init; } = 1;
     public required string DeviceId { get; init; }
     public IReadOnlyList<SyncComponentDto> Components { get; init; } = [];
@@ -85,6 +88,7 @@ public sealed class SyncTokenStatusResponse
     public required string ServerTime { get; init; }
     public int InventoryProtocol { get; init; }
     public int CostProtocol { get; init; }
+    public int OrderSourceProtocol { get; init; }
 }
 
 public sealed class SyncAccountIdentity

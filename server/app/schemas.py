@@ -20,6 +20,7 @@ class HealthResponse(BaseModel):
     status: str
     server_time: datetime
     cost_protocol: int = 1
+    order_source_protocol: Literal[1] = 1
     inventory_protocol: int = 1
     bom_preset_protocol: int = 1
     photo_protocol: int = 1
@@ -31,6 +32,7 @@ class SyncTokenStatus(BaseModel):
     status: str
     server_time: datetime
     cost_protocol: int = 1
+    order_source_protocol: Literal[1] = 1
     inventory_protocol: int = 1
     bom_preset_protocol: int = 1
     photo_protocol: int = 1
@@ -102,6 +104,7 @@ class StockMovementPayload(BaseModel):
 
     purchase_amount: str | None = None
     cost_amount: str | None = None
+    source_ref: str | None = Field(default=None, pattern=r"^lcsc-order:v1:[0-9a-f]{64}$", max_length=78)
 
     @field_validator("purchase_amount", mode="before")
     @classmethod
@@ -132,10 +135,12 @@ class PushRequest(BaseModel):
     stock_movements: list[StockMovementPayload] = Field(default_factory=list)
     cost_protocol: Literal[0, 1] = 0
     inventory_protocol: Literal[0, 1] = 0
+    order_source_protocol: Literal[0, 1] = 0
     storage_locations: list[StorageLocationPayload] = Field(default_factory=list)
 
 
 class PushResponse(BaseModel):
+    order_source_protocol: Literal[1] = 1
     accepted_components: int
     accepted_stock_movements: int
     server_time: datetime
@@ -147,6 +152,7 @@ class PullResponse(BaseModel):
     components: list[ComponentPayload] = Field(default_factory=list)
     stock_movements: list[StockMovementPayload] = Field(default_factory=list)
     cost_protocol: int = 1
+    order_source_protocol: Literal[1] = 1
     inventory_protocol: int = 1
     storage_locations: list[StorageLocationPayload] = Field(default_factory=list)
 

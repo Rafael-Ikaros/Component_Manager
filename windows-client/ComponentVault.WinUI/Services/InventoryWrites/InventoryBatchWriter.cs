@@ -13,12 +13,21 @@ internal sealed class InventoryBatchWriter
 
     internal InventoryBatchWriter(InventoryDatabase database) => _database = database;
 
-    public bool IsBatchReceiptCommitted(string receiptId)
+    public bool IsBatchReceiptCommitted(string receiptId) => IsBatchReceiptCommitted(receiptId, "");
+
+    public bool IsBatchReceiptCommitted(string receiptId, string raw)
     {
         using var connection = _database.OpenConnection();
+        return IsReceived(connection, receiptId, BatchOrderSource.FromOrder(receiptId, raw));
+    }
+
+    private static bool IsReceived(SqliteConnection connection, string receiptId, string? sourceRef)
+    {
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT EXISTS(SELECT 1 FROM batch_inbound_receipts WHERE receipt_id=$id)";
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM batch_inbound_receipts WHERE receipt_id=$id) " +
+                              "OR EXISTS(SELECT 1 FROM stock_movements WHERE source_ref=$source)";
         command.Parameters.AddWithValue("$id", receiptId);
+        command.Parameters.AddWithValue("$source", (object?)sourceRef ?? DBNull.Value);
         return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture) != 0;
     }
 
@@ -49,15 +58,11 @@ internal sealed class InventoryBatchWriter
             var skipped = 0;
             foreach (var line in request.Lines)
             {
-                using (var receipt = connection.CreateCommand())
+                var sourceRef = BatchOrderSource.FromOrder(line.ReceiptId, line.Raw);
+                if (IsReceived(connection, line.ReceiptId, sourceRef))
                 {
-                    receipt.CommandText = "SELECT EXISTS(SELECT 1 FROM batch_inbound_receipts WHERE receipt_id=$id)";
-                    receipt.Parameters.AddWithValue("$id", line.ReceiptId);
-                    if (Convert.ToInt64(receipt.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
-                    {
-                        skipped++;
-                        continue;
-                    }
+                    skipped++;
+                    continue;
                 }
                 using (var location = connection.CreateCommand())
                 {
@@ -131,15 +136,16 @@ internal sealed class InventoryBatchWriter
                     movement.CommandText = """
                         INSERT INTO stock_movements(
                             id, component_id, movement_type, quantity, reason, note,
-                            happened_at, updated_at, deleted, location_id, destination_location_id
+                            happened_at, updated_at, deleted, location_id, destination_location_id, source_ref
                         ) VALUES($id, $component, 'inbound', $quantity, '批量嘉立创入库', '',
-                            $at, $at, 0, $location, NULL)
+                            $at, $at, 0, $location, NULL, $source)
                         """;
                     movement.Parameters.AddWithValue("$id", movementId);
                     movement.Parameters.AddWithValue("$component", componentId);
                     movement.Parameters.AddWithValue("$quantity", line.Quantity);
                     movement.Parameters.AddWithValue("$at", at);
                     movement.Parameters.AddWithValue("$location", line.LocationId);
+                    movement.Parameters.AddWithValue("$source", (object?)sourceRef ?? DBNull.Value);
                     movement.ExecuteNonQuery();
                 }
                 SetCost(connection, componentId, average, movementId, purchaseAmount, purchaseAmount);

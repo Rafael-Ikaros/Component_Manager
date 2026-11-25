@@ -1,12 +1,15 @@
 # Windows 客户端
 
+**本目录已停止维护。** 自 2026-11-25 起，仓库不再运行 Windows CI 测试、构建或打包，不再发布 Windows 安装包，版本号也不再随 Android、Web 和服务端更新。
+源码、现有本地数据和历史 Release 附件保留；后续 Windows 功能计划集成到贴片机上位机项目。以下内容仅供查阅历史实现和按需本地构建，不代表持续支持承诺。
+
 本目录是 WinUI 3 桌面客户端，以本机 SQLite 管理库存，可选连接自托管服务同步。
 库存、导入编辑、库位、出入库、BOM 项目用料与同步按模块维护；职责见
 [客户端架构](../docs/architecture.md#客户端库存编辑与恢复)，用户操作见[使用指南](../docs/README.md)。
 
 在库存中打开“批量嘉立创入库”，可使用扫码枪或导入立创商城 `.xls` 物料明细对账单。项目用料可从侧栏直接打开，支持 CSV / XLSX BOM、库存匹配、预设和领料复核。
 
-## 构建与分发
+## 历史实现的本地构建
 
 使用 Windows、符合项目目标的 .NET SDK 及 WinUI 构建工具。当前目标框架以
 `ComponentVault.WinUI/ComponentVault.WinUI.csproj` 为准。
@@ -18,7 +21,7 @@ dotnet build windows-client\ComponentVault.WinUI\ComponentVault.WinUI.csproj
 dotnet publish windows-client\ComponentVault.WinUI\ComponentVault.WinUI.csproj -c Release /p:PublishProfile=win-x64.pubxml
 ```
 
-分发产物是自包含 x64 ZIP，解压完整目录后运行 `ComponentVault.WinUI.exe`，不分发 MSIX。
+历史分发产物是自包含 x64 ZIP，解压完整目录后运行 `ComponentVault.WinUI.exe`，不分发 MSIX。
 更新时关闭旧应用、解压新版本并保留 `%LOCALAPPDATA%\ComponentVault`，不删除业务数据库。
 启动失败时查看 `%LOCALAPPDATA%\ComponentVault\logs\startup.log`。
 安装、更新与旧 MSIX 迁移见[应用更新](../docs/app-updates.md)。

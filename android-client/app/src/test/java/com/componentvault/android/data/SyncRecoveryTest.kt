@@ -297,6 +297,51 @@ class SyncRecoveryTest {
         }
     }
 
+    @Test fun duplicateOrderReviewArchivesOnlyAProvenDuplicate() {
+        val helper = InventoryDatabaseHelper(context)
+        val service = InventorySyncService(context, helper, preferences, Any())
+        val replay = InventoryConflictReplay(context, service)
+        val writer = InventoryWriteService(context, helper, InventoryImportCatalog(context, helper, preferences, service))
+        SQLiteDatabase.create(null).use { db ->
+            helper.onCreate(db)
+            ensureStorageLocation(db, "A", inventoryTime)
+            val source = "lcsc-order:v1:" + "a".repeat(64)
+            val base = "2026-10-22T01:00:00Z"
+            val server = "2026-10-22T03:00:00Z"
+            db.execSQL("INSERT INTO components(id,sku,name,category,package_name,location,quantity,min_stock,updated_at,base_updated_at,inventory_unit_cost) " +
+                "VALUES('part','C100','part','category','0603','A',20,0,?,?,'2.5')", arrayOf(inventoryTime, base))
+            setAllocationQuantity(db, "part", "A", 20)
+            db.execSQL("INSERT INTO stock_movements(id,component_id,movement_type,quantity,reason,happened_at,updated_at,location_id,purchase_amount,cost_amount,source_ref) " +
+                "VALUES('local-order','part','inbound',10,'order',?,?,'A','30','30',?)", arrayOf(inventoryTime, inventoryTime, source))
+            enqueueEntity(db, "component", "part", inventoryTime)
+            enqueueEntity(db, "stock_movement", "local-order", inventoryTime)
+            val remote = remoteComponent("part", "C100", 20).put("updated_at", server).put("inventory_unit_cost", "2.5")
+            val accepted = service.getMovementJson(db, "local-order")!!.put("id", "server-order")
+                .put("happened_at", server).put("updated_at", server)
+            val snapshot = JSONObject(pullSnapshot(remote)).put("order_source_protocol", 1)
+                .put("storage_locations", JSONArray().put(JSONObject().put("id", "A").put("name", "A").put("deleted", false)))
+                .put("stock_movements", JSONArray().put(accepted))
+            val oldServer = JSONObject(snapshot.toString()).apply { remove("order_source_protocol"); remove("stock_movements") }
+            assertFalse(replay.review(db, oldServer).components.single().acceptServerDuplicate)
+            assertTrue(replay.review(db, oldServer).components.single().blockedReason != null)
+            val preview = replay.review(db, snapshot).components.single()
+            assertTrue(preview.acceptServerDuplicate)
+            enqueueEntity(db, "component", "unrelated-edit", inventoryTime)
+            assertTrue(replay.review(db, snapshot).components.single().blockedReason != null)
+            assertTrue(runCatching { replay.replay(db, snapshot, preview, emptyList(), writer) }.isFailure)
+            assertEquals(3, scalar(db, "SELECT COUNT(*) FROM sync_queue"))
+            db.execSQL("DELETE FROM sync_queue WHERE entity_id='unrelated-edit'")
+            assertEquals(null, replay.replay(db, snapshot, preview, emptyList(), writer))
+            assertEquals(0, scalar(db, "SELECT COUNT(*) FROM sync_queue"))
+            assertEquals(1, scalar(db, "SELECT COUNT(*) FROM inventory_replay_history"))
+            assertEquals(1, scalar(db, "SELECT COUNT(*) FROM stock_movements"))
+            assertEquals(source, service.getMovementJson(db, "server-order")?.getString("source_ref"))
+            assertEquals(20, service.getComponentJson(db, "part")?.getInt("quantity"))
+            assertEquals("2.5", service.getComponentJson(db, "part")?.getString("inventory_unit_cost"))
+        }
+        helper.close()
+    }
+
     private fun withDatabase(block: (SQLiteDatabase) -> Unit) {
         val helper = InventoryDatabaseHelper(context)
         try { block(helper.writableDatabase) } finally { helper.close() }

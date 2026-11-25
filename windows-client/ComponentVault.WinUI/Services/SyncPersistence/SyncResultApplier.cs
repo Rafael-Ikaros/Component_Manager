@@ -342,7 +342,8 @@ internal sealed class SyncResultApplier(InventoryDatabase database)
         command.Parameters.AddWithValue("$destination_location_id", (object?)movement.DestinationLocationId ?? DBNull.Value);
         command.ExecuteNonQuery();
         using var costs = connection.CreateCommand();
-        costs.CommandText = "UPDATE stock_movements SET purchase_amount=$purchase,cost_amount=$cost WHERE id=$id";
+        costs.CommandText = "UPDATE stock_movements SET purchase_amount=$purchase,cost_amount=$cost,source_ref=COALESCE($source,source_ref) WHERE id=$id";
+        costs.Parameters.AddWithValue("$source", (object?)movement.SourceRef ?? DBNull.Value);
         costs.Parameters.AddWithValue("$purchase", (object?)movement.PurchaseAmount ?? DBNull.Value);
         costs.Parameters.AddWithValue("$cost", (object?)movement.CostAmount ?? DBNull.Value);
         costs.Parameters.AddWithValue("$id", movement.Id);

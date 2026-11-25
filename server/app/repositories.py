@@ -325,8 +325,8 @@ def _upsert_stock_movement(
             sync_revision,
         ),
     )
-    connection.execute("UPDATE stock_movements SET purchase_amount = ?, cost_amount = ? WHERE id = ?",
-                       (stock_movement.purchase_amount, stock_movement.cost_amount, stock_movement.id))
+    connection.execute("UPDATE stock_movements SET purchase_amount = ?, cost_amount = ?, source_ref = ? WHERE id = ?",
+                       (stock_movement.purchase_amount, stock_movement.cost_amount, stock_movement.source_ref, stock_movement.id))
     connection.execute(
         "UPDATE stock_movements SET location_id = ?, destination_location_id = ? "
         "WHERE id = ?",
@@ -374,6 +374,7 @@ def _row_to_stock_movement(row: sqlite3.Row) -> StockMovementPayload:
             "destination_location_id": row["destination_location_id"],
             "purchase_amount": row["purchase_amount"],
             "cost_amount": row["cost_amount"],
+            "source_ref": row["source_ref"],
         }
     )
 

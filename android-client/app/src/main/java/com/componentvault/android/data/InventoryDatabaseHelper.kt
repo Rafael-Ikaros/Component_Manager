@@ -57,7 +57,8 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
                 location_id TEXT,
                 destination_location_id TEXT,
                 purchase_amount TEXT,
-                cost_amount TEXT
+                cost_amount TEXT,
+                source_ref TEXT
             )
             """.trimIndent(),
         )
@@ -78,6 +79,7 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
         createBackupTables(db)
         createBatchJlcTables(db)
         createInventoryReplayHistory(db)
+        createOrderSourceIndex(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -119,6 +121,14 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
             db.execSQL("ALTER TABLE stock_movements ADD COLUMN cost_amount TEXT")
         }
         if (oldVersion < 7 && newVersion >= 7) createInventoryReplayHistory(db)
+        if (oldVersion < 8 && newVersion >= 8) {
+            db.execSQL("ALTER TABLE stock_movements ADD COLUMN source_ref TEXT")
+            createOrderSourceIndex(db)
+        }
+    }
+
+    private fun createOrderSourceIndex(db: SQLiteDatabase) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_movements_source_ref ON stock_movements(source_ref) WHERE source_ref IS NOT NULL")
     }
 
     private fun createInventoryReplayHistory(db: SQLiteDatabase) {
@@ -278,6 +288,6 @@ class InventoryDatabaseHelper(private val appContext: Context) : SQLiteOpenHelpe
 
     private companion object {
         const val DATABASE_NAME = "component-vault.db"
-        const val DATABASE_VERSION = 7
+        const val DATABASE_VERSION = 8
     }
 }

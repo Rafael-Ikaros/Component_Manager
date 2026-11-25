@@ -218,7 +218,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (result.IsSuccess) { Refresh(); _sync.ScheduleAutoSync(); }
         return result;
     }
-    public bool IsBatchReceiptCommitted(string receiptId) => _store.IsBatchReceiptCommitted(receiptId);
+    public bool IsBatchReceiptCommitted(string receiptId, string raw = "") => _store.IsBatchReceiptCommitted(receiptId, raw);
     public OperationResult CommitBatchInbound(BatchInboundCommitRequest request)
     {
         var result = _store.CommitBatchInbound(request);

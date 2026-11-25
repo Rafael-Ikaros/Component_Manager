@@ -333,6 +333,27 @@ public sealed class SyncApiClientTests
         ],handler.Requests);
     }
 
+    [Fact]
+    public async Task OrderSourceCapability_BlocksOnlyKeyedPushes()
+    {
+        var movement = new SyncStockMovementDto
+        {
+            Id = "synthetic-order", ComponentId = "part", MovementType = "inbound", Quantity = 1,
+            Reason = "Test", HappenedAt = "2026-09-16T00:00:00Z", UpdatedAt = "2026-09-16T00:00:00Z",
+            Deleted = false, SourceRef = "lcsc-order:v1:" + new string('a', 64),
+        };
+        var handler = new RecordingHandler((request, _) => Task.FromResult(SuccessFor(request)));
+        var client = CreateClient(handler);
+        var rejected = await client.RunSyncAsync(Settings(), new SyncPushRequest
+        {
+            DeviceId = "test-device", StockMovements = [movement],
+        }, null);
+        Assert.False(rejected.IsSuccess);
+        Assert.Contains("订单来源去重", rejected.Message);
+        Assert.Equal(["POST https://primary.example/auth/ping", "GET https://primary.example/auth/me"], handler.Requests);
+        Assert.True((await client.RunSyncAsync(Settings(), EmptyPush(), null)).IsSuccess);
+    }
+
     private static SyncApiClient CreateClient(HttpMessageHandler handler) =>
         new(new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) });
 

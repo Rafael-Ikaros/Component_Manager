@@ -270,6 +270,8 @@ public sealed class JlcOrderImportTests(ITestOutputHelper output) : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT quantity FROM components WHERE sku='C12345'";
         Assert.Equal(10L, command.ExecuteScalar());
+        command.CommandText = "SELECT source_ref FROM stock_movements";
+        Assert.Equal("lcsc-order:v1:" + original.Raw["lcsc-order:order-".Length..], command.ExecuteScalar());
         command.CommandText = "SELECT COUNT(*) FROM stock_movements";
         Assert.Equal(1L, command.ExecuteScalar());
     }

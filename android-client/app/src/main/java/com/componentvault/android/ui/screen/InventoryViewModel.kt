@@ -817,9 +817,11 @@ class InventoryViewModel(
                 val review = conflictReviewUiState.review
                 conflictReviewUiState = conflictReviewUiState.copy(
                     review = review?.copy(components = review.components.filterNot { it.id == component.id }),
-                    message = context.getString(R.string.sync_conflict_saved_pending),
+                    message = if (replay.savedVersion == null) replay.operation.message
+                        else context.getString(R.string.sync_conflict_saved_pending),
                 )
-                val result = repository.syncReviewedInventory(component.id, checkNotNull(replay.savedVersion))
+                val version = replay.savedVersion ?: return@launch
+                val result = repository.syncReviewedInventory(component.id, version)
                 conflictReviewUiState = conflictReviewUiState.copy(message = result.message, failed = !result.isSuccess)
             } catch (error: CancellationException) {
                 throw error

@@ -192,7 +192,7 @@ class BatchJlcDatabaseTest {
         }
         assertEquals(10, number("SELECT quantity FROM components WHERE sku='C70565'"))
         assertEquals(10, number("SELECT SUM(quantity) FROM component_allocations"))
-        assertEquals(7, number("PRAGMA user_version"))
+        assertEquals(8, number("PRAGMA user_version"))
         assertEquals(1, number("SELECT COUNT(*) FROM components WHERE sku='C70565' AND inventory_unit_cost IS NULL"))
         assertEquals(1, number("SELECT COUNT(*) FROM stock_movements WHERE id='old-movement' AND quantity=10 AND purchase_amount IS NULL AND cost_amount IS NULL"))
 
@@ -208,12 +208,73 @@ class BatchJlcDatabaseTest {
 
     @Test
     fun orderReceiptsPreventInboundAcrossDifferentImportSessions() = runBlocking {
-        val order = row("order", "C70565", "5", "B").copy(id = "order-synthetic-order-sku")
+        val digest = "b".repeat(64)
+        val source = "lcsc-order:v1:$digest"
+        val order = row("order", "C90001", "5", "B").copy(id = "order-$digest", purchaseAmount = "12.5")
         assertTrue(repository.commitBatchJlc("first-import", listOf(order)).isSuccess)
+        val helper = InventoryDatabaseHelper(context)
+        try {
+            val service = InventorySyncService(context, helper, context.getSharedPreferences("component_vault_sync", 0), Any())
+            helper.readableDatabase.use { db ->
+                val movementId = db.rawQuery("SELECT id,source_ref FROM stock_movements", null).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(source, it.getString(1))
+                    it.getString(0)
+                }
+                val movement = checkNotNull(service.getMovementJson(db, movementId))
+                assertEquals(source, movement.getString("source_ref"))
+                assertEquals("12.5", movement.getString("purchase_amount"))
+            }
+        } finally { helper.close() }
         assertTrue(order.id in repository.loadBatchJlcReceipts("another-import"))
         assertTrue(repository.commitBatchJlc("another-import", listOf(order)).isSuccess)
-        assertEquals(15, number("SELECT quantity FROM components WHERE sku='C70565'"))
-        assertEquals(1, number("SELECT COUNT(*) FROM stock_movements"))
+        val component = repository.loadComponents().single { it.sku == order.sku }
+        assertEquals(5, component.quantity)
+        assertEquals("2.5", component.inventoryUnitCost)
+        assertEquals("12.5", repository.loadMovements().single().purchaseAmount)
+        assertEquals(1, number("SELECT COUNT(*) FROM batch_jlc_receipts"))
+    }
+
+    @Test fun pulledOrderMovementPreventsReceivingTheSameSource() = runBlocking {
+        val helper = InventoryDatabaseHelper(context)
+        val settings = context.getSharedPreferences("component_vault_sync", 0)
+        val service = InventorySyncService(context, helper, settings, Any())
+        val digest = "a".repeat(64)
+        val order = row("order", "C70565", "5", "B").copy(id = "order-$digest", purchaseAmount = "0")
+        val component = repository.loadComponents().single()
+        try {
+            helper.writableDatabase.use { db ->
+                val movement = org.json.JSONObject().put("id", "remote-order").put("component_id", component.id)
+                    .put("movement_type", "inbound").put("quantity", 5).put("reason", "order")
+                    .put("location_id", "B").put("deleted", false).put("happened_at", component.updatedAt)
+                    .put("updated_at", component.updatedAt).put("purchase_amount", "0").put("cost_amount", "0")
+                    .put("source_ref", "lcsc-order:v1:$digest")
+                service.upsertRemoteMovement(db, movement)
+                assertEquals("lcsc-order:v1:$digest", service.getMovementJson(db, "remote-order")?.getString("source_ref"))
+            }
+            assertTrue(order.id in repository.loadBatchJlcReceipts("new-import"))
+            assertTrue(repository.commitBatchJlc("new-import", listOf(order)).isSuccess)
+            assertEquals(10, number("SELECT quantity FROM components WHERE sku='C70565'"))
+            assertEquals(1, number("SELECT COUNT(*) FROM stock_movements"))
+            assertEquals(0, number("SELECT COUNT(*) FROM batch_jlc_receipts"))
+        } finally { helper.close() }
+    }
+
+    @Test fun versionSevenSourceMigrationPreservesLegacyHistory() {
+        val helper = InventoryDatabaseHelper(context)
+        SQLiteDatabase.create(null).use { db ->
+            db.execSQL("CREATE TABLE stock_movements(id TEXT PRIMARY KEY, quantity INTEGER, purchase_amount TEXT, cost_amount TEXT)")
+            db.execSQL("INSERT INTO stock_movements VALUES('legacy',3,'1.5','1.5')")
+            helper.onUpgrade(db, 7, 8)
+            db.rawQuery("SELECT quantity,purchase_amount,cost_amount,source_ref FROM stock_movements", null).use {
+                assertTrue(it.moveToFirst())
+                assertEquals(3, it.getInt(0))
+                assertEquals("1.5", it.getString(1))
+                assertEquals("1.5", it.getString(2))
+                assertTrue(it.isNull(3))
+            }
+        }
+        helper.close()
     }
 
     @Test

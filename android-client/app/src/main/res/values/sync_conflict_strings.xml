@@ -29,4 +29,10 @@
     <string name="sync_conflict_confirm_action">Apply reviewed movements</string>
     <string name="sync_conflict_confirm_commit">Confirm and sync</string>
     <string name="sync_conflict_confirm_description">Apply the %2$d reviewed movements for %1$s using the server stock shown on this page? The app checks the server version again before saving.</string>
+    <string name="sync_order_source_upgrade">Upgrade the server to sync orders with source deduplication. Local data and pending changes were kept.</string>
+    <string name="sync_duplicate_order_review">This order item was already received. Refresh the sync conflict review before retrying.</string>
+    <string name="sync_duplicate_order_mixed">The server already has an order item from this batch, but the local changes cannot be safely reconciled. Pending records were kept for review.</string>
+    <string name="sync_duplicate_order_accept_server">Keep the server receipt</string>
+    <string name="sync_duplicate_order_accept_explanation">Archive the local duplicate and retain the server’s stock and receipt? No new stock will be uploaded.</string>
+    <string name="sync_duplicate_order_reconciled">Archived the local duplicate and kept the server receipt. Use Sync now to refresh inventory.</string>
 </resources>

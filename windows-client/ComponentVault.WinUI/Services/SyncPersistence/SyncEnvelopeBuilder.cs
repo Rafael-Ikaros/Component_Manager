@@ -191,7 +191,7 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
                 updated_at,
                 deleted,
                 location_id,
-                destination_location_id, purchase_amount, cost_amount
+                destination_location_id, purchase_amount, cost_amount, source_ref
             FROM stock_movements
             WHERE id = $id
             """;
@@ -218,6 +218,7 @@ internal sealed class SyncEnvelopeBuilder(InventoryDatabase database, SyncSettin
             DestinationLocationId = reader.IsDBNull(10) ? null : reader.GetString(10),
             PurchaseAmount = reader.IsDBNull(11) ? null : reader.GetString(11),
             CostAmount = reader.IsDBNull(12) ? null : reader.GetString(12),
+            SourceRef = reader.IsDBNull(13) ? null : reader.GetString(13),
         };
     }
 

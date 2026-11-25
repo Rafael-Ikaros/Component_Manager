@@ -98,6 +98,13 @@ def save_allocations(connection: sqlite3.Connection, component: ComponentPayload
     connection.execute("UPDATE components SET inventory_managed = 1 WHERE id = ?", (component.id,))
 
 
+class DuplicateOrderSource(ValueError):
+    def __init__(self, source_ref: str, movement_id: str):
+        super().__init__("This order item has already been received. No inventory changes were uploaded.")
+        self.detail = {"code": "duplicate_order_source", "message": str(self),
+                       "source_ref": source_ref, "movement_id": movement_id}
+
+
 def validate_inventory_push(connection: sqlite3.Connection, payload: PushRequest) -> None:
     for component in payload.components:
         existing = connection.execute("SELECT * FROM components WHERE id = ?", (component.id,)).fetchone()
@@ -126,7 +133,30 @@ def validate_inventory_push(connection: sqlite3.Connection, payload: PushRequest
     elif any(c.allocations is None for c in payload.components):
         raise ValueError("Inventory protocol 1 requires a complete allocation snapshot.")
 
-    component_ids = {c.id for c in payload.components}
+    components = {c.id: c for c in payload.components}
+    sources: dict[str, str] = {}
+    for movement in payload.stock_movements:
+        stored = connection.execute("SELECT source_ref FROM stock_movements WHERE id = ?", (movement.id,)).fetchone()
+        previous = stored["source_ref"] if stored else None
+        if "source_ref" not in movement.model_fields_set:
+            movement.source_ref = previous
+        elif stored and movement.source_ref != previous:
+            raise ValueError("An existing inventory movement's order source cannot be changed.")
+        source = movement.source_ref
+        if source is None:
+            continue
+        if movement.movement_type != "inbound" or movement.quantity <= 0:
+            raise ValueError("An order source requires a positive inbound movement.")
+        if not stored and (payload.order_source_protocol != 1 or payload.inventory_protocol != 1):
+            raise ValueError("Order sources require order_source_protocol=1 and inventory_protocol=1.")
+        if source in sources:
+            raise DuplicateOrderSource(source, sources[source])
+        sources[source] = movement.id
+        owner = connection.execute("SELECT id FROM stock_movements WHERE source_ref = ?", (source,)).fetchone()
+        if owner and owner["id"] != movement.id:
+            raise DuplicateOrderSource(source, owner["id"])
+
+    checked_retries: set[str] = set()
     location_ids = {row[0] for row in connection.execute("SELECT id FROM storage_locations")}
     location_ids.update(item.id for item in payload.storage_locations)
     for movement in payload.stock_movements:
@@ -145,8 +175,22 @@ def validate_inventory_push(connection: sqlite3.Connection, payload: PushRequest
             for code in (movement.location_id, movement.destination_location_id)
         ):
             raise ValueError("A movement references an unknown storage location.")
-        if payload.inventory_protocol == 1 and not existing and movement.component_id not in component_ids:
-            raise ValueError("A new inventory movement requires its component snapshot in the same push.")
+        if payload.inventory_protocol == 1 and not existing:
+            component = components.get(movement.component_id)
+            if component is None:
+                raise ValueError("A new inventory movement requires its component snapshot in the same push.")
+            # A changed snapshot can legitimately contain a net-zero batch. An exact
+            # retry may also bring back older, unkeyed history (e.g. Excel recovery),
+            # but must not acquire another stock change at its own version.
+            historical = (movement.source_ref is None and component.base_updated_at is not None
+                          and _time(component.base_updated_at) == _time(component.updated_at)
+                          and _time(movement.updated_at) < _time(component.updated_at))
+            if (payload.order_source_protocol == 1 and movement.quantity != 0 and not historical
+                    and component.id not in checked_retries):
+                current = connection.execute("SELECT * FROM components WHERE id = ?", (component.id,)).fetchone()
+                if check_component_version(connection, current, component):
+                    raise ValueError("A changed inventory snapshot is required for a new stock movement; refresh and review before retrying.")
+                checked_retries.add(component.id)
         if existing and payload.inventory_protocol == 1:
             for key, value in movement.model_dump().items():
                 equal = (

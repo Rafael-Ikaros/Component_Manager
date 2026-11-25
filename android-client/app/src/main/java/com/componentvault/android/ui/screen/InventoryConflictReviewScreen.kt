@@ -113,7 +113,9 @@ internal fun InventoryConflictReviewContent(
             next in 0L..Int.MAX_VALUE.toLong() && projectedTotal in 0L..Int.MAX_VALUE.toLong()
         }
     }
-    val canSubmit = !busy && component?.blockedReason == null && edits.isNotEmpty() && fits
+    val reconcileDuplicate = component?.acceptServerDuplicate == true
+    val canSubmit = !busy && component?.blockedReason == null && (reconcileDuplicate || edits.isNotEmpty() && fits)
+    val confirmAction = if (reconcileDuplicate) R.string.sync_duplicate_order_accept_server else R.string.sync_conflict_confirm_action
 
     SecondaryPageScaffold(
         title = stringResource(R.string.sync_conflict_review_title),
@@ -163,7 +165,11 @@ internal fun InventoryConflictReviewContent(
                         component.blockedReason?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
                 }
-                if (component.blockedReason == null && component.movements.isNotEmpty()) {
+                if (reconcileDuplicate) {
+                    item(key = "duplicate-confirm") {
+                        Button(onClick = { confirm = true }, enabled = canSubmit) { Text(stringResource(confirmAction)) }
+                    }
+                } else if (component.blockedReason == null && component.movements.isNotEmpty()) {
                     fun editMovement(index: Int, entry: MovementFields) {
                         draft = MovementReviewDraft(
                             component.id, component.serverVersion, component.localVersion,
@@ -235,13 +241,14 @@ internal fun InventoryConflictReviewContent(
     if (confirm && component != null) {
         AlertDialog(
             onDismissRequest = { confirm = false },
-            title = { Text(stringResource(R.string.sync_conflict_confirm_action)) },
-            text = { Text(stringResource(R.string.sync_conflict_confirm_description, component.sku, edits.size)) },
+            title = { Text(stringResource(confirmAction)) },
+            text = { Text(if (reconcileDuplicate) stringResource(R.string.sync_duplicate_order_accept_explanation)
+                else stringResource(R.string.sync_conflict_confirm_description, component.sku, edits.size)) },
             confirmButton = {
                 TextButton(
                     enabled = canSubmit,
-                    onClick = { confirm = false; onReplay(component, edits) },
-                ) { Text(stringResource(R.string.sync_conflict_confirm_commit)) }
+                    onClick = { confirm = false; onReplay(component, if (reconcileDuplicate) emptyList() else edits) },
+                ) { Text(stringResource(if (reconcileDuplicate) confirmAction else R.string.sync_conflict_confirm_commit)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.action_cancel)) }
