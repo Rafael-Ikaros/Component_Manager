@@ -2,7 +2,7 @@
 
 ## 部署者入口
 
-- **[群晖界面直接部署 API 和 Web](docker-manual.md)**。按 DSM 向导创建两个独立容器，包含备份、替换和启动排障步骤。
+- **[群晖界面部署图文教程](docker-manual.md)**。跟随 DSM 实机截图创建两个独立容器，包含备份、替换和启动排障步骤。
 - [可选的 Compose 部署](docker-quickstart.md)。包含端口、挂载、首次配置和账户密钥说明。
 - [切换正式版与开发版](docker-channels.md) · [可选的网页一键更新](server-web-update.md)。
 

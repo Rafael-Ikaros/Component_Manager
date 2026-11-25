@@ -2,7 +2,7 @@
 
 在群晖 Container Manager 中分别创建 API 和 Web 容器，即可使用库存、账户、同步、资料补全和版本检查。整个过程在 DSM 界面完成，无需项目 YAML、`.env`、SSH 或 Updater。
 
-**2026-11-25 群晖实测（`linux/amd64`）。** 从 Docker Hub 重新下载 `dev` 和 `web-dev`，使用 DSM 向导创建独立容器并沿用原 `/data` 挂载。API 返回 `0.7.9-dev.29`，Web 可用原管理员密钥登录，原有账户、库存和 Web 配置可用，开发渠道检查更新正常。
+本文操作截图取自实际群晖界面，使用 `0.7.9-dev.29` 的配套镜像。截图中的版本、容器名称、目录和 IP 是本次操作示例；安装时按下面的说明替换为自己的设置。拓扑与备份流程图单独标为示意图。
 
 **已有部署请先备份并记录原 `/data` 映射。** 替换 API 时沿用原数据来源和生效的环境变量。新建 `data` 目录仅适用于新安装。[备份与替换步骤](#5-手动更新或切换渠道)
 
@@ -16,38 +16,44 @@
 | 开发版 | `rafaelikaros/component_manager:dev` | `rafaelikaros/component_manager:web-dev` |
 
 1. 打开 Container Manager 的「镜像仓库」（旧版称「注册表」），搜索 `rafaelikaros/component_manager`，下载表中同一行的两个标签。
-2. 在侧栏「映像」确认下载完成。选中要部署的镜像，点击「运行」打开创建容器向导。先创建 API，再对 Web 重复操作。[群晖容器向导](https://kb.synology.com/en-my/DSM/help/ContainerManager/docker_container?version=7)
+2. 在侧栏「映像」确认两个镜像都已下载。下图使用固定版本 `0.7.9-dev.29` 和 `web-0.7.9-dev.29` 举例，按上表选择你要部署的配套标签即可。
 
-浮动标签下载后，现有容器仍使用创建时的镜像。若要固定版本，选择实际存在且版本号相同的 API、`web-` 标签，例如 `0.7.9-dev.29` 与 `web-0.7.9-dev.29`。[GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases) · [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)
+   ![DSM 映像列表显示已下载的同版本 API 和 Web 镜像。](images/docker-manual/01-images.jpg)
+
+若要固定版本，选择实际存在且版本号相同的 API、`web-` 标签。下载新镜像后，现有容器仍使用创建时的镜像。[GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases) · [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)
 
 ## 2. 创建 API 容器
 
-新安装先在 File Station 创建持久化目录，例如共享文件夹 `docker` 下的 `/docker/component-vault/data`。已有部署使用原目录。
+新安装先在 File Station 创建持久化目录，例如 `/docker/component-vault/data`，目录名可自定。已有部署沿用原数据目录。选中 API 镜像，点击「运行」打开创建容器向导。[群晖容器向导](https://kb.synology.com/en-my/DSM/help/ContainerManager/docker_container?version=7)
 
-1. **常规设置。** 容器名可填 `component-vault-api`，按需开启自动重启，取消勾选「通过 Web Station 设置网页门户」。
-2. **高级设置。** 将宿主 `8787` 映射到容器 `8787`（TCP），把持久化目录读写挂载到 `/data`。使用普通 `bridge` 网络，保持高权限执行关闭。新安装保留镜像默认环境变量，可稍后在 `/setup` 保存管理员密钥，无需添加 `API_TOKEN`。已有部署保留当前生效的自定义变量。
-3. **执行命令与摘要。** 启动命令留空，使用镜像默认的 `uvicorn` 命令。核对端口、原 `/data` 来源和下表设置，完成后运行容器。
+1. **常规设置。** 容器名可填 `component-vault-api`，截图中的 `component-vault-api-example` 是演示名称。自动重启按需开启。等「通过 Web Station 设置网页门户」出现后，确认未勾选，再点「下一步」。
+
+   ![DSM API 常规设置页，演示容器已启用自动重启，Web Station 网页门户未勾选。](images/docker-manual/02-api-general.jpg)
+
+2. **高级设置。** 将本地 `8787` 映射到容器 `8787`（TCP）。在「存储空间设置」选中数据目录，将容器路径填为 `/data`，权限选「读写」。新安装保留镜像默认环境变量，稍后在 `/setup` 保存管理员密钥即可。已有部署继续使用生效的自定义配置。
+
+   ![DSM API 高级设置页，TCP 8787 映射到 8787，所选数据目录以读写方式挂载到 /data。](images/docker-manual/03-api-ports-data.jpg)
+
+3. **网络和命令。** 选择 `bridge`，保持高权限执行关闭，命令输入框留空。灰色的 `uvicorn` 是镜像默认命令提示。核对端口和数据目录，完成创建并运行 API。
+
+   ![DSM API 网络与命令设置，网络为 bridge，命令框中的 uvicorn 是默认提示。](images/docker-manual/04-api-command.jpg)
 
 宿主 `8787` 被占用时，可换成其他空闲宿主端口。容器端口保持 `8787`，浏览器和客户端使用新宿主端口。
 
-![API 高级设置示意。TCP 端口 8787 映射至 8787，原数据目录读写挂载到 /data。](images/docker-manual/api-ports-and-data.svg)
-
 ## 3. 创建 Web 容器
 
-1. **常规设置。** 选择配套的 `web-*` 镜像，容器名可填 `component-vault-web`。按需开启自动重启，取消勾选「通过 Web Station 设置网页门户」。
-2. **高级设置。** 共享管理镜像可能预列容器端口 `80` 和 `8790`。普通 Web 只保留宿主 `8081` → 容器 `80`（TCP），移除 `8790` 那一行。存储映射留空，使用普通 `bridge` 网络，保持高权限执行关闭。保留镜像继承的 `PATH`、`NGINX` 相关变量等默认值，无需新增环境变量。
-3. **执行命令与摘要。** 启动命令输入框留空，使用镜像默认值。共享管理镜像的系统默认 Entrypoint 为 `/usr/local/bin/componentvault-entrypoint`，摘要显示「命令（系统默认） `web`」。入口路径由镜像提供，命令框既不填入口路径，也不填 `updater`。旧的 Web 专用镜像显示它自己的默认命令。
-4. **运行。** 核对下表，完成后运行。先访问 `http://NAS地址:8081/`，确认能显示登录页。这一步只访问 Web 容器，不需要 API 先完成配置。
+1. **常规设置。** 选中配套的 `web-*` 镜像，点击「运行」。容器名可填 `component-vault-web`，自动重启按需开启，保持「通过 Web Station 设置网页门户」未勾选。
+2. **高级设置。** 只保留本地 `8081` → 容器 `80`（TCP）。若列表预填了 `8790`，删掉那一行。Web 的存储映射留空，API 的 `/data` 只挂在 API 容器。保留镜像继承的 `PATH`、NGINX 等默认环境变量。
+
+   ![DSM Web 高级设置页，仅保留 TCP 8081 到 80，没有 8790 行和存储挂载。](images/docker-manual/05-web-ports.jpg)
+
+3. **网络和命令。** 选择 `bridge`，保持高权限执行关闭。共享管理镜像的 Entrypoint `/usr/local/bin/componentvault-entrypoint` 由镜像提供。命令框中的灰色 `web` 是默认提示，输入框保持空白，不用手填入口路径或 `updater`。旧版 Web 专用镜像会显示自己的默认命令。按下表核对后完成创建并运行 Web。
+
+   ![DSM Web 网络与命令设置，bridge 网络下保留镜像入口和灰色默认命令 web。](images/docker-manual/06-web-command.jpg)
 
 宿主 `8081` 被占用时，可换成其他空闲宿主端口。容器端口保持 `80`，Web 访问地址和 API 允许的 Web 来源都使用新宿主端口。
 
-![Web 高级设置示意。保留 TCP 8081 到 80 的映射，删除 8790 行，存储映射留空。](images/docker-manual/web-port-and-mounts.svg)
-
 ### 创建前核对
-
-若「通过 Web Station 设置网页门户」稍后才显示，请在点击「下一步」前确认该选项未勾选。两个容器的命令输入框都留空。
-
-![默认启动设置示意。关闭 Web Station 网页门户，输入框留空。API 默认运行 uvicorn，共享 Web 镜像默认运行 web。](images/docker-manual/default-startup.svg)
 
 | 设置 | API 容器 | Web 容器 |
 | --- | --- | --- |
@@ -58,17 +64,27 @@
 | 启动命令 | 留空，使用默认 `uvicorn` 命令 | 留空，使用默认 Web 命令 |
 | 网络与权限 | `bridge`，关闭高权限和 Web Station 网页门户 | `bridge`，关闭高权限和 Web Station 网页门户 |
 
-两个容器都无需挂载 Docker socket。Web 页面由浏览器访问 API，登录时填写浏览器能访问的 NAS 地址和 API 宿主端口。
+两个容器都无需挂载 Docker socket。在 Container Manager 的「容器」确认 API 和 Web 正在运行，「项目」一栏为 `-`。
+
+![DSM 容器列表中，两个独立容器均显示运行状态，项目一栏为短横线。](images/docker-manual/07-running-containers.jpg)
+
+先访问 `http://NAS地址:8081/`，确认能打开 Web 登录页。再访问 `http://NAS地址:8787/health`，确认 API 已启动。
 
 ## 4. 在网页保存配置
 
-以下 `NAS地址` 换成浏览器实际访问 NAS 的 IP 或主机名；使用自己选择的本地端口。
+将 `NAS地址` 换成你实际使用的 NAS IP 或主机名。截图中的地址仅供参照，端口按你在向导里设置的本地端口填写。
 
-1. 打开 `http://NAS地址:8787/setup`。新安装生成或填写管理员访问令牌并妥善保存。已有部署使用现行管理员密钥。
-2. 将管理 Web 的允许来源设为 `http://NAS地址:8081`，管理 Web 地址也填写这个地址。如需在网页增删、批量更新库存，启用相应的 Web 库存操作选项。
-3. 保存配置，API 会写入挂载目录中的 `/data/config.json`。已有部署的非空环境变量优先于文件，环境变量已接管的设置应从原部署配置核对。
-4. 打开 `http://NAS地址:8081/`，API 地址填 `http://NAS地址:8787`，使用管理员令牌登录。
-5. 确认库存页和设置页可以正常打开；Android 也填写同一个 API 地址及对应账户密钥。
+1. **设置管理员密钥。** 打开 `http://NAS地址:8787/setup`。新安装在网页生成或填写管理员访问令牌。已配置的部署可沿用原密钥。首次配置无需在容器中新增 `API_TOKEN` 环境变量。
+
+   ![API 首次配置页，管理员访问令牌输入框为空。](images/docker-manual/08-first-setup.jpg)
+
+2. **填写 Web 地址和允许来源。** 例如管理 Web 地址填 `http://NAS地址:8081/`，允许来源填 `http://NAS地址:8081`，末尾不带 `/`。如果需要在网页增删或批量更新库存，再开启 Web 库存操作。点击「保存」后，API 将配置写入 `/data/config.json`，请妥善保管管理员密钥。已有部署如使用非空环境变量覆盖某项设置，以该变量生效值为准。
+
+   ![API 配置页展示 Web 地址、允许来源、未勾选的 Web 库存操作和保存按钮。](images/docker-manual/09-web-config.jpg)
+
+3. **登录 Web。** 打开 `http://NAS地址:8081/`，API 地址填 `http://NAS地址:8787`。登录框里的 `API_TOKEN` 指上一步在 `/setup` 保存的密钥。登录后检查库存页和设置页。Android 使用同一个 API 地址和对应账户密钥。
+
+   ![Web 登录页有 API 地址和密钥输入框，密钥为空。](images/docker-manual/10-web-login.jpg)
 
 Web 与 API 使用相同的 IP 或主机名、相同的 HTTP/HTTPS 协议，端口可以不同。API 允许的 Web 来源填写浏览器实际打开的 Web `协议://主机:端口`。手机和电脑填写能访问的 NAS 地址，`localhost` 指当前设备。通过反向代理访问时按浏览器看到的 Web 来源配置。[环境变量与连接说明](docker-quickstart.md#3-环境变量和网页配置的优先级)
 
@@ -101,7 +117,7 @@ Web 与 API 使用相同的 IP 或主机名、相同的 HTTP/HTTPS 协议，端�
 | 容器启动即退出，日志显示 `exec /usr/local/bin/componentvault-entrypoint: no such file or directory` | 用同一映像新建一个独立的临时 Web 容器，仅映射空闲宿主端口到 `80`，保留镜像默认入口和命令，不挂载目录。对照两者的 Image ID、入口、命令、挂载与日志，记录是否复现。该测试只用 Web，无需操作 API 数据或开启高权限。 |
 | Web 登录页已打开，连接 API 或登录失败 | 先从同一浏览器打开 API 的 `/health`。确认登录页填的是 API 宿主地址，再核对 API 允许来源是否与浏览器打开的 Web 来源完全一致。遇到 CORS 或会话 Cookie 错误时，使用同一主机及协议访问 Web 和 API，并核对当前生效的配置。[连接与 Cookie 说明](docker-quickstart.md#3-环境变量和网页配置的优先级) |
 
-反馈启动问题时，请附上「映像」里的 Image ID（与容器 ID 是两项不同的值）、NAS 架构（如 `amd64` 或 `arm64`）、DSM 版本、容器实际 Entrypoint/Cmd、挂载的容器内目标和原始错误。请遮盖 Token、Cookie 和环境变量里的敏感值，避免发送环境变量或配置文件全文。
+反馈启动问题时，请附上「映像」里的 Image ID（与容器 ID 是两项不同的值）、镜像架构（如 Intel N100 对应 `linux/amd64`）、DSM 版本、容器实际 Entrypoint/Cmd、挂载的容器内目标和原始错误。请遮盖 Token、Cookie 和环境变量里的敏感值，避免发送环境变量或配置文件全文。
 
 ## 6. 网页一键更新是可选项
 

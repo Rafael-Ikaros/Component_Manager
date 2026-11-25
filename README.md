@@ -24,7 +24,7 @@
 
 <p align="center">
   <a href="https://github.com/Rafael-Ikaros/Component_Manager/releases/latest/download/component-vault-android-release.apk"><img src="docs/design/readme/download-android.svg" width="250" height="84" alt="下载 Android 正式版 APK" /></a>
-  <a href="docs/docker-manual.md"><img src="docs/design/readme/deploy-docker.svg" width="250" height="84" alt="查看群晖界面部署教程" /></a>
+  <a href="docs/docker-manual.md"><img src="docs/design/readme/deploy-docker.svg" width="250" height="84" alt="查看群晖界面部署图文教程" /></a>
 </p>
 
 ---
