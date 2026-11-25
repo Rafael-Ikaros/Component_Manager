@@ -2,6 +2,7 @@
 set -eu
 
 case "$(cat /tmp/componentvault-role)" in
+    api) url=http://127.0.0.1:8787/health ;;
     web) url=http://127.0.0.1/ ;;
     updater) url=http://127.0.0.1:8790/health ;;
     *) exit 1 ;;

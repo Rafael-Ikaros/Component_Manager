@@ -1,11 +1,12 @@
 # Docker 正式版与开发版切换
 
-正式版使用 `latest / web-latest`，开发版使用 `dev / web-dev`。两组镜像由独立的
-**Docker Images** 工作流发布；开发版不会覆盖正式版标签。普通部署者无需 Docker Hub Token。
+统一镜像尚未发布。当前正式版使用 `latest / web-latest`，旧布局的开发版使用 `dev / web-dev` 或成对固定标签，例如 `0.7.9-dev.29 / web-0.7.9-dev.29`。镜像由 **Docker Images** 工作流发布，开发版不会推进正式版标签。普通部署者无需 Docker Hub Token。
+
+统一镜像发布后，采用统一模板的项目从同一 `dev`、`latest` 或固定标签启动 API 和 Web，Web 显式指定 `command: [web]`。旧模板继续使用配套 `web-*` 兼容标签。新模板的部署和迁移见[快速部署](docker-quickstart.md#统一镜像版本发布后)；目标版本仍采用旧镜像布局时，回退使用该版本的部署模板。
 
 普通部署可在群晖界面[手动创建和更新两个容器](docker-manual.md)，也可使用 Compose；均不需要向应用挂载 Docker socket。
 
-只有启用可选网页更新时，才另外部署 updater。从 `0.7.9-dev.8` 起，Web 和 updater 使用同一 `web-*` 管理镜像，仍为两个容器。
+启用可选网页更新的 Compose 项目还需独立部署 updater。旧布局从 `0.7.9-dev.8` 起由 Web 和 updater 共用 `web-*` 管理镜像；统一布局从同一镜像启动三个角色。
 网页更新只替换 API/Web；切换渠道不会重建正在执行任务的 updater。
 旧独立 updater 的迁移和后续维护见[网页更新教程](server-web-update.md#从独立-updater-镜像迁移)。
 
@@ -47,8 +48,8 @@
    sh tools/deployment/switch-channel.sh --project-name component-warehouse --channel stable
    ```
 
-助手先拉取镜像，API/Web 的版本及构建提交配套后才备份 `.env`、修改配置和重建容器。
-拉取失败或两镜像尚未配套时，运行容器和 `.env` 不变，待发布完成后重试。
+助手根据原 Compose 项目的布局决定镜像标签。旧模板使用配套 API 和 `web-*` 标签，统一模板共用标签并要求目标镜像支持统一角色。助手先拉取并检查目标镜像，再备份 `.env`、修改配置和重建容器。
+镜像拉取或校验失败时，运行容器和 `.env` 保持原状。若渠道尚在发布，待发布完成后重试。
 重建中断后可重复执行同一命令；不会执行 `down -v`。
 
 为兼容旧 Hub Compose，助手自动写入渠道键及 API/Web 完整镜像键，保留其它 `.env` 内容。
@@ -67,8 +68,7 @@ COMPONENT_VAULT_DOCKER_CHANNEL=dev
 ```
 
 已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，应清空，以便按渠道取镜像。
-下载配套镜像并重新部署**原项目**，沿用原挂载。若原 Compose 写死了镜像名，在原文件中成对修改 API 和 Web 的 `image`。
-不要新建空项目或删除数据卷。只使用单独容器而非项目时，仍需在 GUI 中为 API、Web 选择配套镜像。
+按原模板选择镜像并重新部署**原项目**，沿用原挂载。若原 Compose 写死了镜像名，在原文件中同时修改 API 和 Web 的 `image`。使用单独容器时，参照[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换两个容器。
 
 ## Watchtower 与版本确认
 
@@ -77,4 +77,4 @@ COMPONENT_VAULT_DOCKER_CHANNEL=dev
 
 在服务端“设置 → 关于服务端”查看实际版本，`/health` 也提供 `version / revision`。
 GitHub Release 出现时镜像可能尚在构建，应以独立 Docker Images 工作流成功和 Hub 标签可拉取为准。
-API/Web 是配套镜像，更新后核对两个容器及登录、库存读取，不把 Watchtower 的“发现新镜像”当作验收。
+更新后核对 API/Web 两个容器、登录和库存读取。

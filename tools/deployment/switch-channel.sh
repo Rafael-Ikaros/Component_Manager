@@ -10,7 +10,8 @@ Usage: sh switch-channel.sh --project-name NAME [--channel stable|dev] [--dry-ru
 
 Switch the existing Compose project's API and deployed Web console together.
   --project-name NAME   Existing Compose project name (required).
-  --channel stable|dev  Stable uses latest/web-latest; dev uses dev/web-dev.
+  --channel stable|dev  Stable uses latest; development uses dev.
+                        Legacy projects retain their web-* compatibility image.
                         When omitted, an interactive terminal offers a menu.
   --dry-run             Show the plan without changing files or containers.
   --result-file PATH    Write version/revision/Web metadata after success (for the updater).
@@ -75,6 +76,8 @@ api_ids=$(docker ps -aq --filter "label=com.docker.compose.project=$project" \
 set -- $api_ids
 [ "$#" -eq 1 ] || fail "Multiple API containers found for $project; resolve the duplicate deployment first."
 api_id=$1
+# Compose sets this label separately from any capability inherited from the image.
+compose_layout=$(docker inspect --format '{{ index .Config.Labels "io.componentvault.compose-layout" }}' "$api_id")
 working_dir=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$api_id")
 config_files=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' "$api_id")
 [ -d "$working_dir" ] || fail 'The original Compose working directory is unavailable on this host.'
@@ -115,6 +118,7 @@ if [ "$has_web" = true ]; then set -- "$@" --profile web; fi
 
 api_image=$official_repository:$image_channel
 web_image=$official_repository:web-$image_channel
+if [ "$compose_layout" = unified ]; then web_image=$api_image; fi
 printf 'Project: %s\nEnvironment: %s\nChannel: %s\nAPI image: %s\n' "$project" "$env_file" "$channel" "$api_image" >&2
 if [ "$has_web" = true ]; then
     printf 'Web image: %s\nServices: api admin-web\n' "$web_image" >&2
@@ -165,6 +169,12 @@ if [ "$has_web" = true ]; then
     "$@" --env-file "$candidate" pull api admin-web || fail 'Image pull failed; .env and containers were not changed. Retry the same command.'
 else
     "$@" --env-file "$candidate" pull api || fail 'Image pull failed; .env and containers were not changed. Retry the same command.'
+fi
+if [ "$compose_layout" = unified ]; then
+    for target_image in "$api_image" "$web_image"; do
+        target_layout=$(docker image inspect --format '{{ index .Config.Labels "io.componentvault.image-layout" }}' "$target_image")
+        [ "$target_layout" = unified ] || fail 'TARGET_IMAGE_LAYOUT_UNSUPPORTED: This project selects roles from a unified image. The target release uses the old image layout; use its deployment template for a manual rollback. .env and containers were not changed.'
+    done
 fi
 if [ "$require_web_update" = true ]; then
     api_capability=$(docker image inspect --format '{{ index .Config.Labels "io.componentvault.server-update" }}' "$api_image")

@@ -1,11 +1,13 @@
 # Deploy published Docker Hub images. Enable the web profile to start the Web console.
-# Defaults to the floating latest/web-latest API and Web tags.
-# Set COMPONENT_VAULT_DOCKER_CHANNEL=dev for dev/web-dev; latest restores stable.
+# Requires a release with the unified image layout. Older releases use their own template.
+# All roles use latest or dev; the command selects the service.
 # Full image overrides take precedence over the channel.
 # Pull before updating; check Docker Hub tags before selecting fixed release tags.
 services:
   api:
     image: ${COMPONENT_VAULT_IMAGE:-rafaelikaros/component_manager:${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    labels:
+      io.componentvault.compose-layout: unified
     ports:
       - "8787:8787"
     environment:
@@ -23,7 +25,8 @@ services:
   admin-web:
     profiles:
       - web
-    image: ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    image: ${COMPONENT_VAULT_WEB_IMAGE:-${COMPONENT_VAULT_IMAGE:-rafaelikaros/component_manager:${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}}
+    command: [web]
     depends_on:
       - api
     ports:

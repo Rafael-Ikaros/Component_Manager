@@ -85,6 +85,11 @@ def main() -> None:
             assert override_environment["ADMIN_WEB_ORIGINS"] == "http://localhost:8081"
             assert override_environment["WEB_INVENTORY_ENABLED"] in (True, "true")
             assert any(volume.get("target") == "/data" for volume in api_empty["volumes"])
+            assert api_empty["labels"]["io.componentvault.compose-layout"] == "unified"
+            assert empty["services"]["admin-web"]["command"] == ["web"]
+            assert not any(volume["target"] == "/var/run/docker.sock"
+                           for service in empty["services"].values()
+                           for volume in service.get("volumes", []))
             if compose_file.name == "docker-compose.hub.yml":
                 web = empty["services"]["admin-web"]
                 assert web.get("image") and "web" in web.get("profiles", [])
@@ -103,11 +108,15 @@ def main() -> None:
                         f"rafaelikaros/component_manager:{channel}"
                     )
                     assert selected["services"]["admin-web"]["image"] == (
-                        f"rafaelikaros/component_manager:web-{channel}"
+                        f"rafaelikaros/component_manager:{channel}"
                     )
                     assert selected["services"]["api"]["volumes"] == api_empty["volumes"]
                 assert api_empty["image"] == "rafaelikaros/component_manager:latest"
-                assert web["image"] == "rafaelikaros/component_manager:web-latest"
+                assert web["image"] == api_empty["image"]
+                unified_pin = render(compose_file, os.devnull, {
+                    "COMPONENT_VAULT_IMAGE": "example/inventory:unified-pinned",
+                }, profile="web")["services"]
+                assert unified_pin["api"]["image"] == unified_pin["admin-web"]["image"]
                 pinned = render(compose_file, os.devnull, {
                     "COMPONENT_VAULT_DOCKER_CHANNEL": "dev",
                     "COMPONENT_VAULT_IMAGE": "example/inventory:0.7.9",
@@ -122,7 +131,9 @@ def main() -> None:
                 services = managed["services"]
                 assert set(services) == {"api", "admin-web", "updater"}
                 assert services["api"]["image"] == "rafaelikaros/component_manager:dev"
-                assert services["admin-web"]["image"] == "rafaelikaros/component_manager:web-dev"
+                assert services["admin-web"]["image"] == services["api"]["image"]
+                assert services["admin-web"]["command"] == ["web"]
+                assert services["api"]["labels"]["io.componentvault.compose-layout"] == "unified"
                 assert services["api"]["volumes"] == api_empty["volumes"]
                 assert services["api"]["ports"] == api_empty["ports"]
                 assert services["admin-web"]["ports"] == web["ports"]
@@ -134,6 +145,12 @@ def main() -> None:
                 updater = services["updater"]
                 assert not updater.get("ports")
                 assert updater["image"] == services["admin-web"]["image"]
+                unified_pin = render(WEB_UPDATE_FILE, os.devnull, {
+                    "COMPONENT_VAULT_DEPLOY_DIR": str(ROOT),
+                    "COMPONENT_VAULT_IMAGE": "example/inventory:unified-pinned",
+                }, project_name="component-vault-compose-ci")["services"]
+                assert all(service["image"] == "example/inventory:unified-pinned"
+                           for service in unified_pin.values())
                 assert updater["command"] == ["updater"]
                 assert updater["environment"]["UPDATE_PROJECT_NAME"] == "component-vault-compose-ci"
                 assert "UPDATE_TOKEN_FILE" not in updater["environment"]

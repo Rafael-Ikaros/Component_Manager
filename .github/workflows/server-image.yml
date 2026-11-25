@@ -73,6 +73,22 @@ jobs:
         run: |
           echo "version=${RELEASE_TAG:-source}" >> "$GITHUB_OUTPUT"
           echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -f Dockerfile ]; then
+            echo 'unified=true' >> "$GITHUB_OUTPUT"
+            echo 'api_context=.' >> "$GITHUB_OUTPUT"
+            echo 'api_file=Dockerfile' >> "$GITHUB_OUTPUT"
+            echo 'api_target=api' >> "$GITHUB_OUTPUT"
+            echo 'web_file=Dockerfile' >> "$GITHUB_OUTPUT"
+            echo 'web_target=legacy-web' >> "$GITHUB_OUTPUT"
+          else
+            # Historical releases retain their original build layout.
+            echo 'unified=false' >> "$GITHUB_OUTPUT"
+            echo 'api_context=./server' >> "$GITHUB_OUTPUT"
+            echo 'api_file=server/Dockerfile' >> "$GITHUB_OUTPUT"
+            echo 'api_target=' >> "$GITHUB_OUTPUT"
+            echo 'web_file=admin-web/Dockerfile' >> "$GITHUB_OUTPUT"
+            echo 'web_target=' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Validate publishing configuration
         if: inputs.push_image || (github.event_name == 'push' && github.ref_type == 'tag')
@@ -121,10 +137,12 @@ jobs:
           updater/.venv/bin/python -m pip install -r updater/requirements-dev.txt
           updater/.venv/bin/python -m unittest updater.test_app updater.test_helper -v
 
-      - name: Build image for startup validation
+      - name: Build unified image for startup validation
         uses: docker/build-push-action@v7
         with:
-          context: ./server
+          context: ${{ steps.build_identity.outputs.api_context }}
+          file: ${{ steps.build_identity.outputs.api_file }}
+          target: ${{ steps.build_identity.outputs.api_target }}
           build-args: |
             APP_VERSION=${{ steps.build_identity.outputs.version }}
             APP_REVISION=${{ steps.build_identity.outputs.revision }}
@@ -134,30 +152,47 @@ jobs:
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,mode=max,scope=server-image
 
-      - name: Build shared management image for startup validation
+      - name: Build legacy Web default from the shared runtime
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: admin-web/Dockerfile
+          file: ${{ steps.build_identity.outputs.web_file }}
+          target: ${{ steps.build_identity.outputs.web_target }}
+          build-args: |
+            APP_VERSION=${{ steps.build_identity.outputs.version }}
+            APP_REVISION=${{ steps.build_identity.outputs.revision }}
           platforms: linux/amd64
           load: true
           tags: component-vault-management:ci
           cache-from: type=gha,scope=web-image
           cache-to: type=gha,mode=max,scope=web-image
 
+      - name: Verify container role dispatch and shared image layers
+        if: steps.build_identity.outputs.unified == 'true'
+        run: python -m unittest discover -s tools/deployment -p test_container_entrypoint.py -v
+
       - name: Verify Compose first-run configuration schema
         run: python tools/deployment/verify-compose-config.py
+
+      - name: Verify all roles start from one image in Compose
+        if: steps.build_identity.outputs.unified == 'true'
+        env:
+          SMOKE_IMAGE_LAYOUT: unified
+          SMOKE_STARTUP_ONLY: 'true'
+        run: bash tools/deployment/verify-web-update.sh
 
       - name: Verify updater startup, authentication and persisted failed jobs
         run: |
           mkdir -p "$RUNNER_TEMP/updater-data" "$RUNNER_TEMP/updater-state"
           printf '%s' 'ci-updater-token' > "$RUNNER_TEMP/updater-data/.updater-token"
+          image=component-vault-server:ci
+          if [ ! -f Dockerfile ]; then image=component-vault-management:ci; fi
           docker run -d --name component-vault-updater-ci \
             -p 127.0.0.1:18790:8790 \
             -e UPDATE_PROJECT_NAME=isolated-missing-project \
             -v "$RUNNER_TEMP/updater-data:/data:ro" \
             -v "$RUNNER_TEMP/updater-state:/state" \
-            component-vault-management:ci updater
+            "$image" updater
           trap 'docker logs component-vault-updater-ci; docker rm -f component-vault-updater-ci' EXIT
           curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
             --output /dev/null http://127.0.0.1:18790/health
@@ -249,9 +284,11 @@ jobs:
 
       - name: Verify web startup and bundled assets
         run: |
+          image=(component-vault-server:ci web)
+          if [ ! -f Dockerfile ]; then image=(component-vault-management:ci); fi
           docker run -d --name component-vault-web-ci \
             -p 127.0.0.1:18081:80 \
-            component-vault-management:ci
+            "${image[@]}"
           trap 'docker logs component-vault-web-ci; docker rm -f component-vault-web-ci' EXIT
           curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
             --output "$RUNNER_TEMP/admin-index.html" http://127.0.0.1:18081/
@@ -269,6 +306,15 @@ jobs:
             curl --fail --silent --show-error --max-time 3 \
               --output /dev/null "http://127.0.0.1:18081$asset"
           done
+
+      - name: Verify legacy Web image still starts without a role argument
+        run: |
+          docker run -d --name component-vault-legacy-web-ci \
+            -p 127.0.0.1:18082:80 component-vault-management:ci
+          trap 'docker logs component-vault-legacy-web-ci; docker rm -f component-vault-legacy-web-ci' EXIT
+          curl --fail --silent --show-error --retry 12 --retry-delay 1 --retry-all-errors --max-time 3 \
+            --output /dev/null http://127.0.0.1:18082/
+          docker exec component-vault-legacy-web-ci /usr/local/bin/componentvault-healthcheck
 
       - name: Check out release workflow tools
         if: steps.build_identity.outputs.revision != github.workflow_sha
@@ -302,12 +348,14 @@ jobs:
           EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
         run: python "$RELEASE_TOOLS/fixed_docker_tags.py"
 
-      - name: Publish fixed multi-platform API image
+      - name: Publish fixed multi-platform unified image
         if: steps.image_tags.outputs.api_missing == 'true'
         id: published_api
         uses: docker/build-push-action@v7
         with:
-          context: ./server
+          context: ${{ steps.build_identity.outputs.api_context }}
+          file: ${{ steps.build_identity.outputs.api_file }}
+          target: ${{ steps.build_identity.outputs.api_target }}
           build-args: |
             APP_VERSION=${{ steps.build_identity.outputs.version }}
             APP_REVISION=${{ steps.build_identity.outputs.revision }}
@@ -321,13 +369,17 @@ jobs:
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,mode=max,scope=server-image
 
-      - name: Publish fixed multi-platform management image
+      - name: Publish legacy Web default using the same runtime
         if: steps.image_tags.outputs.web_missing == 'true'
         id: published_web
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: admin-web/Dockerfile
+          file: ${{ steps.build_identity.outputs.web_file }}
+          target: ${{ steps.build_identity.outputs.web_target }}
+          build-args: |
+            APP_VERSION=${{ steps.build_identity.outputs.version }}
+            APP_REVISION=${{ steps.build_identity.outputs.revision }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.image_tags.outputs.web_version }}
@@ -362,6 +414,7 @@ jobs:
           script=tools/deployment/verify-web-update.sh
           if [[ -f ".release-tools/$script" ]]; then script=".release-tools/$script"; fi
           bash "$script"
+          if [ -f Dockerfile ]; then SMOKE_IMAGE_LAYOUT=unified bash "$script"; fi
 
       - name: Promote the verified image pair to the channel
         if: env.PROMOTE_CHANNEL == 'true' && steps.verified_images.outcome == 'success'

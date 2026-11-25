@@ -33,13 +33,11 @@ Vite 构建参数只影响源码构建，不会在已构建的 Hub 镜像中随�
 
 ## 部署与接口
 
-管理台与 API 是两个配套镜像。管理镜像同时包含网页和 Updater，分别启动、独立运行：
-默认命令 `web` 运行 Nginx；`command: [updater]` 运行更新服务，不启动 Nginx。
-只有 Updater 容器挂载 Docker socket、更新任务卷及原部署目录，Web 无需这些挂载。
-两者使用相同的 `COMPONENT_VAULT_WEB_IMAGE`，不再单独发布新的 `updater-*` 镜像。
+统一镜像尚未发布。当前已发布的 dev.29 使用配套的 API 和 `web-*` 标签，后者默认启动 Web。
+统一镜像包含 API、Web 和可选 Updater，默认启动 API。Web 容器通过 `command: [web]` 启动 Nginx，Updater 容器通过 `command: [updater]` 启动更新服务。只有 Updater 容器挂载 Docker socket、更新任务卷及原 Compose 部署目录。
 
-在仓库根目录运行 `docker build -f admin-web/Dockerfile .` 构建管理镜像；
-构建需要 `updater/` 和 `tools/deployment/`，不能以 `admin-web/` 为构建上下文。
+从仓库根目录运行 `docker build -t component-vault:local .`，使用根目录的 Dockerfile 构建统一镜像。
+维护兼容标签时使用 `--target legacy-web`，该构建目标默认启动 Web。
 
 Hub 模板的 Web 使用 `web` profile，端口为 `8081:80`；
 完整网页更新模板默认启动 Web。普通部署见[快速部署](../docs/docker-quickstart.md)。

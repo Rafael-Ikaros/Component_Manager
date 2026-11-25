@@ -40,11 +40,9 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 
 普通部署可手动创建 API/Web 容器或使用普通 Compose，两者均不向业务容器挂载 Docker socket、不要求特权模式。Web 由浏览器直连配置的 API 地址，不依赖 Compose 内部服务名；首次配置保存在 API 的 `/data`。手动部署见[操作指南](docker-manual.md)。
 
-从 `0.7.9-dev.8` 起，API 使用独立镜像，Web 与 updater 共用 `web-*` 管理镜像、保留独立容器。
-管理镜像默认启动 Nginx，`command: [updater]` 启动单 worker 更新服务；每个容器只运行对应角色。
-健康检查根据启动角色访问网页或更新接口。两者在 Compose 中共用 `COMPONENT_VAULT_WEB_IMAGE`；
-只给 updater 挂载 Docker socket、原部署目录和任务卷。更新 API/Web 时不重建 updater，
-同一镜像产物不要求两个容器始终运行同一版本。旧独立 updater 的迁移见[部署教程](server-web-update.md#从独立-updater-镜像迁移)。
+统一镜像（尚未发布）在同一镜像内提供 API、Nginx 管理台和单 worker 更新服务。启动命令分别为 `api`、`web`、`updater`，默认 `api`。每个容器运行一个角色；健康检查按该角色选择接口。现有 `web-*` 标签作为兼容入口，默认启动 Web。统一镜像发布前，`0.7.9-dev.8` 起的旧开发版仍由独立 API 镜像和 `web-*` 管理镜像组成，后者也可用 `command: [updater]` 启动更新服务。
+
+只给 updater 挂载 Docker socket、原部署目录和任务卷。更新 API/Web 时保留正在运行的 updater 容器，运行版本可因此暂时不同。升级部署结构见[部署教程](server-web-update.md#统一镜像版本发布后)。
 
 网页更新是可选部署能力。首次启用时，将独立 updater 加入原 Compose 项目并共享原数据卷。完整模板从 Compose 取得项目名，管理员通过 `COMPONENT_VAULT_DEPLOY_DIR` 指定原项目目录。启用后由管理员选择渠道、确认并提交更新作业，版本检测仍是独立的只读操作。
 
@@ -63,9 +61,9 @@ BOM 成本来自本次只读预览的库存均价，不从参考报价或预设�
 - `POST /admin-api/components/bulk-delete` 使用认证账户的 SQLite、Web 写入开关和同一批次 request_id；每批 1–100 个唯一 ID 与版本。单个短事务复用单删墓碑、同步变更及 MQTT outbox，冲突/缺失全部回滚；数量、分配和历史流水保留，不硬删除业务行。
 - 库存页通过显式多选模式进入当前页批量操作。窄屏使用底部导航、紧凑结果列表，以及独立的库存工具和详情对话框。详情关闭后回到原列表位置。概览、同步和 BOM 预设在窄屏展示列表，设置按功能分组。
 - `POST /admin-api/about/check-update?channel=stable|dev` 默认 stable。stable 只接受正式版；dev 按语义版本比较有效正式/开发发布（不含草稿）。浏览器按 API 地址保存检测偏好，接口不拉镜像或操作宿主机。
-- `docker-ci.yml` 按相关路径独立检查 API/Web 镜像；`server-image.yml` 独立发布多架构镜像，接受 dev 和正式 tag。`release-from-changelog.yml` 在 sync/tag 后并行调用 Docker 与原生附件流程，不依赖机器人创建 tag 再触发工作流。Docker 凭据/失败不再阻断原生附件 job。
+- `docker-ci.yml` 按相关路径独立验证镜像及三个角色；`server-image.yml` 独立发布多架构镜像，接受 dev 和正式 tag。`release-from-changelog.yml` 在 sync/tag 后并行调用 Docker 与原生附件流程，不依赖机器人创建 tag 再触发工作流。Docker 凭据/失败不再阻断原生附件 job。
 - Docker 发布按队列串行执行。先查询固定标签，并按摘要核对已有镜像的 `linux/amd64`、`linux/arm64` 和发布身份。只构建仓库明确返回缺失的固定标签，发布后回读完整镜像组合。启用渠道发布时，隔离 Compose 项目先验证 Web 更新及数据保留，再把对应的浮动标签指向已验证的镜像摘要。手动补发默认只补固定标签。
-- Hub Compose 默认 latest/web-latest，`COMPONENT_VAULT_DOCKER_CHANNEL=dev` 改用 dev/web-dev；完整镜像覆盖仍优先。部署助手复用原项目和 Compose 文件，拉取配套镜像后更新 `.env` 和重建，不引入 Docker socket 到 API/Web。详见 [渠道教程](docker-channels.md)。
+- 统一镜像 Hub Compose 默认以 `latest` 或 `COMPONENT_VAULT_DOCKER_CHANNEL=dev` 选择同一标签，`COMPONENT_VAULT_IMAGE` 可固定镜像。显式配置的 `COMPONENT_VAULT_WEB_IMAGE` 仍优先覆盖 Web 和 updater。部署助手根据 API 容器上由 Compose 写入的 `io.componentvault.compose-layout=unified` 标识选择同一标签；旧模板继续使用配套的 `web-*`。镜像标识用于校验目标兼容性，部署助手复用原项目和 Compose 文件，保存 `.env` 后重建 API/Web。[部署指南](docker-quickstart.md)
 
 应用品牌母版位于 `docs/design/branding/component-vault-logo-ikaros.png`。`tools/branding/generate_icons.py` 使用 Pillow 生成现有路径的派生资源；Android 使用应用自有 mipmap 与自适应前景/白色背景，Windows 的 EXE 与 `AppWindow` 共用多尺寸 `Assets/ComponentVault.ico`；Web 使用 `public` 下的 Logo 与 favicon。派生资源随客户端或 Web 构建发布，dev 不推动 Docker 正式标签。
 
@@ -129,16 +127,12 @@ Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享�
 - Android, Windows, and server all use SQLite in the current architecture, and
   each runtime is implemented against live storage.
 
-The API and admin Web containers are built independently. `server-image.yml`
-always builds and starts amd64 validation images, checks API/auth/database
-startup, then fetches the Web index and its emitted JS/CSS assets. When Docker
-Hub variables and token are configured, releases publish API tags `<version>`
-and Web tags `web-<version>` for amd64/arm64. Stable releases also publish
-`latest` and `web-latest`. Dev releases publish `dev` and `web-dev`.
-SQLite persists under `/data`.
-`docker-compose.hub.yml` retains the source Compose data volume and exposes the
-Web image through the optional `web` profile. Its default API/Web images use
-`latest` / `web-latest`; updating requires pulling and recreating the containers.
+API and admin Web run in separate containers. The unreleased unified image
+provides both roles and the optional updater in one artifact. The Hub Compose
+template exposes Web through the optional `web` profile and keeps SQLite under
+`/data`. Use the Compose template from the selected release for already
+published images such as the current stable `latest` and `0.7.9-dev.29`.
+Updating requires pulling the target image and recreating the containers.
 See [Docker Hub operations](dockerhub.md).
 
 The API provides a separate, small `/setup` page on its own origin for first-run
@@ -458,8 +452,8 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Dev tags (`vX.Y.Z-dev.N`) build the same `master` code as prereleases, injecting
   artifact version names and monotonically ordered Android version codes. They
   do not advance stable metadata or move stable Docker tags. The separate Docker
-  workflow publishes dev/web-dev and matching fixed tags; Web and updater share
-  the web image, while existing updater tags remain historical. New releases
+  workflow publishes the fixed version and advances `dev` after validation,
+  with `web-dev` and `web-<version>` retained for compatible deployments. New releases
   contain no Windows build or attachment. See [release channels](runbook.md#stable-and-dev-publishing).
 - CI explicitly includes branch pushes alongside pull requests. The reusable
   release workflow prioritizes supplied inputs because its event context comes

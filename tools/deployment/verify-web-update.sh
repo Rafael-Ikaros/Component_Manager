@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Pre-promotion acceptance test. Uses only its temporary CI project and fixed image tags.
+# Compose startup and pre-promotion checks in an isolated CI project.
 set -euo pipefail
 
 : "${RUNNER_TEMP:?Run this check on the isolated GitHub Actions runner}"
-: "${RELEASE_TAG:?Set the just-published release tag}"
-: "${EXPECTED_REVISION:?Set the just-published commit SHA}"
+startup_only=${SMOKE_STARTUP_ONLY:-false}
+if [ "$startup_only" = false ]; then
+    : "${RELEASE_TAG:?Set the just-published release tag}"
+    : "${EXPECTED_REVISION:?Set the just-published commit SHA}"
+fi
+export SMOKE_STARTUP_ONLY=$startup_only
 UPDATE_CHANNEL=${UPDATE_CHANNEL:-dev}
 case "$UPDATE_CHANNEL" in stable|dev) ;; *) echo 'Invalid UPDATE_CHANNEL' >&2; exit 1;; esac
 repository=${DOCKERHUB_IMAGE:-rafaelikaros/component_manager}
@@ -12,12 +16,22 @@ project="cv-web-update-${GITHUB_RUN_ID:-local}-$$"
 deployment=$(mktemp -d "$RUNNER_TEMP/component-vault-web-update.XXXXXX")
 export UPDATE_CHANNEL EXPECTED_REVISION RELEASE_TAG
 export SMOKE_PROJECT=$project SMOKE_DEPLOY_DIR=$deployment
-export SMOKE_API_TARGET="$repository:${RELEASE_TAG#v}"
-export SMOKE_WEB_TARGET="$repository:web-${RELEASE_TAG#v}"
+release_version=${RELEASE_TAG:-}
+export SMOKE_API_TARGET="$repository:${release_version#v}"
+export SMOKE_WEB_TARGET="$repository:web-${release_version#v}"
+export SMOKE_IMAGE_LAYOUT=${SMOKE_IMAGE_LAYOUT:-legacy}
+case "$SMOKE_IMAGE_LAYOUT" in
+    legacy) ;;
+    unified) export SMOKE_WEB_TARGET=$SMOKE_API_TARGET ;;
+    *) echo 'Invalid SMOKE_IMAGE_LAYOUT' >&2; exit 1 ;;
+esac
 
 # Exercise the release's own updater helper against the fixed tags before the
 # public channel moves. Only redirect the image references in this CI copy.
-python - "$repository" <<'PY'
+if [ "$startup_only" = true ]; then
+    cp tools/deployment/switch-channel.sh "$deployment/switch-channel.sh"
+else
+    python - "$repository" <<'PY'
 import os
 from pathlib import Path
 import shlex
@@ -35,6 +49,7 @@ for line in replacements:
 target = Path(os.environ['SMOKE_DEPLOY_DIR']) / 'switch-channel.sh'
 target.write_text(''.join(replacements.get(line, line) + '\n' for line in source), encoding='utf-8')
 PY
+fi
 
 read -r api_port web_port < <(python - <<'PY'
 import socket
@@ -47,16 +62,21 @@ PY
 export SMOKE_API_BASE="http://127.0.0.1:$api_port"
 export SMOKE_WEB_BASE="http://127.0.0.1:$web_port"
 
-docker tag component-vault-server:ci "$repository:updater-smoke-before"
-docker tag component-vault-management:ci "$repository:web-updater-smoke-before"
+api_before=$repository:updater-smoke-before
+web_before=$api_before
+docker tag component-vault-server:ci "$api_before"
+if [ "$SMOKE_IMAGE_LAYOUT" = legacy ]; then
+    web_before=$repository:web-updater-smoke-before
+    docker tag component-vault-management:ci "$web_before"
+fi
 cat > "$deployment/.env" <<EOF
 COMPOSE_PROJECT_NAME=$project
 SMOKE_DEPLOY_DIR=$deployment
 SMOKE_API_PORT=$api_port
 SMOKE_WEB_PORT=$web_port
 API_TOKEN=ci-online-update-token
-COMPONENT_VAULT_IMAGE=$repository:updater-smoke-before
-COMPONENT_VAULT_WEB_IMAGE=$repository:web-updater-smoke-before
+COMPONENT_VAULT_IMAGE=$api_before
+COMPONENT_VAULT_WEB_IMAGE=$web_before
 EOF
 cat > "$deployment/compose.yml" <<'YAML'
 services:
@@ -92,6 +112,19 @@ volumes:
   component_vault_data:
   component_vault_updater_state:
 YAML
+if [ "$SMOKE_IMAGE_LAYOUT" = unified ]; then
+    # Explicit role selection is part of the new deployment template. Old
+    # projects deliberately retain the implicit Web default for compatibility.
+    python - "$deployment/compose.yml" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+text = text.replace('  api:\n', '  api:\n    labels:\n      io.componentvault.compose-layout: unified\n', 1)
+text = text.replace('  admin-web:\n', '  admin-web:\n    command: [web]\n', 1)
+path.write_text(text)
+PY
+fi
 compose=(docker compose --project-name "$project" --project-directory "$deployment"
     --env-file "$deployment/.env" -f "$deployment/compose.yml")
 cleanup() {
@@ -112,6 +145,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -166,7 +200,13 @@ status = wait_for(lambda: request('/admin-api/server-update/status'), 'Updater t
 assert status['enabled'], status
 wait_for(web_ready, 'Initial Web startup')
 before = {service: container(service) for service in ('api', 'admin-web', 'updater')}
-assert inspect(before['admin-web'])['Image'] == inspect(before['updater'])['Image'], 'Web and updater must start from the same image ID'
+images = {service: inspect(container_id)['Image'] for service, container_id in before.items()}
+assert images['admin-web'] == images['updater'], 'Web and updater must start from the same image ID'
+if os.environ['SMOKE_IMAGE_LAYOUT'] == 'unified':
+    assert len(set(images.values())) == 1, images
+if os.environ['SMOKE_STARTUP_ONLY'] == 'true':
+    print('Compose startup: API, Web and updater healthy on the same image.')
+    sys.exit(0)
 original_mount = data_source(before['api'])
 original_ports = inspect(before['api'])['HostConfig']['PortBindings']
 timestamp = datetime.now(timezone.utc).isoformat()

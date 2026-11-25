@@ -1,4 +1,5 @@
-# Single-file Hub deployment with Web administration and optional Web updates.
+# Single-image Hub deployment with separate API, Web and optional updater roles.
+# Requires a unified-image release; use the release's own template for older versions.
 # Keep the existing Compose project name. Set COMPONENT_VAULT_DEPLOY_DIR
 # to this directory's absolute NAS/host path in .env.
 # Until a compatible stable release is available, set
@@ -19,13 +20,15 @@ services:
       UPDATER_URL: http://updater:8790
       WEB_INVENTORY_ENABLED: ${WEB_INVENTORY_ENABLED:-}
     labels:
+      io.componentvault.compose-layout: unified
       com.centurylinklabs.watchtower.enable: "false"
     volumes:
       - component_vault_data:/data
     restart: unless-stopped
 
   admin-web:
-    image: &management-image ${COMPONENT_VAULT_WEB_IMAGE:-rafaelikaros/component_manager:web-${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}
+    image: &management-image ${COMPONENT_VAULT_WEB_IMAGE:-${COMPONENT_VAULT_IMAGE:-rafaelikaros/component_manager:${COMPONENT_VAULT_DOCKER_CHANNEL:-latest}}}
+    command: [web]
     depends_on:
       - api
     ports:

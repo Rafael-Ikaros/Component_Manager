@@ -12,10 +12,11 @@ MOCK_DOCKER = r'''#!/bin/sh
 set -eu
 case "$1" in
  ps) case "$*" in *service=api*) echo api-id;; *service=admin-web*) [ "${MOCK_WEB:-1}" = 0 ] || echo web-id;; esac;;
- inspect) case "$3" in *working_dir*) echo "$MOCK_DIR";; *config_files*) echo "$MOCK_FILES";; *Config.Image*) echo rafaelikaros/component_manager:latest;; esac;;
+ inspect) case "$3" in *working_dir*) echo "$MOCK_DIR";; *config_files*) echo "$MOCK_FILES";; *compose-layout*) echo "${MOCK_COMPOSE_LAYOUT:-}";; *image-layout*) echo "${MOCK_RUNNING_IMAGE_LAYOUT:-}";; *Config.Image*) echo rafaelikaros/component_manager:latest;; esac;;
  image)
    web=false; case "$5" in *:web-*) web=true;; esac
    case "$4" in
+     *image-layout*) echo "${MOCK_TARGET_LAYOUT:-unified}";;
      *server-update*) echo "${MOCK_CAPABILITY:-1}";;
      *image.version*) echo v0.7.9-dev.6;;
      *image.revision*) if [ "$web" = true ]; then echo "${MOCK_WEB_REVISION:-abc}"; else echo abc; fi;;
@@ -99,9 +100,29 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.result.read_text().splitlines(), ["v0.7.9-dev.6", "abc", "true"])
         self.assertIn("COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:dev", self.envfile.read_text())
+        self.assertIn("COMPONENT_VAULT_WEB_IMAGE=rafaelikaros/component_manager:web-dev", self.envfile.read_text())
         self.assertIn(f"<{self.files[1].as_posix()}>", self.log.read_text())
         self.assertIn("<--no-deps>", self.log.read_text())
         self.assertEqual(next(self.deployment.glob(".env.before-channel-*")).read_text(), self.original)
+
+    def test_legacy_project_keeps_web_default_after_api_image_upgrade(self):
+        for running_layout in ("", "unified"):
+            result = self.run_helper({"MOCK_RUNNING_IMAGE_LAYOUT": running_layout})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("COMPONENT_VAULT_WEB_IMAGE=rafaelikaros/component_manager:web-dev",
+                          self.envfile.read_text().splitlines())
+
+    def test_unified_project_selects_the_same_image_for_api_and_web(self):
+        result = self.run_helper({"MOCK_COMPOSE_LAYOUT": "unified"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("COMPONENT_VAULT_WEB_IMAGE=rafaelikaros/component_manager:dev", self.envfile.read_text())
+        self.assertEqual(self.result.read_text().splitlines(), ["v0.7.9-dev.6", "abc", "true"])
+
+    def test_unified_project_rejects_old_layout_before_recreating_containers(self):
+        result = self.run_helper({"MOCK_COMPOSE_LAYOUT": "unified", "MOCK_TARGET_LAYOUT": "legacy"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("TARGET_IMAGE_LAYOUT_UNSUPPORTED", result.stderr)
+        self.assert_unchanged()
 
     @unittest.skipUnless(os.name == "posix", "POSIX ownership/mode require a POSIX filesystem")
     def test_env_and_backup_keep_original_owner_group_and_mode(self):

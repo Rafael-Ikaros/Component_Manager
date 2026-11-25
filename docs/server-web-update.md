@@ -4,11 +4,7 @@
 
 本页适用于官方 Docker Compose 和群晖 Container Manager 项目。
 启用 updater 后，管理员可在“设置 → 关于服务端”选择渠道、确认更新并查看进度。
-配置可采用[完整单文件模板](../docker-compose.hub-web-update.yml)。
-
-从 `0.7.9-dev.8` 起，API 使用独立镜像，Web 与 updater 共用 `web-*` 管理镜像。
-仍有三个容器：Web 默认启动网页；updater 通过 `command: [updater]` 单独启动更新服务。
-两者共用 `COMPONENT_VAULT_WEB_IMAGE`，但网页更新不会重建正在执行任务的 updater。
+**统一镜像尚未发布。** 当前使用 `0.7.9-dev.29` 时，下载 [dev.29 的完整单文件模板](https://github.com/Rafael-Ikaros/Component_Manager/blob/v0.7.9-dev.29/docker-compose.hub-web-update.yml)。该版本 API 使用独立镜像，Web 与 updater 共用 `web-*` 管理镜像，仍各自运行在独立容器。Web 使用默认命令，updater 使用 `command: [updater]`。当前正式 `latest` 缺少网页更新能力。统一版本的配置见[后续说明](#统一镜像版本发布后)。
 
 ## 是否只换镜像就够
 
@@ -16,7 +12,7 @@
 | --- | --- |
 | 0.7.8 保留库存升级到 dev | 支持；在原项目成对更新 API 和 Web，沿用完整 `/data` 和应用配置 |
 | 只换 dev 镜像，部署一项不改，就能在网页更新 | 不支持；镜像升级不会自动创建 updater 或补上它需要的挂载 |
-| 已启用 updater 后更新到后续兼容正式版或 dev | 支持；网页选择并确认即可，日常无需手改部署 |
+| 已启用 updater 后更新到采用同一部署结构的兼容版 | 支持；网页选择并确认。迁移到统一 Compose 模板时需先修改原项目 |
 | 从 dev 在网页切回 0.7.8 | 不支持；旧目标缺少网页更新能力 |
 | 网页检查到新版就自动安装 | 不会；updater 需要管理员确认，定时跟随当前标签应选择 Watchtower |
 
@@ -25,7 +21,7 @@ updater 自身的镜像维护仍通过原项目完成，不承诺所有未来部
 
 ## 已有正式版先升级到 dev
 
-已有库存可以直接沿用。正式渠道使用 `latest / web-latest`，开发渠道使用 `dev / web-dev`。部署前在 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 核对两种镜像的实际版本。
+已有库存可以直接沿用。当前正式版使用 `latest / web-latest`。以下步骤适用于升级到仍采用旧结构的 dev，使用 `dev / web-dev` 或同版本的固定标签。使用统一版本时按[迁移步骤](#统一镜像版本发布后)配置。
 保持原 Compose 项目名称、完整 `/data`、现有环境变量、端口和网络，在 Container Manager
 原项目中成对改用并拉取开发镜像，然后重新部署。只更新 Web 或只重启旧 API 都不算完成升级。
 如果原文件已经使用本仓库的渠道变量，可设 `COMPONENT_VAULT_DOCKER_CHANNEL=dev`，
@@ -55,7 +51,7 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
 
 ## 当前支持范围
 
-- 当前共享管理镜像模板需使用 `0.7.9-dev.8` 或更新兼容版本；`web-0.7.9-dev.7`
+- 旧版共享管理镜像模板需使用 `0.7.9-dev.8` 或更新兼容版本；`web-0.7.9-dev.7`
   及旧正式镜像不能通过 `command: [updater]` 运行更新服务。已部署的独立 dev.7 updater
   可以继续使用，采用新模板时按下方迁移步骤操作。
 - 0.7.8 不包含网页更新入口。在线更新会在替换前检查目标 API/Web 的
@@ -84,11 +80,9 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    ```
 
    群晖使用 Container Manager 中的项目名，命令行使用 `docker compose -p 原项目名`。旧 `.env` 中已有相同的 `COMPOSE_PROJECT_NAME` 可以保留。
-   兼容的正式版可省略渠道行，默认使用 `latest / web-latest`。
-   现有 `COMPONENT_VAULT_IMAGE`、`COMPONENT_VAULT_WEB_IMAGE` 非空时优先于渠道，应清空或指定配套的兼容版本。
-   Web 和 updater 均使用 `web-dev`，固定版本时均由 `COMPONENT_VAULT_WEB_IMAGE` 指定。
-   新模板不再读取 `COMPONENT_VAULT_UPDATER_IMAGE`，旧 `.env` 中此项可移除。
-3. 使用 [`docker-compose.hub-web-update.yml`](../docker-compose.hub-web-update.yml) 的配置。
+   使用旧模板固定在 dev.29 时，令 `COMPONENT_VAULT_IMAGE` 为 `rafaelikaros/component_manager:0.7.9-dev.29`，令 `COMPONENT_VAULT_WEB_IMAGE` 为 `rafaelikaros/component_manager:web-0.7.9-dev.29`，后者同时供 Web 和 updater 使用。这两个配置优先于渠道变量。
+   共享管理镜像的模板已停止读取 `COMPONENT_VAULT_UPDATER_IMAGE`，旧 `.env` 中此项可移除。
+3. 使用与所选镜像版本对应的模板，保存为 `docker-compose.hub-web-update.yml`。dev.29 使用页首模板，统一版本按[下方配置](#统一镜像版本发布后)选择。
    已有项目沿用原文件名、端口、API 数据来源及其它自定义设置。MQTT 或目录查询曾使用环境变量时，保留原 `api.environment` 中相应的条目。
    完整模板默认同时启动 Web，不用再开启 `web` profile，也不用手动合并三套服务。
    **现有部署的端口、数据卷或自定义网络与模板不一致时，不要直接覆盖这些部分。**
@@ -112,7 +106,7 @@ Docker 的镜像/挂载变更通过重建应用；Compose 保留已有挂载卷�
    原部署目录以外若还有 Compose override、env/config 文件，需以相同绝对路径映射到 updater。
 6. 若使用 Watchtower，API/Web 的 `com.centurylinklabs.watchtower.enable` 设为 `false`，
    避免两个更新服务同时重建；其它应用仍可沿用 Watchtower。
-7. 在 Container Manager 的「映像」中更新项目使用的 API 和管理镜像标签；尚未下载的标签从「注册表」下载。dev 使用 `dev` 和 `web-dev`，其中 `web-dev` 同时供 Web 和 updater 使用。[群晖映像管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_image?version=7)
+7. 在 Container Manager 的「映像」中更新项目使用的标签；尚未下载的标签从「注册表」下载。使用旧模板时确认 API 和管理镜像的版本一致。[群晖映像管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_image?version=7)
 8. 在「项目 → 原项目 → YAML 配置」保存并部署。对照原设置核对 API/Web 端口、`/data` 和 updater 的 `/state`；只点「重新启动」会继续运行已有容器。更新已有项目时，先确认没有进行中的网页更新任务；换用新模板或更新 updater 自身需要重新部署 updater。避免使用「清除」或「删除」项目。[群晖项目管理](https://kb.synology.com/zh-cn/DSM/help/ContainerManager/docker_project?version=7)
 9. 在原 API 地址打开 `/health` 核对版本，再登录管理台检查库存与「设置 → 关于服务端」的更新状态。新安装应先在 `/setup` 保存管理员密钥和 Web 地址，应用设置会写入 `/data/config.json`。
 
@@ -124,10 +118,18 @@ updater 在后续切换时读取原 Compose 文件，并在同一目录备份和
 
 这里的 Docker socket 权限不是“仅允许修改本项目”的权限。常见 root 模式下，控制 Docker 守护进程可获得主机级能力，见[官方说明](https://docs.docker.com/engine/security/)。更新器只操作指定项目是本程序的逻辑约束，不是 Docker 为该 socket 提供的项目级隔离。不接受这一授权时，保留普通 API/Web 并手动更新；无需为了使用业务功能启用更新器。
 
+## 统一镜像版本发布后
+
+使用对应版本的 [`docker-compose.hub-web-update.yml`](../docker-compose.hub-web-update.yml)。同一个完整镜像标签应用于 API、Web 和 updater；API 使用默认的 `api` 启动命令，Web 和 updater 分别由模板显式指定 `command: [web]` 和 `command: [updater]`。新建开发部署使用已发布的统一 `dev`；等统一正式版发布后才使用 `latest`。要固定版本，只设置 `COMPONENT_VAULT_IMAGE`。原项目残留的非空 `COMPONENT_VAULT_WEB_IMAGE` 会覆盖 Web 和 updater 镜像，迁移时移除该覆盖值。
+
+已有部署应先等待网页更新任务结束、备份完整 `/data`，再把统一模板的镜像、命令及 API 布局标识合入原项目。沿用原项目名、管理员密钥、应用环境变量、端口、网络、`/data`、updater 的只读数据入口、`/state` 和项目目录等挂载。核对实际配置并重建三个服务。继续使用旧模板的部署仍通过配套的 `web-*` 标签获得默认 Web 入口。
+
+网页切换渠道前会校验目标镜像具备统一角色。当前稳定版及 dev.29 等旧镜像须使用对应旧版部署结构；回退时在宿主机恢复原 Compose 配置，并按需要恢复一致的数据备份。
+
 ## 从独立 Updater 镜像迁移
 
 已运行 `updater-dev` 的旧部署可以先保留原 updater，继续更新兼容的 API/Web。
-若要改为共用管理镜像，在原项目中将 updater 的镜像改为与 Web 相同的变量，并加入启动命令：
+若升级到使用共享管理镜像的旧布局（例如 dev.29），在原项目中将 updater 的镜像改为与 Web 相同的变量，并加入启动命令：
 
 ```yaml
 services:
@@ -163,5 +165,4 @@ services:
 
 ## 命令行仍可选用
 
-不启用网页更新的部署仍可使用[渠道切换助手](docker-channels.md)。CLI 手动降级不强制
-保留网页更新能力，管理员应理解切回旧版本会失去更新入口及可能存在的数据兼容问题。
+Compose 项目可使用[渠道切换助手](docker-channels.md)更新。若统一模板的目标渠道仍采用旧镜像布局，使用该版本的部署模板手动回退。降级前核对数据格式兼容性；缺少网页更新能力的目标版本需通过宿主机维护。

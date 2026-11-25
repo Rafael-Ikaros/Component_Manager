@@ -8,9 +8,9 @@
 
 以下发布凭据、补发和产物核对步骤供维护者使用。日常部署无需配置 Docker Hub Token。
 
-从 `0.7.9-dev.8` 起，工作流只构建 API 和共享管理镜像。管理镜像默认运行 Web，
-以 `command: [updater]` 运行独立更新容器；发布沿用 `web-*` 标签，不再新增 `updater-*` 标签。
-CI 先验证镜像构建和三个容器角色的启动，再用固定版本验证网页更新，最后推进渠道。下方 dev.7 摘要记录的是旧三镜像结构。
+**统一镜像尚未发布。** 当前正式 `latest` 和 `0.7.9-dev.29` 等已发旧版本使用配套的 API、Web 标签。从 `0.7.9-dev.8` 起，旧开发版的 Web 与 updater 共用 `web-*` 管理镜像。
+
+统一镜像版本发布后，新部署只选择 `rafaelikaros/component_manager` 下的一个渠道或固定版本标签。API、Web 和可选 updater 分别运行在独立容器，使用 `api`、`web`、`updater` 命令，默认启动 API。`web-*` 标签继续为已有部署提供默认启动 Web 的兼容入口。
 
 ## 先分清账号、仓库和两种 Token
 
@@ -23,7 +23,7 @@ CI 先验证镜像构建和三个容器角色的启动，再用固定版本验�
 | Docker Hub repository | `component_manager` |
 | 完整镜像名 | `rafaelikaros/component_manager` |
 
-GitHub 用户名和 Docker Hub namespace 不要求相同。填写 `DOCKERHUB_IMAGE` 时使用 `rafaelikaros/component_manager`，末尾不要加 `/`，也不要附加版本或 `latest`；API 与 Web 共用这个仓库，通过不同 tag 区分。
+GitHub 用户名和 Docker Hub namespace 不要求相同。填写 `DOCKERHUB_IMAGE` 时使用 `rafaelikaros/component_manager`，末尾不要加 `/`，也不要附加版本或 `latest`；API 与 Web 容器使用这个仓库。
 
 还要区分两种完全不同的凭据：
 
@@ -112,7 +112,7 @@ GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs
 独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
 手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
-以 dev.14 为例，固定标签是 `0.7.9-dev.14` 和 `web-0.7.9-dev.14`，对应渠道为 `dev` 和 `web-dev`。正式版渠道为 `latest` 和 `web-latest`。旧版 `updater-*` 标签在仍有部署可能依赖时保留，迁移方式见[网页更新指南](server-web-update.md#从独立-updater-镜像迁移)。
+旧版保留原有镜像布局。例如 dev.14 的固定标签是 `0.7.9-dev.14` 和 `web-0.7.9-dev.14`。统一版本的固定标签仍为 `<version>`，保留 `web-<version>` 作为旧配置兼容入口；推进渠道时使用 `dev / web-dev` 或 `latest / web-latest`。旧版 `updater-*` 标签保留，迁移方式见[网页更新指南](server-web-update.md#从独立-updater-镜像迁移)。
 
 补发时，CI 先核对已有固定标签的版本、提交和两种架构，复用符合预期的摘要，只推送缺失的镜像。标签存在但身份不匹配，或 Docker Hub 查询失败时，任务会停止。需要发布修订后的镜像时使用新的版本号。
 
@@ -124,17 +124,17 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 
 ## 六、确认发布确实成功
 
-1. 确认 **Verify fixed images on Docker Hub** 成功。API 与管理镜像的固定标签都已核对摘要、架构和发布身份，发布步骤中已有镜像的构建应显示跳过。
+1. 确认 **Verify fixed images on Docker Hub** 成功。默认 API 与默认 Web 的固定标签都已核对摘要、架构和发布身份，发布步骤中已有镜像的构建应显示跳过。
 2. 如启用了 `promote_channel`，确认 **Verify real Web-triggered Compose update using fixed images** 成功。该步骤通过管理员 API 在隔离项目触发更新，检查 API/Web 容器替换、Updater 持续运行，以及测试库存、挂载和端口是否保留。
-3. 推进渠道时，确认 **Promote the verified image pair to the channel** 成功。工作流按摘要更新两个浮动标签并回读验证。如果推进失败，工作流会尝试恢复已记录的上一组摘要。
+3. 推进渠道时，确认渠道推进步骤成功。工作流按摘要更新两个浮动标签并回读验证。如果推进失败，工作流会尝试恢复已记录的上一组摘要。
 
 再到 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 确认：
 
-- 存在对应 API、管理镜像的固定版本，两份镜像的 OCI `version` 和 `revision` 对应同一发布源。
+- 默认 API 和默认 Web 的固定标签均可查到，OCI `version` 和 `revision` 对应同一发布源。
 - 推进渠道后，同一镜像的固定标签与浮动标签摘要一致。
 - 清单包含 `linux/amd64` 和 `linux/arm64`。
 
-工作流在 `linux/amd64` 实际启动 API、Web、updater，验证健康、认证、任务持久化和 Web 资源。
+统一镜像发布工作流的验收包括在 `linux/amd64` 启动 API、Web、updater，验证健康、认证、任务持久化和 Web 资源。
 `linux/arm64` 参与构建与发布，容器启动和更新验证在 `linux/amd64` 运行器执行。
 
 本地有 Docker 时可额外检查；维护者通过 Actions 发布并不要求本机安装 Docker：

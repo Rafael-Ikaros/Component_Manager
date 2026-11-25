@@ -9,25 +9,28 @@
 | 用 Compose 保存容器配置，手动更新镜像 | 本页第 1 节与普通模板 | 不需要 |
 | 另行启用网页一键更新 | [可选 Updater](server-web-update.md) | 需要，仅授予更新组件 |
 
-API 与管理台保持前后端分离。从 `0.7.9-dev.8` 起，只构建两种镜像：API 和管理镜像。
-管理镜像默认运行 Web；只有主动启用网页更新时，才另建 updater 容器，共三个容器。
-普通 API/Web 均不挂载 `/var/run/docker.sock`、不需特权模式。旧独立 updater 的迁移见[说明](server-web-update.md#从独立-updater-镜像迁移)。
-
-使用哪个部署方式，都可以在网页设置账户、库存操作和应用配置，检查新版本也无需 Updater。
-已有数据升级时，沿用原容器或项目的完整 `/data` 映射并成对更新 API/Web，见[渠道切换](docker-channels.md)。
-只有希望网页直接替你拉取镜像、重建容器时，才需按[可选配置](server-web-update.md#群晖一次性配置)启用 updater；共享管理镜像需使用 `0.7.9-dev.8` 或更新兼容版本。
+API 和管理台分别运行在独立容器中。普通部署可在网页设置账户、库存操作和应用配置，也可检查新版本。需要网页代为重建容器时，可为原 Compose 项目[另行启用 Updater](server-web-update.md#群晖一次性配置)。已有部署沿用完整的 `/data` 映射及管理员密钥。
 
 ## 1. 准备并启动
 
 本节使用 Compose；不使用 Compose 的群晖用户可直接按[手动部署](docker-manual.md)创建容器，两种方式均不要求 Docker socket 挂载。
 
-下载 [`docker-compose.hub.yml`](../docker-compose.hub.yml)，放进固定部署目录。正式版默认使用 `latest / web-latest`，可以直接启动。选择开发版时，在 Compose 同目录创建名为 `.env` 的文件，只需这一行：
+### 当前已发布版本
+
+**统一镜像尚未发布。** 当前正式 `latest` 与 `0.7.9-dev.29` 使用配套的 API、Web 镜像。下载 [旧版普通 Compose 模板](https://github.com/Rafael-Ikaros/Component_Manager/blob/v0.7.9-dev.29/docker-compose.hub.yml)，保存为 `docker-compose.hub.yml`，放到固定部署目录。该模板默认使用 `latest / web-latest`。固定在 dev.29 时，在同目录的 `.env` 设置：
 
 ```dotenv
-COMPONENT_VAULT_DOCKER_CHANNEL=dev
+COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9-dev.29
+COMPONENT_VAULT_WEB_IMAGE=rafaelikaros/component_manager:web-0.7.9-dev.29
 ```
 
-正式版普通部署可省略 `.env`。选择开发版会拉取 `dev / web-dev`。部署前可在 Docker Hub Tags 核对对应版本。需要固定版本时，在 `.env` 中用 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 指定配套的 API 和 Web 完整镜像名。
+若希望跟随仍发布旧结构的开发渠道，可用 `COMPONENT_VAULT_DOCKER_CHANNEL=dev` 选择 `dev / web-dev`。固定版和渠道标签的实际版本以 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags) 为准。
+
+### 统一镜像版本发布后
+
+下载统一版本的 [`docker-compose.hub.yml`](../docker-compose.hub.yml)。API 与可选的 Web 共用 `rafaelikaros/component_manager` 下的同一标签，模板已为 Web 指定 `command: [web]`，API 使用默认命令。统一正式镜像发布后可用默认的 `latest`；使用已发布的统一开发镜像时，在 `.env` 设 `COMPONENT_VAULT_DOCKER_CHANNEL=dev`。固定版本只需设置 `COMPONENT_VAULT_IMAGE` 为该统一镜像完整名称。若从旧模板迁移，清理旧的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖值以共用同一标签，并保留原项目名、端口、网络、应用环境变量和 `/data` 挂载。旧 `web-*` 标签为已有部署保留默认 Web 入口。
+
+### 启动并完成首次配置
 
 SQLite、日志和配置文件使用镜像的默认路径，管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。只有启用网页更新时，才需在 `.env` 里额外填写宿主机项目目录。已有服务仅更新镜像时可继续使用原 Compose 文件。
 
@@ -50,7 +53,7 @@ docker compose -f docker-compose.hub.yml --profile web up -d
 
 管理 Web 位于 `http://服务器IP:8081/`。库存数据保存在 `/data/component_vault.db`；不要执行 `docker compose down -v`。
 
-以后使用默认浮动标签更新时，先在 Docker Hub 核对 `latest` 和 `web-latest` 当前对应的版本，再在原部署目录执行 `docker compose -f docker-compose.hub.yml --profile web pull` 和 `docker compose -f docker-compose.hub.yml --profile web up -d`；仅部署 API 时去掉 `--profile web`。单独执行 `restart` 不会拉取新镜像。
+以后使用浮动标签更新时，先在 Docker Hub 核对正在使用的标签与目标版本，再在原部署目录执行 `docker compose -f docker-compose.hub.yml --profile web pull` 和 `docker compose -f docker-compose.hub.yml --profile web up -d`；仅部署 API 时去掉 `--profile web`。单独执行 `restart` 不会拉取新镜像。
 
 <a id="watchtower-updates"></a>
 
@@ -61,7 +64,7 @@ Watchtower 适合自动跟随**当前镜像标签**更新，不负责在正式/d
 Watchtower 同样需要访问 Docker 守护进程；不希望授予该权限时，继续手动更新即可。
 
 1. 一致备份整个 `/data`，保留原项目名称、目录和数据映射。
-2. 核对 API/Web 已选择同一渠道，例如 `latest / web-latest` 或 `dev / web-dev`。
+2. 核对 API/Web 使用同一渠道。旧模板使用配套标签，统一模板默认使用同一个标签。
 3. 把 [`docker-compose.watchtower.yml`](../docker-compose.watchtower.yml) 放到原部署目录，执行：
 
    ```sh
@@ -86,7 +89,7 @@ API/Web 更新并非原子操作。更新后核对容器、`/health` 版本、�
 
 ## 2. 群晖 Container Manager 与文件映射
 
-在群晖 File Station 中准备项目目录，例如 `/volume1/docker/component-manager/`，将 Compose 放在其中。使用开发版时，先把上面的单行 `.env` 放进这个目录。若希望在 File Station 查看持久化文件，先创建 `data/` 子目录，再在 Container Manager 的 **项目** 中选择该目录并导入 Compose，将 API 的 volume 改成宿主目录映射：
+在群晖 File Station 中准备项目目录，例如 `/volume1/docker/component-manager/`，将 Compose 放在其中。使用开发版时，将对应版本的 `.env` 配置保存在这个目录。若希望在 File Station 查看持久化文件，先创建 `data/` 子目录，再在 Container Manager 的 **项目** 中选择该目录并导入 Compose，将 API 的 volume 改成宿主目录映射：
 
 ```yaml
 services:
@@ -131,7 +134,7 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 
 由于 8081 和 8787 是不同 **origin**，须把浏览器实际打开的 Web `scheme://host:port` 精确加入 `ADMIN_WEB_ORIGINS`，例如 `http://nas:8081`，不要填 API origin 或通配符。API 对允许来源启用带凭据 CORS；改动环境变量后在原项目目录执行 `up -d` **重建** API，单独 `restart` 不会读取新 `.env`。若设置保存于 `/data/config.json`，服务端会动态读取。反向代理应同时正确转发 `/auth/session`、`/auth/me` 与 `/admin-api/*`。
 
-当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。正式使用 `latest / web-latest`，开发使用 `dev / web-dev`；新模板的 updater 与 Web 使用同一个管理镜像，通过 `command: [updater]` 启动。共享镜像需要 `0.7.9-dev.8` 或更新版本，旧正式镜像不包含此启动模式。发布情况可查看 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)，已部署版本以 `/health` 为准。
+当前 API 和管理 Web 支持在设置中编辑应用配置，也可继续使用已认证的 `/setup`。`ADMIN_WEB_URL` 可填写管理台实际完整地址（支持反向代理子路径）；首次保存后先复制管理员密钥，再进入管理台登录。启用网页更新时，按[网页更新指南](server-web-update.md)选择与镜像版本相配的模板，另建显式使用 `command: [updater]` 的容器。发布情况可查看 [Docker Hub Tags](https://hub.docker.com/r/rafaelikaros/component_manager/tags)，已部署版本以 `/health` 为准。
 
 嘉立创／立创目录查询使用公开目录，无需 OpenAPI 凭据。Android 和 Windows 直接查询，Web 库存的目录补全通过服务端查询。已有 Compose 若通过环境变量配置了 MQTT、远程识别规则或目录查询选项，采用新模板时需保留原 `api.environment` 中对应的行。[高级配置](runbook.md#environment-variables)
 
@@ -143,7 +146,7 @@ MQTT 是另一套优先级：已有 Web 保存的数据库配置优先于 MQTT �
 
 创建或重置普通账户时只显示一次完整密钥，请当场复制。之后管理员可重置密钥；旧密钥立即失效，库存保留。停用账户也不会删除库存。普通用户不能进入服务端配置或账户管理页面，遗失密钥应联系管理员。
 
-升级账户版本时，先更新 API 和 Web 两个镜像，再更新原生客户端。旧版客户端仍能使用原管理员密钥，但普通用户需要支持账户身份检查的新版客户端。一个原生安装目前对应一份本地工作区；更换到其他账户时会停止同步并保留数据，不会自动把旧库存导入新账户。
+升级账户版本时，先将 API 和 Web 容器更新到配套版本，再更新原生客户端。旧版客户端仍能使用原管理员密钥，但普通用户需要支持账户身份检查的新版客户端。一个原生安装目前对应一份本地工作区；更换到其他账户时会停止同步并保留数据，不会自动把旧库存导入新账户。
 
 除原有数据库和配置文件外，普通账户库存位于 `/data/users/<账户ID>.db`，继续使用同一 `/data` 挂载，无需为每个用户添加 volume。备份时须停止写入并保存整个数据目录，包括管理员数据库中的账户注册信息和 `users/`。若仅恢复管理员数据库而遗漏用户文件，受影响账户会提示数据不可用，需要补回文件，不能当作空库存继续使用。
 

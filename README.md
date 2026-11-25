@@ -97,12 +97,12 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 
 可在群晖界面[直接创建 API、Web 容器](docs/docker-manual.md)，无需 Compose、`.env` 或 SSH；也可使用[普通 Compose 模板](docs/docker-quickstart.md)。两种普通部署方式都不向应用挂载 Docker socket，不要求特权模式。
 管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。
-API 使用独立镜像，管理镜像默认运行 Web。库存、同步和检查更新均不依赖 Updater。
+当前已发布版本按版本使用配套 API、Web 标签。统一镜像版本发布后，从 `rafaelikaros/component_manager` 选择同一标签创建两个容器，API 使用默认命令，Web 明确指定 `web`。库存、同步和检查更新均不依赖 Updater。
 首次访问 `http://服务器IP:8787/setup` 设置管理员密钥，再在管理台创建普通账户。
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。
 
 > [!NOTE]
-> **网页一键更新是可选项。** 普通部署在群晖界面成对更新 API/Web 镜像。替换前停 API 并备份完整数据目录，保留原 `/data` 映射。[备份与替换](docs/docker-manual.md#5-手动更新或切换渠道)
+> **网页一键更新是可选项。** 普通部署可在群晖界面手动更新 API/Web 容器。替换前停 API 并备份完整数据目录，保留原 `/data` 映射。[备份与替换](docs/docker-manual.md#5-手动更新或切换渠道)
 > 只有希望网页代替你重建容器时，才启用[独立 Updater](docs/server-web-update.md)。该组件需要 Docker 管理权限，并额外运行一个容器；不启用不影响业务功能。
 
 普通部署默认不会自动安装新镜像。可选的网页 Updater 由管理员确认后执行；

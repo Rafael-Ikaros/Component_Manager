@@ -8,7 +8,7 @@
 
 ### 独立 Docker CI 与发布渠道
 
-`docker-ci.yml` 检查镜像构建和 Compose 配置。`server-image.yml` 核对并复用已发布的固定标签，只构建缺失的 API 或管理镜像。隔离项目验证更新后，才推进对应的 `dev / web-dev` 或 `latest / web-latest`。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可用 `master` 上的独立工作流补发同一 tag，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
+`docker-ci.yml` 检查镜像构建和 Compose 配置。统一镜像尚未发布。发布后，`server-image.yml` 按固定版本发布统一镜像与默认 Web 的兼容标签，完成隔离项目验证后才推进对应渠道。旧版固定标签沿用发布时的镜像结构。Changelog 发布并行生成原生附件及 Docker 镜像，各自报告结果。Docker 失败后可用 `master` 上的独立工作流补发同一 tag，需要推进渠道时勾选 `promote_channel`。[镜像发布指南](dockerhub.md)
 
 ### Optional Watchtower updates for the Hub deployment
 
@@ -580,7 +580,7 @@ topic/deletion behavior.
 
 只保留 `master` 主线。日常功能和界面调整先发 dev，CI 成功不能代替实际 UI 验收。准备发布时，将最新版本标题和说明写入 `docs/CHANGELOG.md`：`X.Y.Z-dev.N` 自动走预发布，无后缀的 `X.Y.Z` 自动走正式发布；详细测试说明可链接到 `docs/releases/`。
 
-也可直接给已通过 CI 的提交推送 `vX.Y.Z-dev.N` tag，触发 `Release Artifacts` 与独立 `Docker Images`。两种入口共用渠道识别：dev 发布固定版本与 dev/web-dev，不替换正式 latest/web-latest；不能仅凭原生附件完成推断 Docker 已完成。
+也可直接给已通过 CI 的提交推送 `vX.Y.Z-dev.N` tag，触发 `Release Artifacts` 与独立 `Docker Images`。两种入口共用渠道识别。dev 发布固定版本与对应的开发渠道标签，正式 `latest / web-latest` 保持原版本。Docker 是否完成请单独查看镜像任务。
 
 Both channels keep the same Android application ID and signing key. Published
 Android version codes are derived from the release tag:
@@ -650,4 +650,4 @@ API 与 Web 配套更新后，在「库存 → 库存工具 → 库存资料检�
 分析不写入；应用沿用 `WEB_INVENTORY_ENABLED` 或已保存的 Web 库存操作开关。
 先同步各设备，再核对缺项或差异。可以逐条选择，也可在支持的版本中全选本次扫描的可更新资料。确认应用后再同步设备。
 任务预览只存在本次服务进程，重启后重新分析；网络失败可重试，版本冲突需重新预览。
-开发镜像使用 dev/web-dev，正式镜像使用 latest/web-latest。试用时成对更新并保留原项目和数据；需要源码构建时见[资料更新教程](parameter-enrichment.md)。
+按[镜像部署指南](docker-quickstart.md)为目标版本选择标签和 Compose 模板，重建 API/Web 时保留原项目和数据。需要源码构建时见[资料更新教程](parameter-enrichment.md)。

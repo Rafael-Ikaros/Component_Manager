@@ -1,8 +1,14 @@
-# Build the API and Web console from the local checkout.
+# Build one image, then run the API and Web as separate roles.
 services:
   api:
-    build:
-      context: ./server
+    image: component-vault:local
+    build: &unified-build
+      context: .
+      target: api
+      args:
+        VITE_DEFAULT_API_BASE_URL: ${VITE_DEFAULT_API_BASE_URL:-}
+    labels:
+      io.componentvault.compose-layout: unified
     ports:
       - "8787:8787"
     environment:
@@ -17,11 +23,9 @@ services:
       - component_vault_data:/data
 
   admin-web:
-    build:
-      context: .
-      dockerfile: admin-web/Dockerfile
-      args:
-        VITE_DEFAULT_API_BASE_URL: ${VITE_DEFAULT_API_BASE_URL:-}
+    image: component-vault:local
+    build: *unified-build
+    command: [web]
     depends_on:
       - api
     ports:
