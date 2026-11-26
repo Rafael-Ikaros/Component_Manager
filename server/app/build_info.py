@@ -1,7 +1,13 @@
 """Build identity baked into container images; source runs remain explicit."""
 
-import os
+import json
+from pathlib import Path
 
 
-BUILD_VERSION = os.environ.get("COMPONENT_VAULT_BUILD_VERSION", "source")
-BUILD_REVISION = os.environ.get("COMPONENT_VAULT_BUILD_REVISION", "unknown")
+try:
+    build = json.loads(Path(__file__).with_name("_container_build.json").read_text(encoding="utf-8"))
+except FileNotFoundError:
+    build = {"version": "source", "revision": "unknown"}
+
+BUILD_VERSION = build["version"]
+BUILD_REVISION = build["revision"]

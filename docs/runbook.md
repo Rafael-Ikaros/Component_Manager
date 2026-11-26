@@ -12,6 +12,8 @@
 
 ### 排查镜像与客户端账户接口不一致
 
+Web 版本来自浏览器加载的构建，API 版本来自管理台所连接的服务端。更新后仍看到旧版本时，先比较直连 API 的 `/health` 与「关于服务端」的 API 地址和版本，再核对运行中容器的 Image ID。dev.30 及更早的 API 镜像会读取 `COMPONENT_VAULT_BUILD_VERSION` 和 `COMPONENT_VAULT_BUILD_REVISION`，重建时不要沿用旧镜像自带的值。[手动更新 API](docker-manual.md#更新-api-容器)
+
 见[账户接口排障](docker-quickstart.md#7-客户端提示服务端版本过老或无法确认账户身份)。
 先核对实际 API `/health` 版本及认证 `/auth/me`，再检查端口、反向代理和账户密钥。
 

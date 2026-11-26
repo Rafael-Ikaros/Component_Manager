@@ -17,6 +17,9 @@ bump: patch
 
 <!-- Add unreleased notes below this line. -->
 
+- 「关于服务端」分别显示 Web 管理台和所连接 API 的构建版本及提交，同时显示 API 地址。`0.7.9-dev.31` 在版本栏显示为 `dw31`，GitHub、Docker、API 和更新检查仍使用原版本号。
+- Docker API 从镜像内读取构建版本，避免重建时带入旧的版本环境变量导致误报。群晖独立容器和 Compose 教程补齐 API 更新和版本排查步骤。
+
 ## [0.7.9-dev.30] - 2026-11-26
 
 本版提供 Android APK、Web 静态包和 Docker 统一开发镜像。Windows 不再提供新安装包；正式版与 Docker 正式渠道保持原版本。

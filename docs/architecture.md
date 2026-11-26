@@ -882,8 +882,8 @@ Web 在 SQLite 查询函数中执行过滤，总数与分页使用同一条件�
 原生客户端新增导入的 R/C/L 名称使用短型号、官方主值和精度；完整官方资料仍保存在描述，
 已有自定义名称不批量回填。旧库存摘要只读取已保存的官方字段，不推测型号编码对应的规格。
 
-Docker API 镜像通过 build args 写入发布 tag 和 checkout revision，`/health` 与管理设置
-显示构建信息。身份校验仍以 `/auth/me` 的服务器/账户 ID 为准，不用版本字符串代替身份。
+Docker API 将发布 tag 和 checkout revision 写入镜像内的构建元数据。`/health` 与 `/admin-api/about` 读取同一份值，重建容器时沿用的旧版本环境变量不会改变结果。
+Web 在 Docker 和静态包构建时分别写入发布 tag 与 checkout revision。「关于服务端」并列显示加载的 Web 版本和当前连接的 API 版本。身份校验仍以 `/auth/me` 的服务器和账户 ID 为准。
 Android 和 Windows 的连接测试执行协议与账户接口检查而不保存绑定；正式同步保留原绑定保护。
 
 

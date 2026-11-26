@@ -244,11 +244,20 @@ jobs:
         run: bash tools/deployment/verify-first-run.sh component-vault-server:ci
 
       - name: Verify API startup, authentication and mounted database
+        env:
+          EXPECTED_VERSION: ${{ steps.build_identity.outputs.version }}
+          EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
         run: |
           mkdir -p "$RUNNER_TEMP/component-vault-data"
+          build_overrides=()
+          if grep -Fq 'app/_container_build.json' Dockerfile 2>/dev/null; then
+            # Simulate replacing an older API while carrying over its environment.
+            build_overrides=(-e COMPONENT_VAULT_BUILD_VERSION=v0.7.9-dev.16 -e COMPONENT_VAULT_BUILD_REVISION=old-revision)
+          fi
           docker run -d --name component-vault-api-ci \
             -p 127.0.0.1:18787:8787 \
             -e API_TOKEN=ci-smoke-token \
+            "${build_overrides[@]}" \
             -v "$RUNNER_TEMP/component-vault-data:/data" \
             component-vault-server:ci
           trap 'docker logs component-vault-api-ci; docker rm -f component-vault-api-ci' EXIT
@@ -274,8 +283,8 @@ jobs:
           assert identity['server_id'] and identity['account_id'] == 'admin', identity
           assert identity['role'] == 'admin', identity
           health = json.loads((root / 'server-health.json').read_text())
-          assert health['version'], health
-          assert len(health['revision']) == 40, health
+          assert health['version'] == os.environ['EXPECTED_VERSION'], health
+          assert health['revision'] == os.environ['EXPECTED_REVISION'], health
           database = root / 'component-vault-data' / 'component_vault.db'
           assert database.is_file(), 'Database must be persisted in the mounted /data directory.'
           with sqlite3.connect(f'file:{database}?mode=ro', uri=True) as connection:

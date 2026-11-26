@@ -6,7 +6,11 @@ RUN npm ci
 COPY admin-web/ .
 
 ARG VITE_DEFAULT_API_BASE_URL=
-ENV VITE_DEFAULT_API_BASE_URL=$VITE_DEFAULT_API_BASE_URL
+ARG APP_VERSION=source
+ARG APP_REVISION=unknown
+ENV VITE_DEFAULT_API_BASE_URL=$VITE_DEFAULT_API_BASE_URL \
+    VITE_COMPONENT_VAULT_WEB_VERSION=$APP_VERSION \
+    VITE_COMPONENT_VAULT_WEB_REVISION=$APP_REVISION
 RUN npm run build
 
 # Keep Docker 28 compatibility with older NAS Engines and API negotiation enabled.
@@ -51,8 +55,7 @@ RUN sed -i 's/\r$//' /app/switch-channel.sh /usr/local/bin/componentvault-entryp
 
 ARG APP_VERSION=source
 ARG APP_REVISION=unknown
-ENV COMPONENT_VAULT_BUILD_VERSION=${APP_VERSION} \
-    COMPONENT_VAULT_BUILD_REVISION=${APP_REVISION}
+RUN python -c 'import json, os; from pathlib import Path; Path("app/_container_build.json").write_text(json.dumps({"version": os.environ["APP_VERSION"], "revision": os.environ["APP_REVISION"]}), encoding="utf-8")'
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["/usr/local/bin/componentvault-healthcheck"]

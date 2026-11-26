@@ -280,7 +280,9 @@ jobs:
         run: npm ci
 
       - name: Build admin web
-        run: npm run build
+        env:
+          VITE_COMPONENT_VAULT_WEB_VERSION: ${{ needs.prepare.outputs.release_tag || 'source' }}
+        run: VITE_COMPONENT_VAULT_WEB_REVISION="$(git rev-parse HEAD)" npm run build
 
       - name: Package admin web artifact
         run: |

@@ -123,7 +123,7 @@ export function ServerUpdateCard({ currentVersion, guideUrl, manualGuideUrl, cha
     ?? (job.status === "succeeded" ? "服务已运行所选版本。" : "正在执行更新任务。")) : "";
   return <section className="space-y-4 rounded-xl border bg-slate-50 p-4" aria-label={t("服务端更新")}>
     <h3 className="font-semibold">{t("服务端更新")}</h3>
-    <p className="text-sm text-muted-foreground">{t("当前运行：")}{status?.current_version ?? currentVersion} · {channelName(status?.current_channel ?? (currentVersion === "source" ? "unknown" : currentVersion.includes("-dev.") ? "dev" : "stable"))}</p>
+    <p className="text-sm text-muted-foreground">{t("当前 API 版本：")}{status?.current_version ?? currentVersion} · {channelName(status?.current_channel ?? (currentVersion === "source" ? "unknown" : currentVersion.includes("-dev.") ? "dev" : "stable"))}</p>
     {reconnecting ? <p role="status" className="text-sm text-amber-800">{t("正在重新连接更新服务；已知任务会保留。更新重启期间请稍候。")}</p> : null}
     {status?.enabled === false ? <div className="space-y-2 text-sm">
       <p>{t("可按手动部署教程更新；无需向管理台授予 Docker 管理权限。库存、同步和上方版本检查仍可照常使用。")}</p>
@@ -156,7 +156,7 @@ export function ServerUpdateCard({ currentVersion, guideUrl, manualGuideUrl, cha
     <dialog ref={dialog} aria-labelledby={titleId} className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl border bg-white p-6 text-foreground shadow-xl backdrop:bg-slate-950/40" onCancel={(event) => { if (busy) event.preventDefault(); }}>
       <div className="space-y-4">
         <h3 id={titleId} className="text-lg font-semibold">{t("确认服务端更新")}</h3>
-        <p className="text-sm">{t("当前运行：")}{status?.current_version ?? currentVersion} · {channelName(status?.current_channel ?? "unknown")}</p>
+        <p className="text-sm">{t("当前 API 版本：")}{status?.current_version ?? currentVersion} · {channelName(status?.current_channel ?? "unknown")}</p>
         <p className="text-sm">{t("目标更新渠道")}: {channelName(channel)} ({channel === "stable" ? "latest / web-latest" : "dev / web-dev"})</p>
         <p className="text-sm text-muted-foreground">{t("请先备份完整 /data。更新会重建 API 和 Web，并可能短暂断线；数据迁移后的降级不保证兼容，也不会自动回滚。")}</p>
         {message ? <p role="alert" className="text-sm text-amber-800">{message}</p> : null}

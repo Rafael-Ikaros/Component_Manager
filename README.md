@@ -102,7 +102,7 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。
 
 > [!NOTE]
-> **网页一键更新是可选项。** 普通部署可在群晖界面手动更新 API/Web 容器。替换前停 API 并备份完整数据目录，保留原 `/data` 映射。[备份与替换](docs/docker-manual.md#5-手动更新或切换渠道)
+> **网页一键更新是可选项。** 手动升级时，先停 API 并备份完整数据目录，再从新镜像重建并沿用原 `/data` 映射。升级后在「关于服务端」分别核对 Web 和 API 版本。[群晖独立容器更新 API](docs/docker-manual.md#更新-api-容器) · [Compose 更新 API 和 Web](docs/docker-quickstart.md#更新-api-和-web)
 > 希望在网页上重建容器时，按[群晖 Compose 与 Updater 图文教程](docs/server-web-update.md#群晖一次性配置)配置。Updater 单独运行，需要 Docker 管理权限。
 
 普通部署默认不会自动安装新镜像。可选的网页 Updater 由管理员确认后执行；

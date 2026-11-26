@@ -29,6 +29,7 @@
 | --- | --- |
 | 群晖手动创建 API/Web，不使用 Compose、不授予 Docker 控制权限 | [手动部署与更新](docker-manual.md) |
 | 使用 Compose 安装、配置账户密钥和排障 | [Docker Compose 部署](docker-quickstart.md) |
+| 更换 API 镜像、沿用原库存并核对版本 | [群晖独立容器更新](docker-manual.md#更新-api-容器) · [Compose 更新](docker-quickstart.md#更新-api-和-web) |
 | 正式版升级 dev、选择更新渠道 | [渠道切换](docker-channels.md) |
 | 在群晖用 Compose 部署 Updater、恢复备份和验证更新 | [群晖 Compose 图文教程](server-web-update.md#群晖一次性配置) |
 | 维护者向 Docker Hub 发布镜像、核对发布结果 | [镜像发布](dockerhub.md) |

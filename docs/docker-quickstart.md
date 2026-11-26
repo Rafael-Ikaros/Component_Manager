@@ -31,9 +31,19 @@ docker compose -f docker-compose.hub.yml --profile web ps
 
 新安装的设置保存在 `/data/config.json`。已有部署继续使用原密钥和数据卷。普通用户由管理员创建并分配独立密钥。[账户管理](accounts.md)
 
-### 更新镜像
+### 更新 API 和 Web
 
-先按[第 6 节](#6-升级前备份与回退)备份。继续在原项目目录使用原模板和数据映射，重新执行 `pull`、`up -d` 和 `ps`。`restart` 会继续运行原来的容器。更新后打开 `/health` 核对版本，再登录管理台。需要切换渠道时见[渠道切换](docker-channels.md)。
+先按[第 6 节](#6-升级前备份与回退)备份。继续使用原项目名、原模板和数据挂载。若模板固定了版本，先将其中的固定标签改成目标版本。更新 API 和已部署的 Web 时，在原项目目录执行：
+
+```sh
+docker compose -f docker-compose.hub.yml --profile web pull api admin-web
+docker compose -f docker-compose.hub.yml --profile web up -d api admin-web
+docker compose -f docker-compose.hub.yml --profile web ps
+```
+
+只部署 API 时，去掉 `--profile web` 和 `admin-web`。群晖 Container Manager 的「项目」部署则在原项目中拉取目标映像并重新部署。仅点「重新启动」会继续使用原来的容器。已配置 [Updater](server-web-update.md) 的项目也可通过网页更新 API 和 Web。
+
+更新后直连 API 的 `/health` 检查 `version` 和 `revision`，再登录 Web，在「关于服务端」核对两个版本与实际连接的 API 地址。若 API 仍显示旧版，按[版本排查步骤](docker-manual.md#分阶段排障)检查容器和连接目标。需要切换渠道时见[渠道切换](docker-channels.md)。
 
 <a id="watchtower-updates"></a>
 
