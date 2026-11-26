@@ -25,7 +25,7 @@
     "Both hands holding the blue component box with the white IC emblem",
     "Two clean open circular arcs; no waveform or contact-pad decorations"
   ],
-  "supersedes_selected_master": "component-vault-logo-v2.png",
+  "supersedes_release_branding": "v0.7.9-dev.1",
   "integration": {
     "status": "integrated_for_0.7.9-dev.2",
     "readme_logo_updated": true,
