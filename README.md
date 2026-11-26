@@ -103,7 +103,7 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 
 > [!NOTE]
 > **网页一键更新是可选项。** 普通部署可在群晖界面手动更新 API/Web 容器。替换前停 API 并备份完整数据目录，保留原 `/data` 映射。[备份与替换](docs/docker-manual.md#5-手动更新或切换渠道)
-> 只有希望网页代替你重建容器时，才启用[独立 Updater](docs/server-web-update.md)。该组件需要 Docker 管理权限，并额外运行一个容器；不启用不影响业务功能。
+> 希望在网页上重建容器时，按[群晖 Compose 与 Updater 图文教程](docs/server-web-update.md#群晖一次性配置)配置。Updater 单独运行，需要 Docker 管理权限。
 
 普通部署默认不会自动安装新镜像。可选的网页 Updater 由管理员确认后执行；
 定时跟随当前渠道可选 [Watchtower](docs/docker-quickstart.md#watchtower-updates)，它同样需要 Docker 管理访问。同一服务只使用一种更新方式。

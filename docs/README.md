@@ -30,7 +30,7 @@
 | 群晖手动创建 API/Web，不使用 Compose、不授予 Docker 控制权限 | [手动部署与更新](docker-manual.md) |
 | 使用 Compose 安装、配置账户密钥和排障 | [Docker Compose 部署](docker-quickstart.md) |
 | 正式版升级 dev、选择更新渠道 | [渠道切换](docker-channels.md) |
-| 配置网页更新及了解一次性配置要求 | [网页更新](server-web-update.md) |
+| 在群晖用 Compose 部署 Updater、恢复备份和验证更新 | [群晖 Compose 图文教程](server-web-update.md#群晖一次性配置) |
 | 维护者向 Docker Hub 发布镜像、核对发布结果 | [镜像发布](dockerhub.md) |
 
 普通部署不挂 Docker socket；直接创建的容器或 Compose 项目都可以手动更新。已有部署沿用原数据挂载，不必为了更新改用新空项目。网页一键更新是另行授权的可选功能，需要 Docker 管理访问，详见[网页更新教程](server-web-update.md)。
