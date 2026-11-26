@@ -1,6 +1,6 @@
 # Docker 正式版与开发版切换
 
-当前正式版使用 `latest / web-latest`。开发版从 `0.7.9-dev.30` 起使用统一镜像。镜像由 **Docker Images** 工作流发布，开发版不会推进正式版标签。普通部署者无需 Docker Hub Token。
+正式版 0.7.8 使用 `latest / web-latest`。开发版从 `0.7.9-dev.30` 起使用统一镜像，跟随开发渠道使用 `dev`。dev.31 的固定标签是 `0.7.9-dev.31`，`dw31` 是管理台中的显示名。镜像由 **Docker Images** 工作流发布，开发版不会推进正式版标签。普通部署者无需 Docker Hub Token。
 
 新建开发版项目从同一 `dev` 或固定标签启动 API 和 Web，Web 显式指定 `command: [web]`。旧模板继续使用配套 `web-*` 兼容标签。新模板的部署和迁移见[快速部署](docker-quickstart.md#使用统一镜像)；目标版本仍采用旧镜像布局时，回退使用该版本的部署模板。
 
@@ -60,21 +60,20 @@
 ## 群晖不使用 SSH
 
 在 Container Manager 打开原项目，备份数据并记录原项目名、端口和目录。
-保留原 Compose 文件。若它使用渠道变量，在原项目目录创建或修改 `.env`，
-保留既有应用配置，将渠道键设为 `dev` 或 `latest`：
+在原项目目录编辑 `.env`，保留既有应用配置。如果原模板支持目标渠道，把渠道键设为 `dev` 或 `latest`：
 
 ```dotenv
 COMPONENT_VAULT_DOCKER_CHANNEL=dev
 ```
 
-已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，应清空，以便按渠道取镜像。
-保留原挂载。旧配套镜像模板可在两个渠道间切换并使用 `web-*` 兼容标签。统一镜像模板仅能选择提供统一镜像的渠道。当前切回 0.7.8 正式版，需要在原项目换回对应的配套镜像模板，再部署 `latest / web-latest`。如果去掉 Updater，同时从 API 配置移除 `UPDATER_URL`。使用单独容器时，参照[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换两个容器。
+已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，清除其中固定旧版本的配置，以便按渠道取镜像。
+保留原挂载。旧配套镜像模板可在两个渠道间切换，Web 继续用配套的 `web-*` 标签。统一镜像模板仅支持提供统一镜像的渠道。当前切回 0.7.8 正式版，需要在原项目换回[配套镜像模板](docker-quickstart.md#1-准备并启动)，再部署 `latest / web-latest`。如果去掉 Updater，同时从 API 配置移除 `UPDATER_URL`。完成编辑后按[群晖项目更新步骤](docker-quickstart.md#在群晖更新现有项目)拉取并重建。使用独立容器时，按[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换容器。
 
 ## Watchtower 与版本确认
 
 沿用 [Watchtower 配置](docker-quickstart.md#watchtower-updates)。它跟随当前容器的镜像渠道更新，
 不会自动跨渠道；切换助手保留原 override 中的 Watchtower labels。
 
-在服务端“设置 → 关于服务端”查看实际版本，`/health` 也提供 `version / revision`。
+在 Web「设置 → 关于服务端」分别查看 Web 版本、API 版本和连接地址。API 的 `/health` 返回其实际构建的 `version` 和 `revision`。页面显示 `dw31` 时，API 的发布版本仍为 `v0.7.9-dev.31`。
 GitHub Release 出现时镜像可能尚在构建，应以独立 Docker Images 工作流成功和 Hub 标签可拉取为准。
-更新后核对 API/Web 两个容器、登录和库存读取。
+更新后核对 API 与 Web 的运行版本、登录和库存读取。[版本核对与排障](docker-manual.md#核对-web-和-api-版本)

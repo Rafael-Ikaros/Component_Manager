@@ -5,7 +5,7 @@ Updater 是可选的第三个容器。它面向 **Compose 项目**，管理员�
 | 当前部署 | 怎么更新 |
 | --- | --- |
 | DSM 独立容器 | 在 Container Manager 拉取并替换 API、Web |
-| 普通 Compose 项目 | 在原项目拉取并重新部署，或按本页启用 Updater |
+| 普通 Compose 项目 | 在原项目[拉取并重建 API 和 Web](docker-quickstart.md#更新-api-和-web)，也可按本页启用 Updater |
 | 已启用 Updater 的兼容项目 | 管理员在网页选择渠道并确认更新 |
 
 当前正式版 0.7.8 不支持网页一键更新。它可以保留原数据升级到开发版。更新器需要宿主机的 Docker socket，在典型 root 模式下具备管理主机容器的能力。仅在接受这项权限时启用。[Docker 权限说明](https://docs.docker.com/engine/security/)
@@ -99,7 +99,9 @@ API 和 Updater 使用同一项目网络，API 保留 `UPDATER_URL: http://updat
 
 1. 管理员进入「设置 → 关于服务端」，选择渠道，点击「检查更新」查看目标版本。
 2. 点击「更新到所选渠道」，核对目标和备份提示并确认。Updater 先拉取镜像并检查版本与角色，然后备份 `.env`，重建 API 和已部署的 Web。它自身继续运行。
-3. 短暂断线后刷新管理台。在「关于服务端」分别核对 Web 管理台版本、API 服务端版本和 API 地址，再直连 API 的 `/health`，检查 `version`、登录和库存。如果两处 API 版本不同，核对管理台是否经另一端口或反向代理连接到了旧实例。更新 Updater 自身时仍从原项目手动部署，等待进行中的任务完成。
+3. 短暂断线后刷新管理台。在「关于服务端」核对 Web 管理台版本、API 服务端版本和 API 地址。升级到 dev.31 时，Web 与 API 两栏均显示 `dw31`，API 的 `/health` 返回 `v0.7.9-dev.31`。顺手核对登录和原库存。[版本核对与排障](docker-manual.md#核对-web-和-api-版本)
+
+本次操作重建 API 和 Web，Updater 会继续运行当前容器。需要更新 Updater 自身时，等正在运行的任务完成，再按原项目的部署方式重建 Updater 并保留 `/state`。
 
 下图是 DSM 实际完成的 dev.30 同版本更新。API 与 Web 重建后重新上线，Updater 持续运行，恢复的库存与流水保持一致。确认框可能显示兼容标签 `dev / web-dev`，使用统一模板的项目仍按自身布局共用 `dev` 镜像。
 

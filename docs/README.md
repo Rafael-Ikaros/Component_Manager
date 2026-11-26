@@ -18,10 +18,10 @@
 | 创建、停用、删除用户及分发密钥 | [账户管理](accounts.md) |
 | 用商城订单修正已有元件资料 | [从订单更新资料](order-metadata-update.md) |
 | 扫描库存资料、跨页全选并应用更新 | [库存资料检查](parameter-enrichment.md) |
-| 编辑标签、模板和汉印 M1 打印 | [标签打印](m1-printing-feature-matrix.md) |
-| HM-A300E 配对、纸张与通用 CPCL 打印 | [HM-A300E](hm-a300e.md) |
+| 编辑标签、选择字体字号、保存纸张和校准偏移 | [标签打印](m1-printing-feature-matrix.md) |
+| 蓝牙配对、选择打印协议和核对机型支持 | [打印机兼容性](printer-compatibility.md) · [HM-A300E](hm-a300e.md) · [德佟 P1](detonger-p1.md) |
 | 反馈错误和附加诊断 | [扫码诊断与反馈](feedback-and-scan-diagnostics.md) |
-| 向 Home Assistant、看板发布库存变化 | [MQTT](mqtt.md) |
+| 向 Home Assistant、看板发布管理员库存状态 | [MQTT](mqtt.md) |
 
 ## 部署和更新
 
@@ -29,7 +29,8 @@
 | --- | --- |
 | 群晖手动创建 API/Web，不使用 Compose、不授予 Docker 控制权限 | [手动部署与更新](docker-manual.md) |
 | 使用 Compose 安装、配置账户密钥和排障 | [Docker Compose 部署](docker-quickstart.md) |
-| 更换 API 镜像、沿用原库存并核对版本 | [群晖独立容器更新](docker-manual.md#更新-api-容器) · [Compose 更新](docker-quickstart.md#更新-api-和-web) |
+| 更换 API 或 Web 镜像并沿用原库存 | [群晖独立容器更新](docker-manual.md#更新-api-容器) · [Compose 更新](docker-quickstart.md#更新-api-和-web) |
+| 查看 dw31，排查更新后仍显示旧版本 | [核对 Web 和 API 版本](docker-manual.md#核对-web-和-api-版本) |
 | 正式版升级 dev、选择更新渠道 | [渠道切换](docker-channels.md) |
 | 在群晖用 Compose 部署 Updater、恢复备份和验证更新 | [群晖 Compose 图文教程](server-web-update.md#群晖一次性配置) |
 | 维护者向 Docker Hub 发布镜像、核对发布结果 | [镜像发布](dockerhub.md) |
@@ -42,7 +43,6 @@
 - [接口与格式](integration-guide.md)：认证、同步和管理 API。
 - [开发与运维](runbook.md)：构建、版本发布和故障排查。
 - [更新日志](CHANGELOG.md)：版本功能与修复。
-- [设备兼容性](printer-compatibility.md)：打印机支持范围及诊断含义。
 
 ## 历史证据与设计资料
 

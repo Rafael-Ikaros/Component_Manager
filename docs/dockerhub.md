@@ -104,12 +104,12 @@ GitHub Secrets 的官方说明见 [Using secrets in GitHub Actions](https://docs
 1. 左侧选择 **Docker Images**，点击 **Run workflow**。
 2. **Use workflow from** 选择 `master`。
 3. `source_ref` 留空，默认检出下方 tag；也可显式填相同提交或 tag。
-4. `release_tag` 填已经存在且通过验证的目标 tag，例如 `v0.7.9-dev.14`。
+4. `release_tag` 填已经存在且通过验证的 Git tag，例如 `v0.7.9-dev.31`。`dw31` 是管理台显示名。
 5. `push_image` 选择 `true`。只有需要推进当前渠道时才勾选 `promote_channel`，例如重跑新版本的 Docker 发布。补发历史版本时保持默认值 `false`。
 6. 运行并等待 Docker 任务结束。
 
 `source_ref` 决定源码，`release_tag` 决定版本与渠道；发布前会检查二者指向同一提交。
-独立重跑不重建 Android/Windows，不移动现有 Git tag。普通部署者无需执行这组维护者操作。
+独立重跑只处理 Docker 镜像，沿用已有 Git tag。普通部署者可按[群晖独立容器教程](docker-manual.md#5-手动更新或切换渠道)或 [Compose 更新步骤](docker-quickstart.md#更新-api-和-web)更新容器。
 手动触发方式见 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)。
 
 旧版保留原有镜像布局。例如 dev.14 的固定标签是 `0.7.9-dev.14` 和 `web-0.7.9-dev.14`。统一版本的固定标签仍为 `<version>`，保留 `web-<version>` 作为旧配置兼容入口；推进渠道时使用 `dev / web-dev` 或 `latest / web-latest`。旧版 `updater-*` 标签保留，迁移方式见[网页更新指南](server-web-update.md#从独立-updater-镜像迁移)。
@@ -133,6 +133,8 @@ Docker job 明确失败。changelog 发布并行执行原生附件与 Docker job
 - 默认 API 和默认 Web 的固定标签均可查到，OCI `version` 和 `revision` 对应同一发布源。
 - 推进渠道后，同一镜像的固定标签与浮动标签摘要一致。
 - 清单包含 `linux/amd64` 和 `linux/arm64`。
+
+OCI 标签用于核对仓库中的镜像。容器启动后，从 API 的 `/health` 读取实际构建版本。从 dev.31 起，该版本由构建时写入镜像的文件提供，Web 版本由 Web 构建产物提供。排查部署时以[运行中容器和 API 的核对步骤](docker-manual.md#核对-web-和-api-版本)为准。
 
 统一镜像发布工作流的验收包括在 `linux/amd64` 启动 API、Web、updater，验证健康、认证、任务持久化和 Web 资源。
 `linux/arm64` 参与构建与发布，容器启动和更新验证在 `linux/amd64` 运行器执行。

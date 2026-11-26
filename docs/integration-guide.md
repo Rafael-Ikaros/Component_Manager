@@ -61,12 +61,12 @@ created_at/updated_at/target_version，可按id或最新状态恢复。网络未
 请求 `{ "request_id": "unique-batch-id", "items": [{ "id": "component-id", "expected_updated_at": "2026-11-02T00:00:00Z" }] }`，每批 1–100 项且 ID 唯一；响应 `{ "items": [{ "id": "component-id", "updated_at": "...", "deleted": true }] }`。
 401 未登录、403 写入未启用、404 缺少目标、409 版本/请求号冲突、422 参数错误。整批事务回滚；未知网络结果时使用相同 request_id 和内容重试。删除墓碑通过原 `/sync/pull` 返回，名称、数量、分配和历史流水不被物理删除。
 
-`POST /admin-api/about/check-update?channel=stable|dev` 默认 stable，返回原版本字段及 `channel / image_tag / web_image_tag`；dev 包含有效开发版与更新的正式版，排除草稿，数值比较 dev.10 与 dev.9。`automatic_update` 仍为 false；接口不变更 Docker 或业务数据。
+`POST /admin-api/about/check-update?channel=stable|dev` 默认 stable，返回原版本字段及 `channel / image_tag / web_image_tag`；dev 包含有效开发版与更新的正式版，排除草稿，数值比较 dev.10 与 dev.9。`automatic_update` 仍为 false；接口不变更 Docker 或业务数据。开发渠道返回的 `web_image_tag: web-dev` 是旧 Web 容器的兼容标签；dev.30 起新部署按[部署教程](docker-quickstart.md)使用统一镜像，Web 以 `web` 角色启动。
 
 ## Base URL
 
 The self-hosted server exposes HTTP endpoints under the configured base URL.
-Examples in this document assume `http://localhost:8787`.
+Examples in this document assume `http://localhost:8787`. Run authenticated PowerShell examples with `$apiKey` set to a key from `/setup` or your administrator. The sample sync requests use the administrator account.
 
 ## Authentication
 
@@ -118,7 +118,7 @@ queries or credentials. File locations and recovery steps are in the
 Use this for smoke checks and container health probes.
 
 ```powershell
-curl http://localhost:8787/health
+curl.exe http://localhost:8787/health
 ```
 
 Response body:
@@ -126,17 +126,27 @@ Response body:
 ```json
 {
   "status": "ok",
-  "server_time": "2026-05-07T06:00:00Z"
+  "server_time": "2026-11-26T06:00:00Z",
+  "cost_protocol": 1,
+  "order_source_protocol": 1,
+  "inventory_protocol": 1,
+  "bom_preset_protocol": 1,
+  "photo_protocol": 1,
+  "version": "v0.7.9-dev.31",
+  "revision": "11c6a99c3d0c80703e96f68c7c5ecb7a5bddc18b"
 }
 ```
+
+In packaged API images from dev.31 onward, `version` and `revision` come from build metadata stored in the image. The Web console displays `v0.7.9-dev.31` as `dw31`. Clients continue to receive the release version.
 
 ### `POST /auth/ping`
 
 Validates that the configured token is accepted.
 
 ```powershell
-curl -X POST http://localhost:8787/auth/ping `
-  -H "Authorization: Bearer change-me"
+$apiKey = Read-Host "Account key"
+curl.exe -X POST http://localhost:8787/auth/ping `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 ### `POST /sync/push`
@@ -195,10 +205,9 @@ $body = @'
 }
 '@
 
-curl -X POST http://localhost:8787/sync/push `
-  -H "Authorization: Bearer change-me" `
-  -H "Content-Type: application/json" `
-  -d $body
+Invoke-RestMethod -Method Post -Uri "http://localhost:8787/sync/push" `
+  -Headers @{ Authorization = "Bearer $apiKey" } `
+  -ContentType "application/json" -Body $body
 ```
 
 Success response:
@@ -278,8 +287,8 @@ older server omits `sync_cursor`. Apply all returned entities successfully befor
 persisting the new cursor; clear it when changing servers.
 
 ```powershell
-curl "http://localhost:8787/sync/pull?cursor=0" `
-  -H "Authorization: Bearer change-me"
+curl.exe "http://localhost:8787/sync/pull?cursor=0" `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 ### `GET /admin-api/dashboard`
@@ -288,8 +297,8 @@ Returns the top-level read-only admin snapshot used by the separated web
 console.
 
 ```powershell
-curl http://localhost:8787/admin-api/dashboard `
-  -H "Authorization: Bearer change-me"
+curl.exe http://localhost:8787/admin-api/dashboard `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 ### `GET /admin-api/inventory`
@@ -301,25 +310,26 @@ Returns low-stock watchlist data plus the latest server-side component rows.
 Both endpoints require the existing bearer token and read inventory.
 The overview endpoint above is unchanged.
 
-The list accepts `q` (up to 200 characters; literal substring search across SKU,
-name, category and default location), optional `low_stock=true|false`, `page`
+The list accepts `q` (up to 200 characters, using [normalized inventory search](#库存参数检索)),
+optional `low_stock=true|false`, `page`
 (1..1,000,000, default 1), and `page_size` (1..100, default 25). It excludes deleted
 components and sorts by `updated_at DESC, id ASC`. Pagination is offset-based;
 concurrent inventory changes may shift later pages, so refresh to reconcile them.
 
 The response contains `items`, `page`, `page_size`, `total` and `page_count`.
 Each item exposes `id`, `sku`, `name`, `category`, `package_name`, `location`,
-`quantity`, `min_stock`, `updated_at` and `low_stock`. An empty result has no items
+`quantity`, `min_stock`, `updated_at`, `low_stock`, `photo_key` and `photo_available`. An empty result has no items
 and `page_count=0`. Out-of-range page numbers can return an empty page.
 
 The detail endpoint returns the same component fields plus `description`,
-`inventory_managed`, and `allocations` (`location_id`, `quantity`), or 404 for
+`inventory_managed`, `inventory_unit_cost` (decimal string or null), and
+`allocations` (`location_id`, `quantity`), or 404 for
 missing/deleted components.
 Empty allocations mean no independent allocation data was provided, not zero
 component quantity. Invalid query values return 422; missing/invalid tokens 401.
 
 ```powershell
-curl "http://localhost:8787/admin-api/components?q=C70565&page=1&page_size=20" `
+curl.exe "http://localhost:8787/admin-api/components?q=C70565&page=1&page_size=20" `
   -H "Authorization: Bearer <API_TOKEN>"
 ```
 
@@ -393,8 +403,8 @@ Query parameters:
 At least one of `sku`, `mpn`, `name`, `brand`, or `package_hint` is required.
 
 ```powershell
-curl "http://localhost:8787/admin-api/part-lookup?sku=C30926&mpn=0603B104K500NT&source_type=JlcQr" `
-  -H "Authorization: Bearer change-me"
+curl.exe "http://localhost:8787/admin-api/part-lookup?sku=C30926&mpn=0603B104K500NT&source_type=JlcQr" `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 Typical success response from bundled rules only:
@@ -426,8 +436,8 @@ or `category_path` while keeping local package or family inference.
 Returns information about the active server-side recognition rule pack.
 
 ```powershell
-curl http://localhost:8787/admin-api/recognition-rules/meta `
-  -H "Authorization: Bearer change-me"
+curl.exe http://localhost:8787/admin-api/recognition-rules/meta `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 Typical response:
@@ -452,8 +462,8 @@ that environment variable is configured. If no remote URL is configured, the
 endpoint returns the active metadata without changing the bundled rule pack.
 
 ```powershell
-curl -X POST http://localhost:8787/admin-api/recognition-rules/refresh `
-  -H "Authorization: Bearer change-me"
+curl.exe -X POST http://localhost:8787/admin-api/recognition-rules/refresh `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 ### `GET /admin-api/lcsc/lookup`
@@ -472,8 +482,8 @@ Query parameters:
 At least one of `sku`, `mpn`, or `name` is required.
 
 ```powershell
-curl "http://localhost:8787/admin-api/lcsc/lookup?sku=C30926&mpn=0603B104K500NT" `
-  -H "Authorization: Bearer change-me"
+curl.exe "http://localhost:8787/admin-api/lcsc/lookup?sku=C30926&mpn=0603B104K500NT" `
+  -H "Authorization: Bearer $apiKey"
 ```
 
 Typical success response:
@@ -553,20 +563,21 @@ formats and the limits of cross-device concurrent stock operations.
 An optional server publisher emits accepted component snapshots to
 `<MQTT_TOPIC_PREFIX>/components/<percent-encoded id>/state` with retained QoS 1.
 The JSON carries `event_id`, `id`, `sku`, `name`, `category`, `package_name`,
-`location`, `quantity`, `min_stock`, `updated_at`, `deleted`, and `sync_revision`.
-Managed inventory also publishes `allocations` with per-location quantities.
+`location`, `quantity`, `min_stock`, `inventory_unit_cost` (decimal string or null), `updated_at`,
+`deleted`, and `sync_revision`. Managed inventory also publishes `allocations`
+containing `location_id` and `quantity`. Only the administrator's inventory is published.
 No description, raw label data, or stock-delta command is included. Use quantity
 as state; repeated delivery must not trigger another decrement. Deletions use
 `deleted: true` retained tombstones. Offline client changes appear only after
 successful sync. Existing sync request and response schemas remain unchanged.
 
-`GET /admin-api/mqtt/status` requires the existing bearer token and returns
+`GET /admin-api/mqtt/status` requires administrator authentication and returns
 `enabled`, `connected`, `pending`, `last_publish_at`, and `error`. Configuration,
 delivery semantics, and a Home Assistant sensor example are in [MQTT](mqtt.md).
 
 `GET /admin-api/mqtt/config` returns the editable settings plus
 `password_configured`, `source`, `restart_required`, and `message`, never a
-password. `POST` to the same authenticated endpoint saves `enabled`, `host`,
+password. `POST` to the same administrator endpoint saves `enabled`, `host`,
 `port`, `tls`, `username`, `topic_prefix`, `client_id`, optional `password`, and
 `clear_password`. Empty/omitted password preserves the existing password;
 `clear_password: true` clears it explicitly. Saved settings take effect on API

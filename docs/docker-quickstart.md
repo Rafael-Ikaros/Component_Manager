@@ -13,7 +13,7 @@
 
 ### 使用统一镜像
 
-开发版 API 和 Web 默认共用 `rafaelikaros/component_manager:dev`。模板为 Web 设置 `command: [web]`，API 使用镜像默认命令。固定版本时，令 `COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9-dev.30`，镜像地址优先于渠道变量。旧部署迁移时，清除残留的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖以复用同一个镜像，保留原项目名、网络、端口、自定义环境设置和 `/data` 来源。
+开发版 API 和 Web 默认共用 `rafaelikaros/component_manager:dev`。模板为 Web 设置 `command: [web]`，API 使用镜像默认命令。固定到 dev.31 时，在 `.env` 中填写 `COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9-dev.31`。固定镜像地址优先于渠道变量。旧部署迁移时，清除残留的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖以复用同一个镜像，保留原项目名、网络、端口、自定义环境设置和 `/data` 来源。
 
 ### 启动服务
 
@@ -41,9 +41,9 @@ docker compose -f docker-compose.hub.yml --profile web up -d api admin-web
 docker compose -f docker-compose.hub.yml --profile web ps
 ```
 
-只部署 API 时，去掉 `--profile web` 和 `admin-web`。群晖 Container Manager 的「项目」部署则在原项目中拉取目标映像并重新部署。仅点「重新启动」会继续使用原来的容器。已配置 [Updater](server-web-update.md) 的项目也可通过网页更新 API 和 Web。
+只部署 API 时，去掉 `--profile web` 和 `admin-web`。群晖用户可按[在群晖更新现有项目](#在群晖更新现有项目)操作。已配置 [Updater](server-web-update.md) 的项目也可通过网页更新 API 和 Web。
 
-更新后直连 API 的 `/health` 检查 `version` 和 `revision`，再登录 Web，在「关于服务端」核对两个版本与实际连接的 API 地址。若 API 仍显示旧版，按[版本排查步骤](docker-manual.md#分阶段排障)检查容器和连接目标。需要切换渠道时见[渠道切换](docker-channels.md)。
+更新后直连 API 的 `/health` 检查 `version` 和 `revision`，再登录 Web，在「关于服务端」核对两个版本与实际连接的 API 地址。dev.31 的页面显示 `dw31`。如果读到旧版本，按[版本排查步骤](docker-manual.md#核对-web-和-api-版本)核对容器和连接目标。需要切换渠道时见[渠道切换](docker-channels.md)。
 
 <a id="watchtower-updates"></a>
 
@@ -74,7 +74,13 @@ docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --prof
          - /volume1/docker/component-manager/data:/data
    ```
 
-4. 部署并检查两个容器。按第 1 节完成 `/setup` 和 Web 登录。已有项目升级时仍在原项目中修改 YAML、拉取镜像和重新部署。
+4. 部署后在「容器」确认 API 已运行。若启用了 Web，再检查 Web 容器。按第 1 节完成 `/setup` 和 Web 登录。
+
+### 在群晖更新现有项目
+
+1. 停止 API，按[备份步骤](#6-升级前备份与回退)保存原项目的数据。固定版本需要先修改项目目录里的镜像配置，再在「映像」下载目标标签。同一浮动标签有可用更新时，可通过「操作 → 更新」拉取。[群晖映像管理](https://kb.synology.com/en-us/DSM/help/ContainerManager/docker_image?version=7)
+2. 进入原项目，保留原项目名、路径、端口和数据挂载。修改过 YAML 时，从「详情 → YAML 配置」保存并重新部署。只更新同名镜像时，在项目的「操作」中选「构建」，完成后启动项目。单点「重新启动」只会重启已有容器。[群晖项目管理](https://kb.synology.com/en-global/DSM/help/ContainerManager/docker_project)
+3. 按[版本核对步骤](docker-manual.md#核对-web-和-api-版本)确认 API 和 Web 已运行目标镜像，再检查原账户与库存。
 
 | `/data` 中的文件 | 用途 |
 | --- | --- |
@@ -91,6 +97,8 @@ docker compose -f docker-compose.hub.yml -f docker-compose.watchtower.yml --prof
 Web 与 API 使用同一主机名和协议，端口可以不同。允许来源填写实际打开 Web 页面的 `协议://主机:端口`，例如 `http://nas:8081`。管理台以 `POST /auth/session` 换取 API 会话 Cookie，浏览器只将 API 地址保存在 localStorage。反向代理部署请保留 `/auth/*`、`/admin-api/*` 和 `/health` 等 API 路径。
 
 MQTT 配置保存在 SQLite，优先于 MQTT 环境默认值，按网页提示重启 API 后生效。嘉立创公开目录查询无需 OpenAPI 凭据。高级环境变量须明确传入 API 容器，单独写在宿主 `.env` 中不会自动传递。[高级配置](runbook.md#environment-variables)
+
+自 dev.31 起，构建版本随镜像发布。`.env` 中的渠道键和镜像地址决定部署目标，`/health` 返回当前运行的 API 版本。
 
 ## 4. API Token 在哪里
 

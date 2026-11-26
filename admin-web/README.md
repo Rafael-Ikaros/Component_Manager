@@ -9,7 +9,7 @@
 - 管理员管理普通账户、部署配置、日志和 MQTT；普通账户的数据独立。
 - 库存写入默认关闭，管理员可在 `/setup` 或管理台设置中启用。启用后可编辑、出入库、删除库存及应用库存资料检查结果。现有部署也可继续通过 `WEB_INVENTORY_ENABLED` 指定。
 - 登录通过 `/auth/session` 换取后端 HttpOnly 会话；浏览器不持久保存账户密钥，写请求携带 CSRF Token。
-- 镜像更新需额外启用 updater。检查新版本与执行容器更新是两个操作，详见[网页更新](../docs/server-web-update.md)。
+- 「设置 → 关于服务端」可以检查新版本。希望从页面重建 API 和 Web 时，再为 Compose 项目启用 [Updater](../docs/server-web-update.md)。独立容器可按[群晖更新步骤](../docs/docker-manual.md#5-手动更新或切换渠道)更新。
 
 ## 本地开发
 
@@ -34,6 +34,8 @@ Vite 构建参数只影响源码构建，不会在已构建的 Hub 镜像中随�
 ## 部署与接口
 
 开发版从 `0.7.9-dev.30` 起使用统一镜像。当前正式版和 dev.29 使用配套的 API 和 `web-*` 标签，后者默认启动 Web。
+
+从 dev.31 起，「关于服务端」分别显示当前 Web 构建和 API 构建。Docker 和 GitHub 静态包各自在构建时写入 Web 版本，API 版本来自实际连上的服务端。页面显示 `dw31` 时，发布和镜像仍使用 `0.7.9-dev.31`。
 统一镜像包含 API、Web 和可选 Updater，默认启动 API。Web 容器通过 `command: [web]` 启动 Nginx，Updater 容器通过 `command: [updater]` 启动更新服务。只有 Updater 容器挂载 Docker socket、更新任务卷及原 Compose 部署目录。
 
 从仓库根目录运行 `docker build -t component-vault:local .`，使用根目录的 Dockerfile 构建统一镜像。

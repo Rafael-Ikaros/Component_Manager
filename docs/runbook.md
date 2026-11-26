@@ -12,7 +12,9 @@
 
 ### 排查镜像与客户端账户接口不一致
 
-Web 版本来自浏览器加载的构建，API 版本来自管理台所连接的服务端。更新后仍看到旧版本时，先比较直连 API 的 `/health` 与「关于服务端」的 API 地址和版本，再核对运行中容器的 Image ID。dev.30 及更早的 API 镜像会读取 `COMPONENT_VAULT_BUILD_VERSION` 和 `COMPONENT_VAULT_BUILD_REVISION`，重建时不要沿用旧镜像自带的值。[手动更新 API](docker-manual.md#更新-api-容器)
+Web 版本来自浏览器加载的构建，API 版本来自管理台所连接的服务端。dev.31 起，API 读取镜像内的 `app/_container_build.json`，`/health` 与 `/admin-api/about` 使用同一个构建身份。管理台把 `v0.7.9-dev.31` 显示为 `dw31`。Docker OCI 标签和版本比较沿用正式的发布版本号。
+
+更新后仍看到旧版本时，先比较直连 API 的 `/health` 与「关于服务端」的 API 地址和版本，再核对运行中容器的 Image ID。目标是 dev.30 或更早的版本时，重建容器应省略旧容器的 `COMPONENT_VAULT_BUILD_VERSION`、`COMPONENT_VAULT_BUILD_REVISION`，由目标镜像提供其版本值。[版本核对与排障](docker-manual.md#核对-web-和-api-版本)
 
 见[账户接口排障](docker-quickstart.md#7-客户端提示服务端版本过老或无法确认账户身份)。
 先核对实际 API `/health` 版本及认证 `/auth/me`，再检查端口、反向代理和账户密钥。

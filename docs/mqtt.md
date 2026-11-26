@@ -1,6 +1,6 @@
 # MQTT 库存订阅
 
-服务端可以向自己的 MQTT broker 发布库存状态，供 Home Assistant 或看板订阅。
+服务端可以向自己的 MQTT broker 发布管理员账户的库存状态，供 Home Assistant 或看板订阅。普通账户的库存不会发布。
 Android、Windows 仍先写本地 SQLite，再通过原有同步上传；本地尚未同步的变化
 不会立即出现在 MQTT 中。MQTT 默认关闭，客户端不需要 MQTT 设置。
 
@@ -9,7 +9,7 @@ Android、Windows 仍先写本地 SQLite，再通过原有同步上传；本地�
 需要一个已有的 broker，例如 Home Assistant 使用的 Mosquitto。此服务是发布者，
 不内置 broker，也不会自动连接公共 broker。
 
-可以直接进入管理网页“设置”，填写 MQTT 连接表单后点击“保存 MQTT 配置”。
+使用管理员账户进入管理网页“设置”，填写 MQTT 连接表单后点击“保存 MQTT 配置”。
 保存成功后按页面提示重启服务，配置才会生效；上方“运行状态”始终显示当前进程
 的实际连接，不会因为保存成功而显示已连接。密码留空保留现值，勾选“明确清除已保存
 密码”才删除它。页面提供状态手动刷新。
@@ -32,7 +32,7 @@ broker 凭据，应按服务器配置保护。尚未通过网页保存时，使�
 本地启动时在服务进程环境中设置这些变量。也可以复制 `server/.env.example` 为
 `server/.env`，填写后在 `server` 目录执行
 `.\.venv\Scripts\python.exe -m uvicorn app.main:app --env-file .env --host 0.0.0.0 --port 8787`；
-现有 `run-dev.ps1` 需要显式加载 `.env`。Docker 部署推荐通过管理台设置。
+该命令显式加载 `.env`；`run-dev.ps1` 默认只读取进程环境。Docker 部署推荐通过管理台设置。
 如需使用环境变量，在 Compose 的 `api.environment` 下传入所需的 `MQTT_*`。
 例如填入 `MQTT_HOST: ${MQTT_HOST:-}`，才会读取部署目录 `.env` 中的
 `MQTT_HOST`。以下是可传入的配置示例：
@@ -74,11 +74,16 @@ topic 为具体元件配置传感器。示例消息：
   "location": "嘉立创盒子",
   "quantity": 14,
   "min_stock": 1,
+  "inventory_unit_cost": "0.25",
+  "allocations": [{"location_id": "A1", "quantity": 14}],
   "updated_at": "2026-09-15T01:00:00Z",
   "deleted": false,
   "sync_revision": 42
 }
 ```
+
+库存单位成本 `inventory_unit_cost` 为十进制字符串，未知时为 `null`。
+多库位管理的元件还包含按库位列出的 `allocations`。
 
 这是服务端接受后的完整状态快照，不是扣减命令，也不是库存差值。订阅者应将
 `quantity` 作为最新值；不要每收到一次消息就再扣一次库存。说明文字和原始二维码
@@ -122,11 +127,11 @@ retained 状态让后来连接的订阅者得到最后已发布的库存。这�
 
 ## 状态与排查
 
-携带现有 API bearer token 请求 `GET /admin-api/mqtt/status`，响应包括
+使用管理员 API Bearer 密钥或管理员 Web 会话请求 `GET /admin-api/mqtt/status`，响应包括
 `enabled`、`connected`、`pending`、`last_publish_at`、`error`。不返回账号或密码。
 `last_publish_at` 是本次服务进程最后确认发布的时间，重启后可能为空。
 
-配置读取和保存使用同样鉴权的 `GET/POST /admin-api/mqtt/config`。
+配置读取和保存使用同样鉴权的 `GET/POST /admin-api/mqtt/config`。使用 Web 会话保存时需提供 `X-CSRF-Token`。
 响应中的 `restart_required` 表示保存值和本次运行设置不同。
 
 - `enabled=false`：检查 API 进程实际环境，修改配置后重启。
@@ -134,6 +139,6 @@ retained 状态让后来连接的订阅者得到最后已发布的库存。这�
 - `pending` 持续增加：broker 不可用时队列保存在 SQLite 中，应监控磁盘空间。
 - 手机已改数量但订阅值未变：先确认客户端同步成功，再检查发布队列。
 
-已有服务升级前，停止 API 并备份 SQLite。启动会新增 `mqtt_outbox`、`mqtt_state`、`mqtt_configuration`，
+已有服务升级前，停止 API 并备份完整数据目录。启动会新增 `mqtt_outbox`、`mqtt_state`、`mqtt_configuration`，
 不改元件数量。关闭 MQTT 可停止发布，原本的客户端本地操作与同步继续工作。
 开发测试使用临时数据库与模拟 PUBACK；实际 broker 和 Home Assistant 仍需部署后联调。
