@@ -43,6 +43,11 @@ on:
         required: false
         default: false
         type: boolean
+      rehearse_v078_upgrade:
+        description: Rehearse an isolated Compose upgrade from Docker Hub v0.7.8. Requires source_ref and release_tag, with publishing disabled.
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - 'v*'
@@ -63,6 +68,18 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
       PROMOTE_CHANNEL: ${{ (inputs.push_image && inputs.promote_channel) || (github.event_name == 'push' && github.ref_type == 'tag') }}
     steps:
+      - name: Validate upgrade rehearsal inputs
+        if: inputs.rehearse_v078_upgrade
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+          PUSH_IMAGE: ${{ inputs.push_image }}
+          PROMOTE_INPUT: ${{ inputs.promote_channel }}
+        run: |
+          if [[ -z "$SOURCE_REF" || ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || "$PUSH_IMAGE" == true || "$PROMOTE_INPUT" == true ]]; then
+            echo '::error::Set source_ref and a stable release_tag, and disable push_image and promote_channel for the upgrade rehearsal.'
+            exit 1
+          fi
+
       - name: Checkout source
         uses: actions/checkout@v6
         with:
@@ -173,6 +190,21 @@ jobs:
 
       - name: Verify Compose first-run configuration schema
         run: python tools/deployment/verify-compose-config.py
+
+      - name: Checkout v0.7.8 deployment template
+        if: inputs.rehearse_v078_upgrade
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/v0.7.8
+          path: .upgrade-baseline
+          persist-credentials: false
+
+      - name: Rehearse isolated v0.7.8 Compose upgrade
+        if: inputs.rehearse_v078_upgrade
+        timeout-minutes: 10
+        env:
+          EXPECTED_REVISION: ${{ steps.build_identity.outputs.revision }}
+        run: python tools/deployment/verify-v078-upgrade.py .upgrade-baseline/docker-compose.hub.yml
 
       - name: Verify all roles start from one image in Compose
         if: steps.build_identity.outputs.unified == 'true'
