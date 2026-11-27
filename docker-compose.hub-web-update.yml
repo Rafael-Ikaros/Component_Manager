@@ -2,8 +2,8 @@
 # Requires a unified-image release; use the release's own template for older versions.
 # Keep the existing Compose project name. Set COMPONENT_VAULT_DEPLOY_DIR
 # to this directory's absolute NAS/host path in .env.
-# Until a compatible stable release is available, set
-# COMPONENT_VAULT_DOCKER_CHANNEL=dev in .env before the first deployment.
+# The default channel is latest (unified from stable 0.7.9).
+# Set COMPONENT_VAULT_DOCKER_CHANNEL=dev in .env to follow development releases.
 # Existing deployments must retain their original ports and /data source.
 services:
   api:

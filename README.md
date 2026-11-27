@@ -35,7 +35,7 @@ Android 将数据保存在本机 SQLite，**不用部署服务器，也可以完
 需要多设备使用时，再连接自己的服务端。
 
 > [!NOTE]
-> 上方下载按钮提供正式版。下文也介绍 dev 功能，包含国内 EDA 查询、购买价格与材料成本、料盘识别和网页更新。正式版范围见[发布说明](docs/releases/0.7.8.md)，开发版见 [GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases)。
+> 上方下载按钮提供 Android 正式版。正式版范围与升级须知见[发布说明](docs/CHANGELOG.md#079---2026-11-27)，开发版见 [GitHub Releases](https://github.com/Rafael-Ikaros/Component_Manager/releases)。
 > 部分开发版仅提供 Android APK。
 >
 > **Windows 独立客户端已停止维护。** 自 2026-11-25 起不再构建、更新或发布 Windows 安装包，版本工具也不再改写其版本号。源码和[历史版本附件](https://github.com/Rafael-Ikaros/Component_Manager/releases)保留，后续 Windows 功能计划集成到贴片机上位机项目。
@@ -46,7 +46,7 @@ Android 将数据保存在本机 SQLite，**不用部署服务器，也可以完
 | --- | --- |
 | **嘉立创扫码入库**：扫描包装、输入 C 料号或关键词查询；支持连续采集和订单 Excel 批量入库。 | **型号与参数检索**：组合搜索品牌、型号片段、阻值、容量、封装等信息。 |
 | **多库位库存**：一个元件可存放在多个库位，支持入库、出库、部分及批量转移。 | **项目用料**：导入 BOM、加载预设或手动选料，匹配库存、查看缺料，确认后一次出库。 |
-| **标签与备份**：在 Android 编辑器中选择或保存纸张尺寸，调整文字、字体、字号与位置，导出或通过蓝牙打印。开发版支持汉印 M1、HM-A300E、德佟 P1 和 SUPVAN T50 Pro。可通过 Excel 备份和恢复库存。 | **跨设备同步**：同账户同步库存、BOM 预设和原图；Web 可管理账户、设备与同步情况。 |
+| **标签与备份**：在 Android 编辑器中选择或保存纸张尺寸，调整文字、字体、字号与位置，导出或通过蓝牙打印。支持汉印 M1、HM-A300E、德佟 P1，开发版另支持 SUPVAN T50 Pro。可通过 Excel 备份和恢复库存。 | **跨设备同步**：同账户同步库存、BOM 预设和原图；Web 可管理账户、设备与同步情况。 |
 
 ### 扫描入库，保留你熟悉的型号
 
@@ -97,7 +97,7 @@ Android 遇到两条不同元件记录共用同一 SKU 时会提示核对，保�
 
 可在群晖界面[直接创建 API、Web 容器](docs/docker-manual.md)，无需 Compose、`.env` 或 SSH；也可使用[普通 Compose 模板](docs/docker-quickstart.md)。两种普通部署方式都不向应用挂载 Docker socket，不要求特权模式。
 管理员密钥与 Web 设置在 `/setup` 保存，MQTT 在管理台设置。
-开发版从 `0.7.9-dev.30` 起使用统一镜像。从 `rafaelikaros/component_manager` 选择 `dev` 或固定版本标签，分别创建 API 和 Web 容器。API 使用默认命令，Web 指定 `web`。当前正式版仍使用 `latest` 与 `web-latest` 配套标签。库存、同步和检查更新均不依赖 Updater。
+正式版 0.7.9 起使用统一镜像。从 `rafaelikaros/component_manager` 选择正式渠道 `latest`、开发渠道 `dev` 或对应的固定版本标签，分别创建 API 和 Web 容器。API 使用默认命令，Web 指定 `web`。已有配套镜像部署可继续用 `web-latest` 或 `web-dev` 启动 Web。库存、同步和检查更新均不依赖 Updater。
 首次访问 `http://服务器IP:8787/setup` 设置管理员密钥，再在管理台创建普通账户。
 客户端填写 API 地址及对应账户密钥；同一账户的设备共享库存，不同账户相互隔离。
 

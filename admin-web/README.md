@@ -33,7 +33,7 @@ Vite 构建参数只影响源码构建，不会在已构建的 Hub 镜像中随�
 
 ## 部署与接口
 
-开发版从 `0.7.9-dev.30` 起使用统一镜像。当前正式版和 dev.29 使用配套的 API 和 `web-*` 标签，后者默认启动 Web。
+正式版从 `0.7.9` 起使用统一镜像，开发版从 `0.7.9-dev.30` 起使用同一布局。`web-*` 兼容标签默认启动 Web，可供之前的配套镜像部署继续使用。
 
 从 dev.31 起，「关于服务端」分别显示当前 Web 构建和 API 构建。Docker 和 GitHub 静态包各自在构建时写入 Web 版本，API 版本来自实际连上的服务端。页面显示 `dw31` 时，发布和镜像仍使用 `0.7.9-dev.31`。
 统一镜像包含 API、Web 和可选 Updater，默认启动 API。Web 容器通过 `command: [web]` 启动 Nginx，Updater 容器通过 `command: [updater]` 启动更新服务。只有 Updater 容器挂载 Docker socket、更新任务卷及原 Compose 部署目录。

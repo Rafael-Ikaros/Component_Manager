@@ -613,7 +613,7 @@ dotnet test windows-client/ComponentVault.WinUI/Tests/ReleaseNotesMarkdown/Relea
 
 ### 从订单更新已有资料
 
-自 0.7.8 起可使用配套 API 和 Web 镜像。源码部署使用 `server/requirements.txt` 安装依赖，包括读取 BIFF `.xls` 的 xlrd 和处理上传的 python-multipart。升级时沿用原 `/data` 挂载。
+正式版 0.7.9 起新部署可使用统一镜像，旧部署可继续使用 Web 兼容标签。源码部署使用 `server/requirements.txt` 安装依赖，包括读取 BIFF `.xls` 的 xlrd 和处理上传的 python-multipart。升级时沿用原 `/data` 挂载。
 
 Web“库存 → 从订单更新资料”支持只读差异预览和字段确认；应用沿用 Web 库存写入开关。故障时区分不支持格式/文件损坏、未匹配 SKU、同 SKU 资料冲突、设备并发版本冲突。成功项不会因其他项失败而回滚；网络结果不明可使用原请求重试，不自动刷新版本覆盖。
 

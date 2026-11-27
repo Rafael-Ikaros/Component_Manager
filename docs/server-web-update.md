@@ -8,19 +8,21 @@ Updater 是可选的第三个容器。它面向 **Compose 项目**，管理员�
 | 普通 Compose 项目 | 在原项目[拉取并重建 API 和 Web](docker-quickstart.md#更新-api-和-web)，也可按本页启用 Updater |
 | 已启用 Updater 的兼容项目 | 管理员在网页选择渠道并确认更新 |
 
-当前正式版 0.7.8 不支持网页一键更新。它可以保留原数据升级到开发版。更新器需要宿主机的 Docker socket，在典型 root 模式下具备管理主机容器的能力。仅在接受这项权限时启用。[Docker 权限说明](https://docs.docker.com/engine/security/)
+0.7.9 正式版支持可选的网页更新。更新器需要宿主机的 Docker socket，在典型 root 模式下具备管理主机容器的能力。仅在接受这项权限时启用。[Docker 权限说明](https://docs.docker.com/engine/security/)
 
-## 已有正式版先升级到 dev
+<a id="已有正式版先升级到-dev"></a>
 
-从 0.7.8 升级时，在同一个 Compose 项目里更换镜像和启动命令，保留原 `/data`、密钥、端口、网络和其它实际生效的配置。可在这次编辑中同时启用 Updater，也可以按[普通部署步骤](docker-quickstart.md#使用统一镜像)只升级 API 与 Web。
+## 从 0.7.8 升级
+
+0.7.8 没有网页更新器，第一次需在原 Compose 项目中手动升级，保留 `/data`、原密钥、端口、网络和有效配置。可按[普通部署步骤](docker-quickstart.md#使用统一镜像)先升级 API 与 Web，也可在编辑原项目时同时启用 Updater。
 
 先停 API，备份完整 `/data`，另存原 Compose 和 `.env`。若升级后出现首次配置或空库存，先检查项目名和数据映射。旧部署的非空环境变量会继续优先生效。变更这些覆盖值前，确认持久配置已经保存对应内容。[配置优先级](docker-quickstart.md#3-环境变量和网页配置的优先级)
 
 ## 使用统一镜像
 
-dev.30 起使用[统一镜像更新模板](../docker-compose.hub-web-update.yml)。API、Web 和 Updater 共用同一个标签。模板让 API 使用默认 `api` 命令，Web 执行 `web`，Updater 执行 `updater`。
+使用[统一镜像更新模板](../docker-compose.hub-web-update.yml)时，API、Web 和 Updater 共用同一个标签。模板让 API 使用默认 `api` 命令，Web 执行 `web`，Updater 执行 `updater`。
 
-已有项目迁移时，在原模板中保留项目配置并合入统一镜像对应的 `image`、`command` 和 API 布局标签 `io.componentvault.compose-layout: unified`。需要跟随开发渠道时，取消残留的固定 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 覆盖。旧项目仍可使用配套 `dev` 与 `web-dev` 兼容标签。当前统一布局切回 0.7.8 需在宿主机使用旧版模板，网页会拒绝不兼容镜像。
+已有项目迁移时，在原模板中保留项目配置并合入统一镜像对应的 `image`、`command` 和 API 布局标签 `io.componentvault.compose-layout: unified`。选择浮动渠道时，清除残留的固定 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 覆盖。统一布局可在 `latest` 与 `dev` 之间切换。固定回退到 0.7.8 时请用历史模板及相应的数据备份。
 
 ## 群晖一次性配置
 
@@ -33,10 +35,10 @@ dev.30 起使用[统一镜像更新模板](../docker-compose.hub-web-update.yml)
 ```dotenv
 COMPOSE_PROJECT_NAME=component-vault-compose
 COMPONENT_VAULT_DEPLOY_DIR=/volume1/docker/component-vault-compose
-COMPONENT_VAULT_DOCKER_CHANNEL=dev
+COMPONENT_VAULT_DOCKER_CHANNEL=latest
 ```
 
-项目名必须和稍后在 Container Manager 填的名称一致。File Station 显示共享路径 `/docker/component-vault-compose`，`.env` 中填写带卷名的**宿主机绝对路径**。如果你的共享文件夹在其它卷，按实际路径填写。
+想跟随开发版时，将渠道值改成 `dev`。项目名必须和稍后在 Container Manager 填的名称一致。File Station 显示共享路径 `/docker/component-vault-compose`，`.env` 中填写带卷名的**宿主机绝对路径**。如果你的共享文件夹在其它卷，按实际路径填写。
 
 `.env` 是部署目录中的实际文件。Updater 通过它读取和保存镜像渠道。新安装的管理员 Token 在 `/setup` 设置，恢复已有配置时沿用备份中的密钥。Docker Hub 公开镜像无需填写仓库凭据。
 

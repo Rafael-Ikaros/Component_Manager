@@ -1,6 +1,6 @@
 # Docker 正式版与开发版切换
 
-正式版 0.7.8 使用 `latest / web-latest`。开发版从 `0.7.9-dev.30` 起使用统一镜像，跟随开发渠道使用 `dev`。dev.31 的固定标签是 `0.7.9-dev.31`，`dw31` 是管理台中的显示名。镜像由 **Docker Images** 工作流发布，开发版不会推进正式版标签。普通部署者无需 Docker Hub Token。
+正式版 0.7.9 起使用统一镜像，跟随正式渠道用 `latest`，开发渠道用 `dev`。`web-latest` 和 `web-dev` 继续供旧配套镜像项目启动 Web。固定到 0.7.9 时选择 `0.7.9` 标签。开发版不会推进正式渠道，部署公开镜像无需 Docker Hub Token。
 
 新建开发版项目从同一 `dev` 或固定标签启动 API 和 Web，Web 显式指定 `command: [web]`。旧模板继续使用配套 `web-*` 兼容标签。新模板的部署和迁移见[快速部署](docker-quickstart.md#使用统一镜像)；目标版本仍采用旧镜像布局时，回退使用该版本的部署模板。
 
@@ -17,7 +17,7 @@
 **已有正式版可以直接升级到 dev，沿用原账户和库存。** 在原项目中成对切换 API/Web，
 保留 `/data` 后拉取并重新部署；应用设置随后在 Web 管理。升级不会自动创建 updater，
 如希望以后从网页更新，可将首次升级和启用 updater 合并为一次原项目编辑。
-两类配置的区别见[正式版升级到 dev](server-web-update.md#已有正式版先升级到-dev)。
+两类配置的区别见[从 0.7.8 升级](server-web-update.md#从-078-升级)。
 
 ## 使用部署切换助手
 
@@ -42,7 +42,7 @@
    sh tools/deployment/switch-channel.sh --project-name component-warehouse --channel dev
    ```
 
-   省略 `--channel` 会提供正式版/开发版终端菜单。原项目为配套镜像布局，或正式渠道已经提供统一镜像时，可用同一助手切回正式版：
+   省略 `--channel` 会提供正式版和开发版终端菜单。可用同一助手切回正式渠道：
 
    ```sh
    sh tools/deployment/switch-channel.sh --project-name component-warehouse --channel stable
@@ -67,7 +67,7 @@ COMPONENT_VAULT_DOCKER_CHANNEL=dev
 ```
 
 已有的 `COMPONENT_VAULT_IMAGE` 和 `COMPONENT_VAULT_WEB_IMAGE` 若非空，清除其中固定旧版本的配置，以便按渠道取镜像。
-保留原挂载。旧配套镜像模板可在两个渠道间切换，Web 继续用配套的 `web-*` 标签。统一镜像模板仅支持提供统一镜像的渠道。当前切回 0.7.8 正式版，需要在原项目换回[配套镜像模板](docker-quickstart.md#1-准备并启动)，再部署 `latest / web-latest`。如果去掉 Updater，同时从 API 配置移除 `UPDATER_URL`。完成编辑后按[群晖项目更新步骤](docker-quickstart.md#在群晖更新现有项目)拉取并重建。使用独立容器时，按[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换容器。
+保留原挂载。统一镜像模板可直接在 `dev` 和 `latest` 之间切换。旧配套镜像模板的 Web 仍用对应的 `web-*` 兼容标签。需要回退到固定的 0.7.8 时，使用[历史模板](https://github.com/Rafael-Ikaros/Component_Manager/blob/v0.7.8/docker-compose.hub.yml)并固定 `0.7.8 / web-0.7.8`，按需恢复当时的数据备份。如果去掉 Updater，同时从 API 配置移除 `UPDATER_URL`。完成编辑后按[群晖项目更新步骤](docker-quickstart.md#在群晖更新现有项目)拉取并重建。使用独立容器时，按[手动更新指南](docker-manual.md#5-手动更新或切换渠道)替换容器。
 
 ## Watchtower 与版本确认
 

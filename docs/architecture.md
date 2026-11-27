@@ -128,10 +128,9 @@ Android 导入页创建库位统一调用主 ViewModel，完成后刷新共享�
   each runtime is implemented against live storage.
 
 API and admin Web run in separate containers. The unified image introduced in `0.7.9-dev.30`
-provides both roles and the optional updater in one artifact. The Hub Compose
-template exposes Web through the optional `web` profile and keeps SQLite under
-`/data`. Use the Compose template from the selected release for already
-published images such as the current stable `latest` and `0.7.9-dev.29`.
+and adopted by stable `0.7.9` provides both roles and the optional Updater in one artifact.
+The Hub Compose template exposes Web through the optional `web` profile and keeps SQLite
+under `/data`. Fixed historical releases such as `0.7.8` and `0.7.9-dev.29` use their own Compose templates.
 Updating requires pulling the target image and recreating the containers.
 See [Docker Hub operations](dockerhub.md).
 

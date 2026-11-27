@@ -39,8 +39,8 @@ android {
         buildConfigField("boolean", "SUPVAN_T50_PRO", "false")
         minSdk = 28
         targetSdk = 35
-        versionCode = 31
-        versionName = "0.7.8"
+        versionCode = 32
+        versionName = "0.7.9"
         if (releaseVersionCode != null && releaseVersionName != null) {
             versionCode = releaseVersionCode
             versionName = releaseVersionName

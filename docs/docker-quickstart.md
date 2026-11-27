@@ -4,16 +4,18 @@
 
 ## 1. 准备并启动
 
-先选择渠道，将相应模板下载为 `docker-compose.hub.yml`，放在固定的部署目录里。
+将[统一镜像模板](../docker-compose.hub.yml)保存为 `docker-compose.hub.yml`，放在固定的部署目录里，再选择渠道。
 
-| 渠道 | 下载模板 | 新建部署的镜像设置 |
-| --- | --- | --- |
-| 正式版 0.7.8 | [配套镜像模板](https://github.com/Rafael-Ikaros/Component_Manager/blob/v0.7.9-dev.29/docker-compose.hub.yml) | 默认使用 `latest` 与 `web-latest`，无需 `.env` |
-| 开发版 dev.30 起 | [统一镜像模板](../docker-compose.hub.yml) | 同目录的 `.env` 填一行 `COMPONENT_VAULT_DOCKER_CHANNEL=dev` |
+| 渠道 | 新建部署的镜像设置 |
+| --- | --- |
+| 正式版 0.7.9 起 | 默认使用统一镜像 `latest`，无需 `.env` |
+| 开发版 | 同目录的 `.env` 填一行 `COMPONENT_VAULT_DOCKER_CHANNEL=dev` |
 
 ### 使用统一镜像
 
-开发版 API 和 Web 默认共用 `rafaelikaros/component_manager:dev`。模板为 Web 设置 `command: [web]`，API 使用镜像默认命令。固定到 dev.31 时，在 `.env` 中填写 `COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9-dev.31`。固定镜像地址优先于渠道变量。旧部署迁移时，清除残留的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖以复用同一个镜像，保留原项目名、网络、端口、自定义环境设置和 `/data` 来源。
+API 和 Web 共用同一个镜像，模板为 Web 设置 `command: [web]`，API 使用镜像默认命令。固定到 0.7.9 时，在 `.env` 中填写 `COMPONENT_VAULT_IMAGE=rafaelikaros/component_manager:0.7.9`。固定镜像地址优先于渠道变量。
+
+旧配套镜像项目可以先用原模板更新 `latest / web-latest`。若改用统一模板，保留原项目名、网络、端口、自定义环境设置和 `/data` 来源，再清除残留的 `COMPONENT_VAULT_WEB_IMAGE` 覆盖。旧模板的 `web-latest` 容器换用 `latest` 时，记得添加 `command: [web]`。
 
 ### 启动服务
 
