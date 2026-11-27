@@ -109,7 +109,7 @@ def rehearse(baseline_template, directory):
             }],
         }))
         assert accepted["accepted_components"] == 1, accepted
-        assert accepted["accepted_movements"] == 1, accepted
+        assert accepted["accepted_stock_movements"] == 1, accepted
         before = json.loads(http(api, "/sync/pull?cursor=0"))
         assert [item["id"] for item in before["components"]] == [fixture["id"]], before
         assert any(item["id"] == "upgrade-ci-location" for item in before["storage_locations"]), before
