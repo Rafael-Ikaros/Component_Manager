@@ -11,6 +11,11 @@
     <string name="destination_movements">记录</string>
     <string name="destination_overview">首页</string>
     <string name="destination_settings">设置</string>
+    <string name="shell_settings_local_first">本地优先，按需连接</string>
+    <string name="shell_add_import">添加 / 导入</string>
+    <plurals name="shell_local_inventory_count">
+        <item quantity="other">本地仓库 · %d 种元件</item>
+    </plurals>
     <string name="action_add">新增</string>
     <string name="action_back">返回</string>
     <string name="action_cancel">取消</string>
@@ -248,7 +253,7 @@
     <string name="settings_connection_title">服务器连接</string>
     <string name="settings_connection_subtitle">配置当前设备使用的同步服务端地址。</string>
     <string name="settings_auth_title">认证信息</string>
-    <string name="settings_auth_subtitle">在本机保存共享 API 令牌，用于同步和连接检测。</string>
+    <string name="settings_auth_subtitle">仅在本机保存当前账户访问密钥，用于连接检测和同步。</string>
     <string name="settings_sync_behavior_title">同步行为</string>
     <string name="settings_sync_behavior_subtitle">分别控制启动同步与本地写入后的自动同步。</string>
     <string name="settings_import_preferences_title">导入与标签</string>

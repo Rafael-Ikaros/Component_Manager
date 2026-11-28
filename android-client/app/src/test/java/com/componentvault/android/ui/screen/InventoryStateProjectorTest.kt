@@ -47,15 +47,16 @@ class InventoryStateProjectorTest {
                 StorageLocationRecord("C", "Empty drawer", "2026-10-18"),
             ),
             allocations = listOf(
-                ComponentAllocationRecord("stocked", "A", "Drawer A", 3),
                 ComponentAllocationRecord("stocked", "B", "Drawer B", 5),
+                ComponentAllocationRecord("stocked", "A", "Drawer A", 3),
+                ComponentAllocationRecord("stocked", "C", "Empty drawer", 0),
                 ComponentAllocationRecord("low", "A", "Drawer A", 1),
             ),
         )
 
-        assertEquals(listOf("stocked"), projector.inventory(
-            InventoryFiltersUiState(location = "B"), null,
-        ).list.items.map { it.id })
+        val row = projector.inventory(InventoryFiltersUiState(location = "B"), null).list.items.single()
+        assertEquals("stocked", row.id)
+        assertEquals(listOf("A", "B"), row.inStockLocationIds)
         assertEquals(emptyList(), projector.inventory(
             InventoryFiltersUiState(location = "C"), null,
         ).list.items.map { it.id })
@@ -87,9 +88,9 @@ class InventoryStateProjectorTest {
         assertEquals(listOf("depleted"), projector.inventory(
             InventoryFiltersUiState(location = "A"), null,
         ).list.items.map { it.id })
-        assertEquals(listOf("moved"), projector.inventory(
-            InventoryFiltersUiState(location = "B"), null,
-        ).list.items.map { it.id })
+        val movedRow = projector.inventory(InventoryFiltersUiState(location = "B"), null).list.items.single()
+        assertEquals("moved", movedRow.id)
+        assertEquals(listOf("B"), movedRow.inStockLocationIds)
         assertEquals(listOf("A", "B"), projector.inventory(
             InventoryFiltersUiState(), null,
         ).availableLocations)

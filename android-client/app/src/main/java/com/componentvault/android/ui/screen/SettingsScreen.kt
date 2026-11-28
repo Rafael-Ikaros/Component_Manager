@@ -24,7 +24,22 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Brightness6
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Sell
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.Warehouse
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -99,6 +114,7 @@ internal fun SettingsRouteScreen(
     onSyncNow: () -> Unit,
     onClearImportLearningMappings: () -> Unit,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    localComponentCount: Int? = null,
 ) {
     val strings = vaultStrings()
     val canStepBackToSectionList = !layoutMode.showsListDetail && selectedSection != null
@@ -144,6 +160,7 @@ internal fun SettingsRouteScreen(
             onSyncNow = onSyncNow,
             onClearImportLearningMappings = onClearImportLearningMappings,
             storageLocations = storageLocations,
+            localComponentCount = localComponentCount,
         )
     }
 }
@@ -165,6 +182,7 @@ internal fun SettingsScreen(
     onSyncNow: () -> Unit,
     onClearImportLearningMappings: () -> Unit,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    localComponentCount: Int? = null,
 ) {
     SettingsContent(
         contentPadding = contentPadding,
@@ -182,6 +200,7 @@ internal fun SettingsScreen(
         onSyncNow = onSyncNow,
         onClearImportLearningMappings = onClearImportLearningMappings,
         storageLocations = storageLocations,
+        localComponentCount = localComponentCount,
     )
 }
 
@@ -207,8 +226,11 @@ internal fun SettingsContent(
     storageLocations: List<StorageLocationRecord> = emptyList(),
     onOpenLabelTools: (() -> Unit)? = null,
     onSplitLayoutChanged: (Boolean) -> Unit = {},
+    localComponentCount: Int? = null,
 ) {
     val strings = vaultStrings()
+    val context = LocalContext.current
+    var updateChannel by remember(context) { mutableStateOf(UpdatePreferences.readChannel(context)) }
     var serverUrl by rememberSaveable(syncConfiguration.serverBaseUrl) {
         mutableStateOf(syncConfiguration.serverBaseUrl)
     }
@@ -355,6 +377,11 @@ internal fun SettingsContent(
                         appLanguage = appLanguage,
                         onAppLanguageChange = { appLanguage = it },
                         importLearningSummary = importLearningSummary,
+                        updateChannel = updateChannel,
+                        onUpdateChannelChange = { channel ->
+                            UpdatePreferences.writeChannel(context, channel)
+                            updateChannel = channel
+                        },
                         showToken = showToken,
                         onToggleToken = { showToken = !showToken },
                         isBusy = isBusy,
@@ -416,6 +443,10 @@ internal fun SettingsContent(
                             onManageLocations = onManageLocations,
                             onBackupRestore = onBackupRestore,
                             onOpenLabelTools = onOpenLabelTools,
+                            syncConfiguration = syncConfiguration,
+                            appLanguage = appPreferences.appLanguage,
+                            updateChannel = updateChannel,
+                            localComponentCount = localComponentCount,
                             compact = true,
                         )
                     }
@@ -438,6 +469,10 @@ internal fun SettingsContent(
                         onManageLocations = onManageLocations,
                         onBackupRestore = onBackupRestore,
                         onOpenLabelTools = onOpenLabelTools,
+                        syncConfiguration = syncConfiguration,
+                        appLanguage = appPreferences.appLanguage,
+                        updateChannel = updateChannel,
+                        localComponentCount = localComponentCount,
                     )
                 }
             }
@@ -474,6 +509,10 @@ internal fun SettingsContent(
 private fun SettingsSectionList(
     selectedSection: SettingsSection?,
     onSelectSection: (SettingsSection) -> Unit,
+    syncConfiguration: SyncConfiguration,
+    appLanguage: AppLanguage,
+    updateChannel: UpdateChannel,
+    localComponentCount: Int?,
     onManageLocations: (() -> Unit)? = null,
     onBackupRestore: (() -> Unit)? = null,
     onOpenLabelTools: (() -> Unit)? = null,
@@ -482,54 +521,152 @@ private fun SettingsSectionList(
     val strings = vaultStrings()
     val appearance = LocalAppearance.current
     val route: @Composable (SettingsSection) -> Unit = { section ->
+        val summary = when (section) {
+            SettingsSection.Appearance -> stringResource(
+                R.string.appearance_summary,
+                stringResource(appearance.mode.label()),
+                stringResource(appearance.accent.label()),
+            )
+            SettingsSection.App -> when (appLanguage) {
+                AppLanguage.ZhCn -> stringResource(R.string.appearance_language_chinese)
+                AppLanguage.English -> "English"
+            }
+            SettingsSection.Sync -> stringResource(
+                if (syncConfiguration.serverBaseUrl.isNotBlank() && syncConfiguration.apiToken.isNotBlank()) {
+                    R.string.appearance_sync_configured
+                } else R.string.appearance_sync_not_configured,
+            )
+            SettingsSection.About -> stringResource(
+                if (updateChannel == UpdateChannel.Dev) R.string.appearance_channel_dev
+                else R.string.appearance_channel_stable,
+            )
+            else -> null
+        }
         SettingsSectionCard(
-            title = section.title(strings),
-            supporting = if (compact) null else if (section == SettingsSection.Appearance) {
-                stringResource(R.string.appearance_summary, stringResource(appearance.mode.label()), stringResource(appearance.accent.label()))
-            } else section.supporting(strings),
+            title = section.listTitle(strings),
+            supporting = section.listSupporting(),
+            icon = section.icon(),
             selected = section == selectedSection,
             onClick = { onSelectSection(section) },
+            summary = summary,
+            compact = compact,
             modifier = Modifier.testTag("settings_group_${section.name}"),
         )
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        SettingsLocalWarehouseSummary(localComponentCount)
         SettingsRouteGroup(stringResource(R.string.appearance_group_habits)) {
             route(SettingsSection.Appearance)
-            HorizontalDivider()
+            SettingsRowDivider(compact)
             route(SettingsSection.ImportAndOcr)
-            HorizontalDivider()
+            SettingsRowDivider(compact)
             route(SettingsSection.App)
         }
         SettingsRouteGroup(stringResource(R.string.appearance_group_warehouse)) {
             route(SettingsSection.Sync)
             onManageLocations?.let { action ->
-                HorizontalDivider()
-                SettingsSectionCard(stringResource(R.string.settings_locations_title),
-                    stringResource(R.string.settings_locations_hint).takeUnless { compact }, false, action)
+                SettingsRowDivider(compact)
+                SettingsSectionCard(
+                    title = stringResource(R.string.appearance_locations_title),
+                    supporting = stringResource(R.string.appearance_locations_hint),
+                    icon = Icons.Outlined.LocationOn,
+                    selected = false,
+                    onClick = action,
+                    compact = compact,
+                )
             }
             onBackupRestore?.let { action ->
-                HorizontalDivider()
-                SettingsSectionCard(stringResource(R.string.backup_title),
-                    stringResource(R.string.settings_backup_hint).takeUnless { compact }, false, action)
+                SettingsRowDivider(compact)
+                SettingsSectionCard(
+                    title = stringResource(R.string.appearance_backup_title),
+                    supporting = stringResource(R.string.appearance_backup_hint),
+                    icon = Icons.Outlined.Storage,
+                    selected = false,
+                    onClick = action,
+                    compact = compact,
+                )
             }
             onOpenLabelTools?.let { action ->
-                HorizontalDivider()
-                SettingsSectionCard(stringResource(R.string.appearance_printing),
-                    stringResource(R.string.appearance_printing_hint).takeUnless { compact }, false, action)
+                SettingsRowDivider(compact)
+                SettingsSectionCard(
+                    title = stringResource(R.string.appearance_printing),
+                    supporting = stringResource(R.string.appearance_printing_hint),
+                    icon = Icons.Outlined.Sell,
+                    selected = false,
+                    onClick = action,
+                    compact = compact,
+                )
             }
         }
         SettingsRouteGroup(stringResource(R.string.appearance_group_support)) {
             route(SettingsSection.Feedback)
-            HorizontalDivider()
+            SettingsRowDivider(compact)
             route(SettingsSection.About)
+        }
+    }
+}
+
+private fun SettingsSection.icon(): ImageVector = when (this) {
+    SettingsSection.Appearance -> Icons.Outlined.Brightness6
+    SettingsSection.ImportAndOcr -> Icons.Outlined.DocumentScanner
+    SettingsSection.App -> Icons.Outlined.Translate
+    SettingsSection.Sync -> Icons.Outlined.Dns
+    SettingsSection.Feedback -> Icons.Outlined.ChatBubbleOutline
+    SettingsSection.About -> Icons.Outlined.Info
+}
+
+@Composable
+private fun SettingsLocalWarehouseSummary(localComponentCount: Int?) {
+    val colors = MaterialTheme.colorScheme
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("settings_local_warehouse"),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 77.dp).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = colors.primaryContainer,
+                contentColor = colors.onPrimaryContainer,
+            ) {
+                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Warehouse, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    stringResource(R.string.appearance_local_warehouse),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    if (localComponentCount == null) stringResource(R.string.appearance_local_loading)
+                    else stringResource(R.string.appearance_local_components, localComponentCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 12.sp,
+                    color = colors.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun SettingsRouteGroup(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.titleSmall)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            title,
+            modifier = Modifier.padding(horizontal = 14.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Card(
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -538,36 +675,70 @@ private fun SettingsRouteGroup(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
+private fun SettingsRowDivider(compact: Boolean) {
+    HorizontalDivider(Modifier.padding(start = if (compact) 38.dp else 48.dp, end = 16.dp))
+}
+
+@Composable
 private fun SettingsSectionCard(
     title: String,
-    supporting: String?,
+    supporting: String,
+    icon: ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    summary: String? = null,
+    compact: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
+    val supportingColor = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant
     androidx.compose.material3.Surface(
         color = if (selected) colors.primaryContainer else colors.surface,
         contentColor = if (selected) colors.onPrimaryContainer else colors.onSurface,
     ) {
         Row(
-            modifier = modifier.fillMaxWidth().heightIn(min = 48.dp)
+            modifier = modifier.fillMaxWidth().heightIn(min = 77.dp)
                 .then(if (selected) Modifier.selectable(true, role = Role.Button, onClick = onClick)
                     else Modifier.clickable(role = Role.Button, onClick = onClick))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (supporting != null) {
-                    Text(supporting, style = MaterialTheme.typography.bodySmall,
-                        color = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant)
-                }
-            }
-            androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
+            Icon(
+                icon,
                 contentDescription = null,
+                modifier = Modifier.size(if (compact) 18.dp else 20.dp),
+                tint = supportingColor,
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 13.sp,
+                    color = supportingColor,
+                )
+            }
+            if (summary != null) {
+                Text(
+                    summary,
+                    modifier = Modifier.widthIn(max = if (compact) 64.dp else 96.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 12.sp,
+                    color = supportingColor,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            }
+            Icon(
+                Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = supportingColor,
             )
         }
     }
@@ -606,15 +777,16 @@ private fun SettingsSyncStatusPane(
 }
 
 @Composable
-private fun SettingsAboutPane(showHeading: Boolean = true) {
+private fun SettingsAboutPane(
+    updateChannel: UpdateChannel,
+    onUpdateChannelChange: (UpdateChannel) -> Unit,
+    showHeading: Boolean = true,
+) {
     val strings = vaultStrings()
     val uriHandler = LocalUriHandler.current
     val coroutineScope = rememberCoroutineScope()
     val updateChecker = remember { GitHubReleaseUpdateChecker() }
     val context = LocalContext.current
-    var updateChannel by remember {
-        mutableStateOf(UpdatePreferences.readChannel(context))
-    }
     var showStartupUpdatePrompt by remember {
         mutableStateOf(UpdatePreferences.showStartupPrompt(context))
     }
@@ -689,8 +861,7 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
         Text(stringResource(R.string.settings_update_channel_title), fontWeight = FontWeight.SemiBold)
         Column {
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
-              updateChannel = UpdateChannel.Stable
-              UpdatePreferences.writeChannel(context, updateChannel)
+              onUpdateChannelChange(UpdateChannel.Stable)
               updateResult = null
           }) {
             RadioButton(
@@ -701,8 +872,7 @@ private fun SettingsAboutPane(showHeading: Boolean = true) {
             Text(stringResource(R.string.settings_update_channel_stable))
           }
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
-              updateChannel = UpdateChannel.Dev
-              UpdatePreferences.writeChannel(context, updateChannel)
+              onUpdateChannelChange(UpdateChannel.Dev)
               updateResult = null
           }) {
             RadioButton(
@@ -885,6 +1055,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
     appLanguage: AppLanguage,
     onAppLanguageChange: (AppLanguage) -> Unit,
     importLearningSummary: ImportLearningSummary,
+    updateChannel: UpdateChannel,
+    onUpdateChannelChange: (UpdateChannel) -> Unit,
     showToken: Boolean,
     onToggleToken: () -> Unit,
     isBusy: Boolean,
@@ -1186,7 +1358,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
         SettingsSection.About -> {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    SettingsAboutPane(showHeading = showSectionHeading)
+                    SettingsAboutPane(
+                        updateChannel = updateChannel,
+                        onUpdateChannelChange = onUpdateChannelChange,
+                        showHeading = showSectionHeading,
+                    )
                 }
             }
         }

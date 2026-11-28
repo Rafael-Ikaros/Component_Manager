@@ -9,9 +9,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.componentvault.android.R
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -34,6 +38,7 @@ class InventoryShellImeUiTest {
     @Test
     fun fullShellReleasesBottomNavigationSpaceAboveImeAndRestoresItOnDismiss() {
         lateinit var composeView: View
+        var addOpenCount = 0
         compose.setContent {
             composeView = LocalView.current
             ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
@@ -56,7 +61,7 @@ class InventoryShellImeUiTest {
                             onSortChange = { _ -> },
                             onSelectComponent = { _ -> },
                             onOpenComponentDetail = { _ -> },
-                            onAddComponent = { },
+                            onAddComponent = { addOpenCount++ },
                             onImportComponent = { },
                             onGenerateLabel = { _ -> },
                             onEditComponent = { _ -> },
@@ -96,9 +101,13 @@ class InventoryShellImeUiTest {
             }
             compose.waitForIdle()
         }
+        val add = compose.onNodeWithText(compose.activity.getString(R.string.shell_add_import))
         dispatchIme(false)
+        add.assertIsDisplayed().performClick()
+        compose.runOnIdle { kotlin.test.assertEquals(1, addOpenCount) }
         val closedBottom = compose.onNodeWithTag("inventory_list").getUnclippedBoundsInRoot().bottom
         dispatchIme(true)
+        add.assertDoesNotExist()
         val viewport = compose.onNodeWithTag("shell_viewport").getUnclippedBoundsInRoot()
         val listBottom = compose.onNodeWithTag("inventory_list").getUnclippedBoundsInRoot().bottom
         // The scrolling viewport meets the IME edge without an outer page margin.
@@ -106,6 +115,7 @@ class InventoryShellImeUiTest {
         assertTrue(abs((listBottom - expectedBottom).value) <= 1f,
             "Inventory must end at the IME edge; expected $expectedBottom, got $listBottom")
         dispatchIme(false)
+        add.assertIsDisplayed()
         val restoredBottom = compose.onNodeWithTag("inventory_list").getUnclippedBoundsInRoot().bottom
         assertTrue(abs((restoredBottom - closedBottom).value) <= 1f,
             "Dismissing IME must restore the navigation bar layout")

@@ -5,6 +5,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+internal val VaultPageTitle = TextStyle(
+    fontWeight = FontWeight.Medium,
+    fontSize = 27.sp,
+    lineHeight = 34.sp,
+)
+
 // TextStyle uses the Android default font family and sp follows system font scaling.
 val VaultTypography = Typography(
     displaySmall = TextStyle(

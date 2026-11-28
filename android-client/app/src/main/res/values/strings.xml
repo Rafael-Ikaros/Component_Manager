@@ -12,6 +12,12 @@
     <string name="destination_movements">Records</string>
     <string name="destination_overview">Home</string>
     <string name="destination_settings">Settings</string>
+    <string name="shell_settings_local_first">Local first, connect when needed</string>
+    <string name="shell_add_import">Add / Import</string>
+    <plurals name="shell_local_inventory_count">
+        <item quantity="one">Local warehouse · %d component</item>
+        <item quantity="other">Local warehouse · %d components</item>
+    </plurals>
 
     <string name="action_add">Add</string>
     <string name="action_back">Back</string>
@@ -265,7 +271,7 @@
     <string name="settings_connection_title">Server connection</string>
     <string name="settings_connection_subtitle">Configure the sync endpoint used by this device.</string>
     <string name="settings_auth_title">Authentication</string>
-    <string name="settings_auth_subtitle">Store the shared API token locally for sync and health checks.</string>
+    <string name="settings_auth_subtitle">Store the current account access key on this device only for connection checks and sync.</string>
     <string name="settings_sync_behavior_title">Sync behavior</string>
     <string name="settings_sync_behavior_subtitle">Control launch sync and post-write sync independently.</string>
     <string name="settings_import_preferences_title">Import and labels</string>

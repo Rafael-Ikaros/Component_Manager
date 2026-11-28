@@ -3,12 +3,30 @@ package com.componentvault.android.ui.screen
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.os.Looper
 import android.view.View
 import androidx.activity.ComponentActivity
-import androidx.test.platform.app.InstrumentationRegistry
-import com.componentvault.android.ui.theme.ComponentVaultTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.platform.app.InstrumentationRegistry
+import com.componentvault.android.R
+import com.componentvault.android.data.AppearanceAccent
+import com.componentvault.android.data.AppearanceMode
+import com.componentvault.android.data.AppearancePreferences
+import com.componentvault.android.data.InventoryRepository
+import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.StorageLocationRecord
+import com.componentvault.android.model.StorageLocationSaveIntent
+import com.componentvault.android.ui.theme.ComponentVaultTheme
+import com.componentvault.android.ui.theme.LocalAppearance
+import com.componentvault.android.ui.theme.vaultColorScheme
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
 import org.junit.Rule
@@ -141,6 +159,88 @@ class UiScreenshotTest {
         saveScreenshot("storage-locations-list-dark.png") {
             captureView { compose.activity.window.decorView }
         }
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w393dp-h850dp-normal-port-xhdpi")
+    fun capturePhaseOneSettingsLight() {
+        showPhaseOneFixture(dark = false, accent = AppearanceAccent.Teal)
+        openTab(R.string.destination_settings)
+        compose.onNodeWithText(context.getString(R.string.appearance_title)).assertIsDisplayed()
+        saveScreenshot("phase-one-settings-light.png") { captureView { compose.activity.window.decorView } }
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w320dp-h760dp-normal-port-xhdpi")
+    fun capturePhaseOneInventoryNarrow() {
+        showPhaseOneFixture(dark = false, accent = AppearanceAccent.Blue)
+        openTab(R.string.destination_inventory)
+        compose.onNodeWithText(context.getString(R.string.shell_add_import)).assertIsDisplayed()
+        saveScreenshot("phase-one-inventory-narrow.png") { captureView { compose.activity.window.decorView } }
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w393dp-h850dp-normal-port-xhdpi")
+    fun capturePhaseOneBlueNavigationDark() {
+        showPhaseOneFixture(dark = true, accent = AppearanceAccent.Blue)
+        openTab(R.string.destination_settings)
+        compose.onNodeWithTag("settings_group_Appearance").assertIsDisplayed()
+        saveScreenshot("phase-one-settings-mist-blue-dark.png") {
+            val bitmap = captureView { compose.activity.window.decorView }
+            val bottomHeight = (96 * context.resources.displayMetrics.density).toInt()
+            val pixels = IntArray(bitmap.width * bottomHeight)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, bitmap.height - bottomHeight, bitmap.width, bottomHeight)
+            val indicator = vaultColorScheme(darkTheme = true, accent = AppearanceAccent.Blue).primaryContainer.toArgb()
+            assertTrue(indicator in pixels, "Bottom navigation must render the active accent container")
+            bitmap
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w393dp-h850dp-normal-port-xhdpi")
+    fun capturePhaseOneDetailDark() {
+        showPhaseOneFixture(dark = true, accent = AppearanceAccent.Teal)
+        openTab(R.string.destination_inventory)
+        compose.onNodeWithText("AMS1117-3.3").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("inventory_detail_list").assertIsDisplayed()
+        saveScreenshot("phase-one-detail-dark.png") { captureView { compose.activity.window.decorView } }
+    }
+
+    private fun showPhaseOneFixture(dark: Boolean, accent: AppearanceAccent) {
+        val repository = InventoryRepository(context)
+        runBlocking {
+            sampleLocations.take(3).forEach { location ->
+                val result = repository.saveStorageLocation(location.id, location.name, StorageLocationSaveIntent.Create)
+                assertTrue(result.isSuccess, result.message)
+            }
+            listOf("NE555DR", "4.7 kΩ ±1%", "USB Type-C 16P", "SS14", "100 nF · 50 V", "10 kΩ ±1%", "AMS1117-3.3")
+                .forEachIndexed { index, name ->
+                    val part = ComponentDraft(
+                        sku = "CV-FIXTURE-${index + 1}", name = name, category = "IC",
+                        packageName = if (index == 6) "SOT-223" else "0603",
+                        location = sampleLocations[index % 3].id, description = "布局验证用合成元件",
+                        quantity = listOf(5, 120, 4, 0, 86, 240, 3)[index], minStock = 10,
+                    )
+                    val result = repository.saveComponent(part)
+                    assertTrue(result.isSuccess, result.message)
+                }
+        }
+        val model = InventoryViewModel(context)
+        val appearance = AppearancePreferences(if (dark) AppearanceMode.Dark else AppearanceMode.Light, accent)
+        compose.setContent {
+            CompositionLocalProvider(LocalAppearance provides appearance) {
+                ComponentVaultTheme(darkTheme = dark, accent = accent) { ComponentVaultApp(model) }
+            }
+        }
+        compose.waitUntil(10_000) {
+            org.robolectric.Shadows.shadowOf(Looper.getMainLooper()).idle()
+            model.uiState.inventory.isLoaded || model.startupFailure != null
+        }
+        kotlin.test.assertNull(model.startupFailure)
+    }
+
+    private fun openTab(label: Int) {
+        compose.onNodeWithContentDescription(context.getString(label), useUnmergedTree = true).performClick()
     }
 
     private fun captureView(viewProvider: () -> View): Bitmap {

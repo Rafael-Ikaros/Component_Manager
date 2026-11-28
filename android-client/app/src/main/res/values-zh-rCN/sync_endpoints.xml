@@ -1,5 +1,5 @@
 <resources>
-    <string name="settings_api_token_help">API Token 是部署者设置的 API_TOKEN。部署者可在 Docker 管理面板中打开本应用的 API 容器，查看环境变量 API_TOKEN；也可查看部署目录的 .env。它不是 GPG_KEY 或 DOCKERHUB_TOKEN，也不需要去 GitHub 申请。非部署者请联系管理员。</string>
+    <string name="settings_api_token_help">管理员使用服务端首次配置时设置的密钥；普通用户使用管理员发放的账户密钥。将对应密钥填入此处即可，无需修改 Docker 环境变量。</string>
     <string name="settings_api_token_copy">复制令牌</string>
     <string name="settings_api_token_copied">令牌已复制。</string>
     <string name="settings_external_server_url">外网地址（可选）</string>

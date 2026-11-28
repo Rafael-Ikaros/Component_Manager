@@ -55,6 +55,7 @@ class InventoryTabletRowUiTest {
             }
         }
         compose.onNodeWithText("电容抽屉 A01").assertIsDisplayed()
+        compose.onNodeWithText("0603 · 100 nF · 50 V").assertIsDisplayed()
         compose.onNodeWithText("100").assertIsDisplayed()
         val row = compose.onNodeWithTag("inventory_tablet_row", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue(row.bottom - row.top >= 48.dp)

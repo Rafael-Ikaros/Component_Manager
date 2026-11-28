@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -52,7 +53,7 @@ class InventoryFilterLayoutUiTest {
             assertTrue(kotlin.math.abs((bounds.top + bounds.bottom - quickFilters.first().top - quickFilters.first().bottom).value) <= 2f, "Quick filters must occupy one row")
         }
         for (label in listOf(R.string.filter_category_label, R.string.filter_location_label, R.string.filter_sort_label)) {
-            val button = compose.onNode(hasText(context.getString(label), substring = true)
+            val button = compose.onNode(hasContentDescription(context.getString(label), substring = true)
                 and hasAnyAncestor(hasTestTag("inventory_filter_bar")))
             button.performScrollTo().assertIsDisplayed()
             val bounds = button.getUnclippedBoundsInRoot()
@@ -61,6 +62,10 @@ class InventoryFilterLayoutUiTest {
         }
         compose.onNodeWithTag("inventory_filter_panel_button").assertDoesNotExist()
         compose.onNodeWithTag("inventory_filter_panel").assertDoesNotExist()
+        // Tapping the leading decoration must focus the filled field, not just its text box.
+        compose.onNodeWithTag("inventory_search")
+            .performTouchInput { click(Offset(width * 0.06f, center.y)) }
+            .assertIsFocused()
     }
     @Test
     fun directSelectorsApplyImmediatelyAndCanReturnToAllCategories() {
@@ -79,7 +84,7 @@ class InventoryFilterLayoutUiTest {
                 }
             }
         }
-        fun openSelector(label: Int) = compose.onNode(hasText(context.getString(label), substring = true)
+        fun openSelector(label: Int) = compose.onNode(hasContentDescription(context.getString(label), substring = true)
             and hasAnyAncestor(hasTestTag("inventory_filter_bar"))).performScrollTo().performClick()
         openSelector(R.string.filter_category_label)
         compose.onNodeWithText("Resistor").performClick()

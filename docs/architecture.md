@@ -300,9 +300,12 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 - Navigation centers on four adaptive top-level destinations: `Home`,
   `Inventory`, `Records`, and `Settings`. Home presents the summary. Settings
   groups its Appearance, import, language, sync, warehouse/data, feedback and
-  updates entries; the printing shortcut opens the existing label tools.
-  The sync section remains directly addressable.
-  Inventory's Import and scan bottom sheet has Add component, Batch inbound
+  updates entries around a read-only summary of the loaded local inventory.
+  The printing shortcut opens the existing label tools. Compact settings sections
+  hide the bottom tabs and return to the saved settings list; wider layouts keep
+  the adaptive panes and rail. The sync section remains directly addressable.
+  The compact inventory's docked Add / Import action opens the existing sheet
+  with Add component, Batch inbound
   and Project materials. Batch inbound uses one local draft for package scans,
   C-code text or XLSX lists, and LCSC order XLS files. Add component includes lookup, scanning and manual entry;
   Project materials unifies BOM and manual picking. Data migration is not a
@@ -328,11 +331,13 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   window size classes for width handling, and
   `NavigableListDetailPaneScaffold` for Inventory list-detail behavior. The
   Inventory header treats search as the primary action through
-  an inline `OutlinedTextField`, with results visible while typing and all five
-  filters on a single horizontally scrollable row. Flat rows emphasize quantity
-  and include an overflow menu alongside swipe actions. Detail actions use the
-  existing movement editor; current inventory cost and catalog reference price
-  are displayed separately. `SavedStateHandle` stores only filter values and
+  a filled text field, with results visible while typing and all five filters
+  on a single horizontally scrollable row. Compact rows emphasize quantity,
+  with a separate overflow target alongside swipe actions. Issued quantity and
+  last update remain visible in detail. The detail uses a flat hierarchy and
+  a two-column field grid where width and font scaling permit. Its actions call
+  the existing movement editor; current inventory cost and catalog reference
+  price are displayed separately. `SavedStateHandle` stores only filter values and
   selection ID, and the first loaded projection validates restored selection.
   Loading uses a separate list state so it cannot reset the saved scroll position.
   Compact detail and delete confirmation each use their own target ID.

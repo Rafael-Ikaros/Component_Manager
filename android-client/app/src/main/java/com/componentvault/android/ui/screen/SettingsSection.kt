@@ -24,11 +24,20 @@ internal fun SettingsSection.title(strings: ComponentVaultStrings): String = whe
 }
 
 @Composable
-internal fun SettingsSection.supporting(strings: ComponentVaultStrings): String = when (this) {
-    SettingsSection.Sync -> strings.settings.connectionSubtitle
-    SettingsSection.ImportAndOcr -> strings.settings.importPreferencesSubtitle
-    SettingsSection.App -> strings.settings.languageSubtitle
-    SettingsSection.Feedback -> stringResource(R.string.feedback_section_supporting)
-    SettingsSection.About -> strings.settings.aboutSubtitle
-    SettingsSection.Appearance -> stringResource(R.string.appearance_description)
+internal fun SettingsSection.listTitle(strings: ComponentVaultStrings): String = when (this) {
+    SettingsSection.Sync -> stringResource(R.string.appearance_sync_title)
+    SettingsSection.ImportAndOcr -> stringResource(R.string.appearance_import_title)
+    else -> title(strings)
 }
+
+@Composable
+internal fun SettingsSection.listSupporting(): String = stringResource(
+    when (this) {
+        SettingsSection.Sync -> R.string.appearance_sync_hint
+        SettingsSection.ImportAndOcr -> R.string.appearance_import_hint
+        SettingsSection.App -> R.string.appearance_language_hint
+        SettingsSection.Feedback -> R.string.appearance_feedback_hint
+        SettingsSection.About -> R.string.appearance_about_hint
+        SettingsSection.Appearance -> R.string.appearance_description
+    },
+)

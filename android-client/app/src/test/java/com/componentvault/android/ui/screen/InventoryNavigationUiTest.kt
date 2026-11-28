@@ -38,6 +38,23 @@ class InventoryNavigationUiTest {
     }
 
     @Test
+    @Config(qualifiers = "w393dp-h850dp")
+    fun compactSettingsSectionHidesBottomTabsAndArrowReturnsToSettings() {
+        val model = InventoryViewModel(context)
+        compose.setContent { MaterialTheme { ComponentVaultApp(model) } }
+        val settingsTab = compose.onNodeWithContentDescription(
+            context.getString(R.string.destination_settings), useUnmergedTree = true,
+        )
+        settingsTab.performClick()
+        compose.onNodeWithTag("settings_group_Appearance").assertIsDisplayed().performClick()
+        settingsTab.assertDoesNotExist()
+        compose.onNodeWithTag("appearance_mode_System").assertIsDisplayed()
+        compose.onNodeWithContentDescription(context.getString(R.string.action_back)).performClick()
+        compose.onNodeWithTag("settings_group_Appearance").assertIsDisplayed()
+        settingsTab.assertIsDisplayed()
+    }
+
+    @Test
     @Config(qualifiers = "w1200dp-h960dp")
     fun detailFollowsAnExplicitWideSelectionButDoesNotReopenAfterBack() {
         val ids = runBlocking {

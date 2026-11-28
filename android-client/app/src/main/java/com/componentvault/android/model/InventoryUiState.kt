@@ -68,6 +68,7 @@ data class InventoryListItemUiState(
     val description: String = "",
     val specificationSummary: String? = null,
     val issuedQuantity: Long = 0,
+    val inStockLocationIds: List<String> = emptyList(),
 )
 
 data class InventoryDetailUiState(

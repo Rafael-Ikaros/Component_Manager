@@ -23,6 +23,8 @@ internal class InventoryStateProjector(
     private val locations: List<StorageLocationRecord>,
     private val allocations: List<ComponentAllocationRecord>,
 ) {
+    private val allocationsByComponent by lazy { allocations.groupBy { it.componentId } }
+
     fun overview(snapshot: DashboardSnapshot): OverviewUiState = OverviewUiState(
         componentCount = snapshot.componentCount,
         totalUnits = snapshot.totalUnits,
@@ -69,7 +71,7 @@ internal class InventoryStateProjector(
         }.orEmpty(),
         issuedQuantity = component?.let { issuedQuantities[it.id] } ?: 0,
         allocations = component?.let { selected ->
-            allocations.filter { it.componentId == selected.id && it.quantity > 0 }
+            allocationsByComponent[selected.id].orEmpty().filter { it.quantity > 0 }
         }.orEmpty(),
     )
 
@@ -82,7 +84,6 @@ internal class InventoryStateProjector(
         )
 
     private fun filter(filters: InventoryFiltersUiState): List<ComponentRecord> {
-        val allocationsByComponent = allocations.groupBy { it.componentId }
         val filtered = components.filter { component ->
             val matchesLowStock = filters.stockFilter != InventoryStockFilter.LowStock || component.isLowStock
             val matchesQuery = InventorySearch.matches(component, filters.query)
@@ -127,5 +128,10 @@ internal class InventoryStateProjector(
         description = component.description,
         specificationSummary = component.officialRclSpecificationSummary(),
         issuedQuantity = issuedQuantities[component.id] ?: 0,
+        inStockLocationIds = allocationsByComponent[component.id].orEmpty()
+            .filter { it.quantity > 0 }
+            .map { it.locationId }
+            .distinct()
+            .sortedBy { it != component.location },
     )
 }

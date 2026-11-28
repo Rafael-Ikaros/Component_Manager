@@ -1,5 +1,5 @@
 <resources>
-    <string name="settings_api_token_help">The deployer sets API_TOKEN. In a Docker management panel, open this app’s API container and find the API_TOKEN environment variable, or check the deployment directory’s .env file. It is not GPG_KEY or DOCKERHUB_TOKEN, and you do not request it from GitHub. If you are not the deployer, ask the administrator.</string>
+    <string name="settings_api_token_help">Administrators use the key set during the server’s initial setup or managed in the admin console. Regular users use the account key issued by an administrator. Enter the applicable key here; no Docker environment variable changes are needed.</string>
     <string name="settings_api_token_copy">Copy token</string>
     <string name="settings_api_token_copied">Token copied.</string>
     <string name="settings_external_server_url">External URL (optional)</string>

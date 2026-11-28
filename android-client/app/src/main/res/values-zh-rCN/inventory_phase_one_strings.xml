@@ -5,4 +5,10 @@
     <string name="inventory_value_cny">库存价值（CNY）</string>
     <string name="inventory_cost_unknown">成本未知</string>
     <string name="inventory_usage_title">用量统计</string>
+    <string name="inventory_no_image_short">缺图</string>
+    <string name="inventory_photo_pending_sync">照片待下载，请同步。</string>
+    <string name="inventory_zero_stock">零库存</string>
+    <string name="inventory_transfer_short">转移</string>
+    <string name="inventory_edit_supporting">名称、封装、最低库存与备注</string>
+    <string name="inventory_label_supporting">预览此元件的标签</string>
 </resources>

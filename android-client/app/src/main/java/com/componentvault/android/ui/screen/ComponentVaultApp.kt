@@ -694,6 +694,7 @@ internal fun ComponentVaultApp(
                                 onBackupRestore = { inventoryBackupVisible = true },
                                 onOpenLabelTools = ::openLabelTools,
                                 onSplitLayoutChanged = { settingsTwoPane = it },
+                                localComponentCount = uiState.inventory.totalComponentCount.takeIf { uiState.inventory.isLoaded },
                             )
                         },
                         snackbarHostState = snackbarHostState,

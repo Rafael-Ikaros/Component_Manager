@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -37,6 +38,8 @@ import com.componentvault.android.model.InventoryListUiState
 import com.componentvault.android.model.InventoryScreenUiState
 import com.componentvault.android.model.ReferencePriceNotes
 import com.componentvault.android.model.ReferencePriceSnapshot
+import com.componentvault.android.model.StorageLocationRecord
+import com.componentvault.android.ui.theme.ComponentVaultTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,6 +74,7 @@ class InventoryPhaseOneUiTest {
     }
 
     @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun overflowInvokesTheSameExplicitActionWithoutOpeningDetail() {
         var opens = 0
         var inbound = 0
@@ -78,14 +82,22 @@ class InventoryPhaseOneUiTest {
         var transfers = 0
         var deletes = 0
         content {
-            InventoryListRow(item, selected = false, onClick = { opens++ },
-                onInbound = { inbound++ }, onOutbound = { outbound++ },
-                onTransfer = { transfers++ }, onDelete = { deletes++ })
+            ComponentVaultTheme(darkTheme = false) {
+                InventoryListRow(item, selected = false, onClick = { opens++ },
+                    onInbound = { inbound++ }, onOutbound = { outbound++ },
+                    onTransfer = { transfers++ }, onDelete = { deletes++ })
+            }
         }
-        compose.onNodeWithText(context.getString(R.string.inventory_usage_issued_value, item.issuedQuantity)).assertIsDisplayed()
-        compose.onNodeWithText(formatShortLocalTimestamp(item.updatedAt)).assertIsDisplayed()
+        // Issued quantity and timestamps now belong to detail, not every list row.
+        compose.onNodeWithText(context.getString(R.string.inventory_usage_issued_value, item.issuedQuantity)).assertDoesNotExist()
+        compose.onNodeWithText(formatShortLocalTimestamp(item.updatedAt)).assertDoesNotExist()
+        val rowBounds = compose.onNodeWithTag("inventory_reveal_card").getUnclippedBoundsInRoot()
+        assertTrue(rowBounds.bottom - rowBounds.top <= 112.dp, "Default phone rows must remain compact")
         val moreBounds = compose.onNodeWithTag("inventory_row_more_${item.id}").getUnclippedBoundsInRoot()
+        val quantityBounds = compose.onNodeWithTag("inventory_row_quantity_${item.id}", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue(moreBounds.right - moreBounds.left >= 48.dp && moreBounds.bottom - moreBounds.top >= 48.dp)
+        assertTrue(moreBounds.left >= quantityBounds.right, "Overflow must be beside, not below, the quantity")
+        assertTrue(moreBounds.top < quantityBounds.bottom && moreBounds.bottom > quantityBounds.top)
         val actions = listOf(R.string.inventory_quick_inbound, R.string.inventory_quick_outbound,
             R.string.inventory_quick_transfer, R.string.action_delete)
         actions.forEach { label ->
@@ -97,6 +109,27 @@ class InventoryPhaseOneUiTest {
             assertEquals(listOf(1, 1, 1, 1), listOf(inbound, outbound, transfers, deletes))
             assertEquals(0, opens)
         }
+    }
+
+    @Test
+    fun rowPrefersInStockLocationsAndKeepsTheAdditionalLocationSuffix() {
+        val current = mutableStateOf(item.copy(location = "empty",
+            inStockLocationIds = listOf("stock-b", "stock-c")))
+        content {
+            InventoryListRow(current.value, selected = false, onClick = {}, storageLocations = listOf(
+                StorageLocationRecord("empty", "Empty drawer", item.updatedAt),
+                StorageLocationRecord("stock-b", "In-stock drawer B", item.updatedAt),
+                StorageLocationRecord("stock-c", "In-stock drawer C", item.updatedAt),
+            ))
+        }
+        compose.onNodeWithTag("inventory_row_location_${item.id}", useUnmergedTree = true)
+            .assertContentDescriptionEquals("In-stock drawer B +1")
+        compose.onNodeWithText("Empty drawer").assertDoesNotExist()
+        compose.onNodeWithText(" +1").assertIsDisplayed()
+        compose.runOnIdle { current.value = current.value.copy(inStockLocationIds = emptyList()) }
+        compose.onNodeWithTag("inventory_row_location_${item.id}", useUnmergedTree = true)
+            .assertContentDescriptionEquals("Empty drawer")
+        compose.onNodeWithText(" +1").assertDoesNotExist()
     }
 
     @Test
@@ -188,6 +221,85 @@ class InventoryPhaseOneUiTest {
             assertEquals(actions.map { component.id to it.second }, requests)
             assertEquals(0, genericMovements)
         }
+    }
+
+    @Test
+    fun defaultNarrowDetailKeepsStockActionsInOneRowAndGroupsEditWithLabel() {
+        var edited: String? = null
+        var labelled: ComponentRecord? = null
+        content {
+            Box(Modifier.width(320.dp)) {
+                InventoryTabletDetailSummary(component,
+                    onEditComponent = { edited = it }, onGenerateLabel = { labelled = it },
+                    onRequestDeleteComponent = {}, onRecordMovement = {}, onDetailAction = { _, _ -> })
+            }
+        }
+        val bounds = listOf("inbound", "outbound", "transfer").map {
+            compose.onNodeWithTag("inventory_detail_$it").assertIsDisplayed().getUnclippedBoundsInRoot()
+        }
+        assertTrue(bounds.all { it.top == bounds.first().top }, "Default stock actions must use one row")
+        compose.onNodeWithTag("inventory_detail_edit").performClick()
+        compose.onNodeWithTag("inventory_detail_label").performClick()
+        compose.runOnIdle { assertEquals(component.id, edited); assertEquals(component, labelled) }
+    }
+
+    @Test
+    fun phoneFieldGridUsesTwoColumnsAndFallsBackToOneAtLargeFontScale() {
+        val scale = mutableStateOf(1f)
+        val longValue = "Full specification value ".repeat(6)
+        content {
+            val density = LocalDensity.current.density
+            CompositionLocalProvider(LocalDensity provides Density(density, fontScale = scale.value)) {
+                Box(Modifier.width(320.dp)) {
+                    InventoryDetailFieldGrid(listOf("SKU" to "C-100", "Package" to "0603", "Notes" to longValue))
+                }
+            }
+        }
+        val sku = compose.onNodeWithText("SKU").getUnclippedBoundsInRoot()
+        val pkg = compose.onNodeWithText("Package").getUnclippedBoundsInRoot()
+        assertEquals(sku.top, pkg.top)
+        assertTrue(pkg.left > sku.right)
+        compose.onNodeWithText(longValue).assertIsDisplayed()
+        compose.runOnIdle { scale.value = 2f }
+        val largeSku = compose.onNodeWithText("SKU").getUnclippedBoundsInRoot()
+        val largePackage = compose.onNodeWithText("Package").getUnclippedBoundsInRoot()
+        assertEquals(largeSku.left, largePackage.left)
+        assertTrue(largePackage.top > largeSku.bottom)
+        compose.onNodeWithText(longValue).assertExists()
+    }
+
+    @Test
+    fun detailNotesHideOnlyStandalonePhotoReferences() {
+        val pngReference = "本地图片：${"a".repeat(64)}.png"
+        val jpgReference = "本地图片：${"b".repeat(64)}.jpg"
+        val notes = "Inspect before soldering.\n封装：0603\n参考本地图片：${"c".repeat(64)}.png"
+        val description = "$pngReference\n$notes\n$jpgReference"
+        val current = mutableStateOf(component.copy(description = description))
+        var labelDescription: String? = null
+        content {
+            InventoryDetailPane(
+                detail = InventoryDetailUiState(component = current.value),
+                onEditComponent = {},
+                onGenerateLabel = { labelDescription = it.description },
+                onRequestDeleteComponent = {},
+                onRecordMovement = {},
+            )
+        }
+        val detailList = compose.onNodeWithTag("inventory_detail_list")
+        detailList.performScrollToNode(hasText(notes))
+        compose.onNodeWithText(notes).assertIsDisplayed()
+        compose.onNodeWithText(pngReference, substring = true).assertDoesNotExist()
+        compose.onNodeWithText(jpgReference, substring = true).assertDoesNotExist()
+
+        detailList.performScrollToNode(hasTestTag("inventory_detail_label"))
+        compose.onNodeWithTag("inventory_detail_label").performClick()
+        val noDescription = context.getString(R.string.label_no_description)
+        compose.runOnIdle {
+            assertEquals(description, labelDescription)
+            current.value = component.copy(description = "\n$pngReference\n")
+        }
+        detailList.performScrollToNode(hasText(noDescription))
+        compose.onNodeWithText(noDescription).assertIsDisplayed()
     }
 
     @Test

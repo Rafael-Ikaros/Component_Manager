@@ -5,4 +5,10 @@
     <string name="inventory_value_cny">Inventory value (CNY)</string>
     <string name="inventory_cost_unknown">Cost unknown</string>
     <string name="inventory_usage_title">Usage</string>
+    <string name="inventory_no_image_short">No image</string>
+    <string name="inventory_photo_pending_sync">Photo pending download. Sync to download it.</string>
+    <string name="inventory_zero_stock">Zero stock</string>
+    <string name="inventory_transfer_short">Transfer</string>
+    <string name="inventory_edit_supporting">Name, package, stock threshold and notes</string>
+    <string name="inventory_label_supporting">Preview this component’s label</string>
 </resources>

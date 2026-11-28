@@ -15,6 +15,25 @@
     <string name="appearance_group_warehouse">Warehouse and data</string>
     <string name="appearance_group_support">Support</string>
     <string name="appearance_printing">Labels and printing</string>
-    <string name="appearance_printing_hint">Open the existing label tools</string>
+    <string name="appearance_printing_hint">Labels, location codes and Bluetooth</string>
     <string name="appearance_about_updates">About and updates</string>
+    <string name="appearance_local_warehouse">Local warehouse</string>
+    <string name="appearance_local_components">%1$d components · Available offline</string>
+    <string name="appearance_local_loading">Loading components…</string>
+    <string name="appearance_import_title">Import and recognition</string>
+    <string name="appearance_import_hint">Locations, OCR and recognition</string>
+    <string name="appearance_language_hint">中文 and English</string>
+    <string name="appearance_language_chinese">中文</string>
+    <string name="appearance_sync_title">Server and sync</string>
+    <string name="appearance_sync_hint">Connection and sync status</string>
+    <string name="appearance_sync_configured">Configured</string>
+    <string name="appearance_sync_not_configured">Not configured</string>
+    <string name="appearance_locations_title">Storage locations</string>
+    <string name="appearance_locations_hint">Locations and location labels</string>
+    <string name="appearance_backup_title">Backup and restore</string>
+    <string name="appearance_backup_hint">Excel inventory and label workbooks</string>
+    <string name="appearance_feedback_hint">Issues and steps to reproduce</string>
+    <string name="appearance_about_hint">Version, project and update channel</string>
+    <string name="appearance_channel_stable" translatable="false">Stable</string>
+    <string name="appearance_channel_dev" translatable="false">Dev</string>
 </resources>

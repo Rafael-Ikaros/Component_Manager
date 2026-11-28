@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appearance_title">外观</string>
-    <string name="appearance_description">主题和强调色</string>
+    <string name="appearance_description">主题与配色</string>
     <string name="appearance_summary">%1$s · %2$s</string>
     <string name="appearance_theme">主题</string>
     <string name="appearance_accent">强调色</string>
@@ -15,6 +15,23 @@
     <string name="appearance_group_warehouse">仓库与数据</string>
     <string name="appearance_group_support">支持</string>
     <string name="appearance_printing">标签与打印</string>
-    <string name="appearance_printing_hint">打开原有标签工具</string>
+    <string name="appearance_printing_hint">元件标签、库位码与蓝牙打印</string>
     <string name="appearance_about_updates">关于与更新</string>
+    <string name="appearance_local_warehouse">本地仓库</string>
+    <string name="appearance_local_components">%1$d 种元件 · 可离线使用</string>
+    <string name="appearance_local_loading">正在读取元件数量…</string>
+    <string name="appearance_import_title">导入与识别</string>
+    <string name="appearance_import_hint">库位、OCR 与识别偏好</string>
+    <string name="appearance_language_hint">中文与 English</string>
+    <string name="appearance_language_chinese">中文</string>
+    <string name="appearance_sync_title">服务器与同步</string>
+    <string name="appearance_sync_hint">连接配置与同步状态</string>
+    <string name="appearance_sync_configured">已配置</string>
+    <string name="appearance_sync_not_configured">未配置</string>
+    <string name="appearance_locations_title">库位管理</string>
+    <string name="appearance_locations_hint">分配位置与库位标签</string>
+    <string name="appearance_backup_title">备份与恢复</string>
+    <string name="appearance_backup_hint">Excel 库存与标签工作簿</string>
+    <string name="appearance_feedback_hint">整理问题与复现过程</string>
+    <string name="appearance_about_hint">版本、项目与更新通道</string>
 </resources>
