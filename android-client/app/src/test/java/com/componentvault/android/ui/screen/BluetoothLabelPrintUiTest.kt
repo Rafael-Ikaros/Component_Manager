@@ -116,6 +116,12 @@ class BluetoothLabelPrintUiTest {
         openEditor()
     }
 
+    private fun waitForSavedQueue() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("print_queue_list")).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun pairTestPrinters(vararg printers: Pair<String, String>) {
         shadowOf(context).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         val adapter = context.getSystemService(BluetoothManager::class.java).adapter
@@ -420,7 +426,7 @@ class BluetoothLabelPrintUiTest {
             back.performClick()
             waitForPrintableConfirmation()
             submit.performClick()
-            compose.waitUntil(10_000) { store.load().items.isNotEmpty() }
+            waitForSavedQueue()
             val elements = requireNotNull(store.load().items.single().design).elements.associateBy { it.id }
             assertEquals(LabelFont.Bold, elements.getValue("name").font)
             assertEquals(12.5f, elements.getValue("name").fontSizePt)
@@ -785,10 +791,11 @@ class BluetoothLabelPrintUiTest {
         compose.onNodeWithTag("label_paper_apply").performClick()
         waitForPrintableConfirmation()
         compose.onNodeWithTag("label_print_submit").performClick()
-        compose.waitUntil(10_000) { queue.load().items.isNotEmpty() }
-        assertEquals(paper, queue.load().paper)
-        assertEquals(seed, queue.load().items.single().seed)
-        assertEquals("Current resistor", queue.load().items.single().design!!.elements.first { it.id == "name" }.text)
+        waitForSavedQueue()
+        val saved = queue.load()
+        assertEquals(paper, saved.paper)
+        assertEquals(seed, saved.items.single().seed)
+        assertEquals("Current resistor", saved.items.single().design!!.elements.first { it.id == "name" }.text)
     }
 
     @Test
@@ -806,7 +813,7 @@ class BluetoothLabelPrintUiTest {
         }
         waitForPrintableConfirmation()
         compose.onNodeWithTag("label_print_submit").performClick()
-        compose.waitUntil(10_000) { store.load().items.size == 2 }
+        waitForSavedQueue()
         val items = store.load().items
         assertEquals(listOf("C100", "C200"), items.map { it.seed!!.sku })
         assertEquals(listOf("Resistor", "Capacitor"), items.map {

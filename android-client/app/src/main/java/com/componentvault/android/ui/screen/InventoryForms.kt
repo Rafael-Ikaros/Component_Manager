@@ -182,41 +182,47 @@ internal fun ComponentEditorSurface(
         if (photoFirst) item(key = "photo_first") {
             ComponentPhotoEditor(description, { description = it }, session = photoSession)
         }
+        val compactEdit = isEditing && !layoutMode.prefersDialogForms
         item {
             SettingsFormSection(
-                title = strings.forms.componentBasicTitle,
-                supporting = strings.forms.componentBasicSubtitle,
+                title = strings.forms.componentBasicTitle.takeUnless { compactEdit },
+                supporting = strings.forms.componentBasicSubtitle.takeUnless { compactEdit },
             ) {
-                SettingsTextField(
-                    value = sku,
-                    onValueChange = { sku = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.common.fieldSku) },
-                    supportingText = { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.component_internal_sku_help)) },
-                    singleLine = true,
-                )
-                SettingsTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.common.fieldName) },
-                    singleLine = true,
-                )
-                EditableChoiceField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = strings.common.fieldCategory,
-                    options = availableCategories.distinct(),
-                    optionLabel = { localizedCategoryLabel(it) },
-                    tag = "component_editor_category",
-                )
-                SettingsTextField(
-                    value = packageName,
-                    onValueChange = { packageName = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.common.fieldPackage) },
-                    singleLine = true,
-                )
+                SettingsTextField(name, { name = it }, label = { Text(strings.common.fieldName) }, singleLine = true)
+                val skuHelp: (@Composable () -> Unit)? = if (compactEdit) null else {
+                    { Text(stringResource(R.string.component_internal_sku_help)) }
+                }
+                SettingsTextField(sku, { sku = it }, label = { Text(strings.common.fieldSku) },
+                    supportingText = skuHelp, singleLine = true)
+                if (!compactEdit) {
+                    EditableChoiceField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = strings.common.fieldCategory,
+                        options = availableCategories.distinct(),
+                        optionLabel = { localizedCategoryLabel(it) },
+                        tag = "component_editor_category",
+                    )
+                }
+                SettingsTextField(packageName, { packageName = it }, label = { Text(strings.common.fieldPackage) },
+                    singleLine = true)
+                if (compactEdit) {
+                    SettingsTextField(
+                        value = minStockText,
+                        onValueChange = { minStockText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.common.fieldMinimumStock) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    SettingsTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.common.fieldDescription) },
+                        minLines = 3,
+                    )
+                }
             }
         }
         item {
@@ -228,31 +234,45 @@ internal fun ComponentEditorSurface(
                     label = strings.common.fieldQuantity,
                     minimum = 0,
                 )
-                OutlinedTextField(
-                    value = minStockText,
-                    onValueChange = { minStockText = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.common.fieldMinimumStock) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
+                if (!compactEdit) {
+                    OutlinedTextField(
+                        value = minStockText,
+                        onValueChange = { minStockText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.common.fieldMinimumStock) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
             }
         }
         item {
             SettingsFormSection(title = strings.forms.componentStorageTitle) {
+                if (compactEdit) {
+                    EditableChoiceField(
+                        value = category,
+                        onValueChange = { category = it },
+                        label = strings.common.fieldCategory,
+                        options = availableCategories.distinct(),
+                        optionLabel = { localizedCategoryLabel(it) },
+                        tag = "component_editor_category",
+                    )
+                }
                 ImportLocationPicker(
                     value = location,
                     onValueChange = { location = it },
                     storageLocations = storageLocations,
                 )
                 if (!photoFirst) ComponentPhotoEditor(description, { description = it }, session = photoSession)
-                SettingsTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.common.fieldDescription) },
-                    minLines = 3,
-                )
+                if (!compactEdit) {
+                    SettingsTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.common.fieldDescription) },
+                        minLines = 3,
+                    )
+                }
             }
         }
         item {

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.selectable
@@ -1586,6 +1587,7 @@ internal fun SettingsTextField(
     enabled: Boolean = true,
     readOnly: Boolean = false,
     isError: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -1602,6 +1604,7 @@ internal fun SettingsTextField(
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
         singleLine = singleLine,
         minLines = minLines,
+        keyboardOptions = keyboardOptions,
         visualTransformation = visualTransformation,
         interactionSource = interaction,
         cursorBrush = SolidColor(colors.primary),
