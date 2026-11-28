@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,8 +36,13 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -45,7 +51,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -351,6 +356,7 @@ internal fun SettingsContent(
                     settingsSectionDetailItems(
                         onSelectSection = onSelectSection,
                         section = section,
+                        storageLocations = storageLocations,
                         showSectionHeading = showTwoPanes,
                         strings = strings,
                         serverUrl = serverUrl,
@@ -755,34 +761,89 @@ internal fun SettingsSectionCard(
 }
 
 @Composable
-private fun SettingsSyncStatusPane(
-    syncConfiguration: SyncConfiguration,
-) {
+private fun SettingsSyncStatusPane(syncConfiguration: SyncConfiguration) {
     val strings = vaultStrings()
-
-    SettingsFormSection(
-        title = stringResource(R.string.sync_run_label),
-        supporting = strings.settings.summarySubtitle,
-    ) {
-        ValueBlock(label = stringResource(R.string.sync_bom_success_label),
-            value = syncConfiguration.bomLastSyncedAt.ifBlank { stringResource(R.string.sync_never) })
+    val never = stringResource(R.string.sync_never)
+    Column {
+        SettingsStatusRow(stringResource(R.string.sync_inventory_success_label), syncConfiguration.lastSyncedAt.ifBlank { never })
+        SettingsStatusRow(strings.settings.deviceId, syncConfiguration.deviceId)
+        SettingsStatusRow(stringResource(R.string.sync_bom_success_label), syncConfiguration.bomLastSyncedAt.ifBlank { never })
+        SettingsStatusRow(strings.settings.endpoint, syncConfiguration.serverBaseUrl.ifBlank { strings.common.labelNotConfigured })
+        if (syncConfiguration.lastSyncMessage.isNotBlank()) {
+            SettingsStatusRow(strings.settings.lastResult, syncConfiguration.lastSyncMessage)
+        }
         PhotoSyncSettings(syncConfiguration)
-        ValueBlock(
-            label = strings.settings.endpoint,
-            value = syncConfiguration.serverBaseUrl.ifBlank { strings.common.labelNotConfigured },
-        )
-        ValueBlock(
-            label = strings.settings.deviceId,
-            value = syncConfiguration.deviceId,
-        )
-        ValueBlock(
-            label = stringResource(R.string.sync_inventory_success_label),
-            value = syncConfiguration.lastSyncedAt,
-        )
-        ValueBlock(
-            label = strings.settings.lastResult,
-            value = syncConfiguration.lastSyncMessage,
-        )
+    }
+}
+
+@Composable
+internal fun SettingsStatusRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 13.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+internal fun SettingsFormNote(message: String) {
+    Text(
+        message, Modifier.fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(15.dp))
+            .padding(horizontal = 15.dp, vertical = 13.dp),
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun SettingsSecondaryButton(label: String, onClick: () -> Unit, modifier: Modifier, enabled: Boolean = true) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 48.dp),
+        shape = RoundedCornerShape(15.dp),
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) { Text(label) }
+}
+
+@Composable
+private fun SettingsDropdown(
+    label: String,
+    value: String,
+    choices: @Composable (close: () -> Unit) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Box {
+            Surface(
+                color = colors.surface, shape = RoundedCornerShape(13.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.outlineVariant),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 49.dp)
+                        .clickable(role = Role.Button) { expanded = true }.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Icon(painterResource(R.drawable.v2_chevron_down), contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
+                choices { expanded = false }
+            }
+        }
     }
 }
 
@@ -810,65 +871,19 @@ private fun SettingsAboutPane(
 
     SettingsFormSection(
         title = strings.settings.aboutTitle.takeIf { showHeading },
-        supporting = strings.settings.aboutSubtitle,
     ) {
-        ValueBlock(
-            label = stringResource(R.string.settings_about_app_name),
-            value = stringResource(R.string.app_name),
-        )
-        ValueBlock(
-            label = strings.settings.appVersion,
-            value = stringResource(
-                R.string.settings_about_version_format,
-                BuildConfig.VERSION_NAME,
-                BuildConfig.VERSION_CODE,
-            ),
-        )
-        ValueBlock(
-            label = stringResource(R.string.settings_about_author),
-            value = "Rafael-Ikaros",
-        )
-        ValueBlock(
-            label = strings.settings.localStorage,
-            value = strings.settings.localStorageValue,
-        )
-        Text(
-            text = strings.settings.aboutBody,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ValueBlock(
-            label = stringResource(R.string.settings_about_project_address),
-            value = PROJECT_URL,
-        )
-        OutlinedButton(
-            onClick = { openTrustedUrl(PROJECT_URL) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.settings_about_open_project))
+        Column {
+            SettingsStatusRow(stringResource(R.string.settings_about_app_name), stringResource(R.string.app_name))
+            SettingsStatusRow(strings.settings.appVersion, stringResource(
+                R.string.settings_about_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
+            ))
+            SettingsStatusRow(stringResource(R.string.settings_about_author), "Rafael-Ikaros")
+            SettingsStatusRow(stringResource(R.string.settings_about_open_source_label),
+                stringResource(R.string.settings_about_open_source_value))
         }
-        ValueBlock(
-            label = stringResource(R.string.settings_about_open_source_label),
-            value = stringResource(R.string.settings_about_open_source_value),
-        )
-        OutlinedButton(
-            onClick = { openTrustedUrl(OPEN_SOURCE_URL) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.settings_about_open_source))
-        }
+        SettingsFormNote(strings.settings.aboutBody)
     }
-    SettingsFormSection(title = stringResource(R.string.settings_update_title)) {
-        SettingsToggleRow(
-            title = stringResource(R.string.settings_update_startup_prompt),
-            subtitle = stringResource(R.string.settings_update_startup_prompt_description),
-            checked = showStartupUpdatePrompt,
-            onCheckedChange = { enabled ->
-                UpdatePreferences.setShowStartupPrompt(context, enabled)
-                showStartupUpdatePrompt = enabled
-            },
-        )
-        Text(stringResource(R.string.settings_update_channel_title), fontWeight = FontWeight.SemiBold)
+    SettingsFormSection(title = stringResource(R.string.settings_update_channel_title)) {
         Column(Modifier.selectableGroup()) {
             UpdateChannel.entries.forEach { channel ->
                 val stable = channel == UpdateChannel.Stable
@@ -889,40 +904,54 @@ private fun SettingsAboutPane(
                 )
             }
         }
-        Button(
-            onClick = {
-                if (!isChecking) {
-                    coroutineScope.launch {
-                        isChecking = true
-                        try {
-                            updateResult = updateChecker.check(BuildConfig.VERSION_NAME, updateChannel)
-                        } finally {
-                            isChecking = false
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    if (!isChecking) {
+                        coroutineScope.launch {
+                            isChecking = true
+                            try {
+                                updateResult = updateChecker.check(BuildConfig.VERSION_NAME, updateChannel)
+                            } finally {
+                                isChecking = false
+                            }
                         }
                     }
-                }
-            },
-            enabled = !isChecking,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                if (isChecking) {
-                    stringResource(R.string.settings_update_checking)
-                } else {
-                    stringResource(R.string.settings_update_check_action)
                 },
-            )
+                enabled = !isChecking,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                shape = RoundedCornerShape(15.dp),
+            ) {
+                Text(stringResource(if (isChecking) R.string.settings_update_checking else R.string.settings_update_check_action))
+            }
+            FilledTonalButton(
+                onClick = { openTrustedUrl(PROJECT_URL) },
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                shape = RoundedCornerShape(15.dp),
+            ) { Text(stringResource(R.string.settings_about_open_project)) }
         }
         SettingsUpdateResult(
             result = updateResult,
             onOpenRelease = ::openTrustedUrl,
         )
         ApkUpdateDownloadPane((updateResult as? ReleaseCheckResult.UpdateAvailable)?.release)
-        OutlinedButton(
-            onClick = { openTrustedUrl(RELEASES_URL) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.settings_update_open_all_releases))
+        SettingsToggleRow(
+            title = stringResource(R.string.settings_update_startup_prompt),
+            subtitle = stringResource(R.string.settings_update_startup_prompt_description),
+            checked = showStartupUpdatePrompt,
+            onCheckedChange = { enabled ->
+                UpdatePreferences.setShowStartupPrompt(context, enabled)
+                showStartupUpdatePrompt = enabled
+            },
+            compact = true,
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { openTrustedUrl(OPEN_SOURCE_URL) }, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_about_open_source))
+            }
+            TextButton(onClick = { openTrustedUrl(RELEASES_URL) }, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_update_open_all_releases))
+            }
         }
         if (browserError) {
             Text(
@@ -1021,6 +1050,7 @@ private const val RELEASES_URL = "https://github.com/Rafael-Ikaros/Component_Man
 private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetailItems(
     onSelectSection: (SettingsSection?) -> Unit,
     section: SettingsSection,
+    storageLocations: List<StorageLocationRecord>,
     showSectionHeading: Boolean,
     strings: ComponentVaultStrings,
     serverUrl: String,
@@ -1071,11 +1101,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
     when (section) {
         SettingsSection.Sync -> {
             item {
-                ValueBlock(label = stringResource(R.string.sync_run_label), value = syncSummary)
-                SettingsFormSection(
-                    title = strings.settings.connectionTitle.takeIf { showSectionHeading },
-                    supporting = strings.settings.connectionSubtitle,
-                ) {
+                SettingsFormSection(title = strings.settings.connectionTitle.takeIf { showSectionHeading }) {
+                    SettingsFormNote(syncSummary.ifBlank { strings.settings.connectionSubtitle })
                     SettingsTextField(
                         value = serverUrl,
                         onValueChange = onServerUrlChange,
@@ -1097,10 +1124,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
             item {
                 val context = LocalContext.current
                 var tokenCopied by remember(apiToken) { mutableStateOf(false) }
-                SettingsFormSection(
-                    title = strings.settings.authTitle,
-                    supporting = strings.settings.authSubtitle,
-                ) {
+                SettingsFormSection {
                     SettingsTextField(
                         value = apiToken,
                         onValueChange = {
@@ -1148,17 +1172,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SettingsFormSection(
-                    title = strings.settings.syncBehaviorTitle,
-                    supporting = strings.settings.syncBehaviorSubtitle,
-                ) {
+                SettingsFormSection {
                     SettingsToggleRow(
+                        compact = true,
                         title = strings.settings.syncOnLaunch,
                         subtitle = strings.settings.syncOnLaunchDescription,
                         checked = autoSyncEnabled,
                         onCheckedChange = onAutoSyncChange,
                     )
                     SettingsToggleRow(
+                        compact = true,
                         title = strings.settings.syncAfterWrites,
                         subtitle = strings.settings.syncAfterWritesDescription,
                         checked = syncAfterLocalChanges,
@@ -1167,10 +1190,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SettingsFormSection(
-                    title = strings.settings.summaryTitle,
-                    supporting = strings.settings.summarySubtitle,
-                ) {
+                SettingsFormSection {
                     if (!errorMessage.isNullOrBlank()) {
                         Text(
                             text = errorMessage,
@@ -1186,44 +1206,70 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Button(
-                            onClick = { onSave() },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(strings.common.actionSaveSettings)
-                        }
-                        OutlinedButton(
+                        SettingsSecondaryButton(
+                            label = strings.common.actionTestConnection,
                             onClick = onTestConnection,
                             enabled = !isBusy,
                             modifier = Modifier.weight(1f),
+                        )
+                        Button(
+                            onClick = { onSave() },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(15.dp),
                         ) {
-                            Text(strings.common.actionTestConnection)
+                            Text(strings.common.actionSaveSettings)
                         }
                     }
-                    OutlinedButton(
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingsSecondaryButton(
+                        label = if (syncRunning) stringResource(R.string.sync_action_cancel) else strings.common.actionSyncNow,
                         onClick = onSyncNow,
                         enabled = syncRunning || (!isBusy && !hasUnsavedConnection),
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (syncRunning) stringResource(R.string.sync_action_cancel) else strings.common.actionSyncNow)
-                    }
+                    )
                 }
             }
         }
 
         SettingsSection.ImportAndOcr -> {
             item {
-                SettingsFormSection(
-                    title = strings.settings.importPreferencesTitle.takeIf { showSectionHeading },
-                    supporting = strings.settings.importPreferencesSubtitle,
-                ) {
-                    SettingsTextField(
-                        value = defaultImportLocation,
-                        onValueChange = onDefaultImportLocationChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(strings.common.fieldLocation) },
-                        singleLine = true,
-                    )
+                SettingsFormSection(title = strings.settings.importPreferencesTitle.takeIf { showSectionHeading }) {
+                    var manualLocation by rememberSaveable {
+                        mutableStateOf(defaultImportLocation.isNotBlank() && storageLocations.none {
+                            it.id == defaultImportLocation || it.name == defaultImportLocation
+                        })
+                    }
+                    val noLocation = stringResource(R.string.v2_settings_no_default_location)
+                    SettingsDropdown(
+                        label = stringResource(R.string.v2_settings_default_location),
+                        value = if (manualLocation) stringResource(R.string.v2_settings_manual_location) else
+                            storageLocations.firstOrNull { it.id == defaultImportLocation || it.name == defaultImportLocation }
+                                ?.name ?: defaultImportLocation.ifBlank { noLocation },
+                    ) { close ->
+                        DropdownMenuItem(text = { Text(noLocation) }, onClick = {
+                            manualLocation = false
+                            onDefaultImportLocationChange("")
+                            close()
+                        })
+                        storageLocations.forEach { location ->
+                            DropdownMenuItem(text = { Text(location.name) }, onClick = {
+                                manualLocation = false
+                                onDefaultImportLocationChange(location.id)
+                                close()
+                            })
+                        }
+                        DropdownMenuItem(text = { Text(stringResource(R.string.v2_settings_manual_location)) },
+                            onClick = { manualLocation = true; close() })
+                    }
+                    if (manualLocation) {
+                        SettingsTextField(
+                            value = defaultImportLocation,
+                            onValueChange = onDefaultImportLocationChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(strings.common.fieldLocation) },
+                            singleLine = true,
+                        )
+                    }
                     SettingsTextField(
                         value = defaultImportMinStockText,
                         onValueChange = onDefaultImportMinStockChange,
@@ -1232,30 +1278,35 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                         singleLine = true,
                     )
                     SettingsToggleRow(
+                        compact = true,
                         title = strings.settings.rememberLastImportLocation,
                         subtitle = strings.settings.rememberLastImportLocationDescription,
                         checked = rememberLastImportLocation,
                         onCheckedChange = onRememberLastImportLocationChange,
                     )
                     SettingsToggleRow(
+                        compact = true,
                         title = strings.settings.localAutoRecognition,
                         subtitle = strings.settings.localAutoRecognitionDescription,
                         checked = enableLocalAutoRecognition,
                         onCheckedChange = onEnableLocalAutoRecognitionChange,
                     )
                     SettingsToggleRow(
+                        compact = true,
                         title = strings.settings.aggressiveRecognition,
                         subtitle = strings.settings.aggressiveRecognitionDescription,
                         checked = preferAggressiveAutoRecognition,
                         onCheckedChange = onPreferAggressiveAutoRecognitionChange,
                     )
                     SettingsToggleRow(
+                        compact = true,
                         title = strings.settings.localImportLearning,
                         subtitle = strings.settings.localImportLearningDescription,
                         checked = enableLocalImportLearning,
                         onCheckedChange = onEnableLocalImportLearningChange,
                     )
                     SettingsToggleRow(
+                        compact = true,
                         title = androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.settings_public_jlc_lookup),
                         subtitle = androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.settings_public_jlc_lookup_description),
                         checked = enablePublicJlcLookup,
@@ -1264,37 +1315,20 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SettingsFormSection(
-                    title = strings.settings.ocrEngineLabel,
-                    supporting = strings.settings.importPreferencesSubtitle,
-                ) {
-                    SettingsChoiceRow(
-                        title = strings.settings.ocrEngineAuto,
-                        subtitle = strings.settings.ocrEngineAutoDescription,
-                        selected = ocrEngineMode == OcrEngineMode.Auto,
-                        onClick = { onOcrEngineModeChange(OcrEngineMode.Auto) },
-                    )
-                    SettingsChoiceRow(
-                        title = strings.settings.ocrEngineMlKit,
-                        subtitle = strings.settings.ocrEngineMlKitDescription,
-                        selected = ocrEngineMode == OcrEngineMode.MlKit,
-                        onClick = { onOcrEngineModeChange(OcrEngineMode.MlKit) },
-                    )
-                }
-            }
-            item {
-                SettingsFormSection(
-                    title = strings.settings.learnedMappingsCount,
-                    supporting = strings.settings.localImportLearningDescription,
-                ) {
-                    ValueBlock(
-                        label = strings.settings.learnedMappingsCount,
-                        value = if (importLearningSummary.mappingCount > 0) {
-                            importLearningSummary.mappingCount.toString()
-                        } else {
-                            strings.settings.noLearnedMappings
-                        },
-                    )
+                SettingsFormSection {
+                    SettingsDropdown(
+                        label = strings.settings.ocrEngineLabel,
+                        value = if (ocrEngineMode == OcrEngineMode.Auto) strings.settings.ocrEngineAuto else strings.settings.ocrEngineMlKit,
+                    ) { close ->
+                        DropdownMenuItem(
+                            text = { Text(strings.settings.ocrEngineAuto) },
+                            onClick = { onOcrEngineModeChange(OcrEngineMode.Auto); close() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(strings.settings.ocrEngineMlKit) },
+                            onClick = { onOcrEngineModeChange(OcrEngineMode.MlKit); close() },
+                        )
+                    }
                     if (!errorMessage.isNullOrBlank()) {
                         Text(
                             text = errorMessage,
@@ -1304,10 +1338,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                     }
                     Button(
                         onClick = { onSave() },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(15.dp),
                     ) {
                         Text(strings.common.actionSaveSettings)
                     }
+                    SettingsStatusRow(
+                        strings.settings.learnedMappingsCount,
+                        if (importLearningSummary.mappingCount > 0) importLearningSummary.mappingCount.toString()
+                        else strings.settings.noLearnedMappings,
+                    )
                     OutlinedButton(
                         onClick = onClearImportLearningMappings,
                         enabled = importLearningSummary.mappingCount > 0 && !isBusy,
@@ -1323,20 +1363,22 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
             item {
                 SettingsFormSection(
                     title = strings.settings.languageTitle.takeIf { showSectionHeading },
-                    supporting = strings.settings.languageSubtitle,
                 ) {
-                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.selectableGroup()) {
                         AppLanguage.entries.forEach { language ->
                             val label = when (language) {
-                                AppLanguage.ZhCn -> strings.settings.languageChinese
-                                AppLanguage.English -> strings.settings.languageEnglish
+                                AppLanguage.ZhCn -> stringResource(R.string.v2_settings_language_zh)
+                                AppLanguage.English -> stringResource(R.string.v2_settings_language_en)
                             }
                             AppearanceChoice(label, appLanguage == language, "settings_language_${language.name}",
+                                supporting = stringResource(if (language == AppLanguage.ZhCn)
+                                    R.string.v2_settings_language_zh_hint else R.string.v2_settings_language_en_hint),
                                 leading = { Icon(painterResource(R.drawable.v2_languages), contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = { onAppLanguageChange(language) },
                             )
                         }
                     }
+                    SettingsFormNote(stringResource(R.string.v2_settings_language_note))
                     if (!errorMessage.isNullOrBlank()) {
                         Text(
                             text = errorMessage,
@@ -1346,7 +1388,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                     }
                     Button(
                         onClick = { onSave() },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(15.dp),
                     ) {
                         Text(strings.common.actionSaveSettings)
                     }
@@ -1598,19 +1641,24 @@ private fun SettingsToggleRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    compact: Boolean = false,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(
+            if (compact) Modifier.heightIn(min = 48.dp)
+                .toggleable(checked, role = Role.Checkbox, onValueChange = onCheckedChange)
+            else Modifier,
+        ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
             )
             Text(
@@ -1619,46 +1667,11 @@ private fun SettingsToggleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
-    }
-}
-
-@Composable
-private fun SettingsChoiceRow(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.RadioButton, onClick = onClick),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (compact) {
+            Checkbox(checked = checked, onCheckedChange = null)
+        } else {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
         }
-        RadioButton(
-            selected = selected,
-            onClick = null,
-        )
     }
 }
 

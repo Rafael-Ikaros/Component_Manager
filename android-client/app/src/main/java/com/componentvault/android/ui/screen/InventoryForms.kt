@@ -665,6 +665,8 @@ internal fun MovementEditorSurface(
                     quantity = editorState.quantityText,
                     reason = editorState.reason,
                     note = editorState.note,
+                    locationQuantity = available,
+                    totalQuantity = component?.quantity,
                     purchaseAmount = if (editorState.movementType == "inbound" && quantity != null && quantity > 0)
                         purchaseTotal(editorState.purchaseText, editorState.purchaseIsUnit, quantity)
                     else null,
@@ -759,40 +761,65 @@ internal fun MovementReviewContent(
     reason: String,
     note: String,
     purchaseAmount: String?,
+    locationQuantity: Int? = null,
+    totalQuantity: Int? = null,
 ) {
     val strings = vaultStrings()
-    val fields = buildList {
-        add(strings.common.fieldComponent to component)
-        add(stringResource(R.string.prototype_movement_kind) to movementTypeLabel(movementType))
-        add(stringResource(R.string.movement_source_location) to location)
-        if (destination != null) add(stringResource(R.string.movement_destination_location) to destination)
-        add(strings.common.fieldQuantity to quantity)
-        add(strings.common.fieldReason to reason)
-        if (note.isNotBlank()) add(strings.common.fieldNote to note)
-        if (purchaseAmount != null) add(stringResource(R.string.prototype_movement_paid) to purchaseAmount)
+    val delta = quantity.toLongOrNull()?.let {
+        when (movementType) {
+            "transfer" -> 0L
+            "outbound" -> -it
+            else -> it
+        }
     }
     Column {
-        fields.forEachIndexed { index, (label, value) ->
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 13.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
+        MovementReviewNote()
+        Text(component, Modifier.padding(top = 20.dp, bottom = 8.dp),
+            style = MaterialTheme.typography.titleSmall)
+        MovementReviewRow(stringResource(R.string.prototype_movement_kind), movementTypeLabel(movementType))
+        MovementReviewRow(strings.common.fieldLocation, location)
+        if (destination != null) MovementReviewRow(stringResource(R.string.movement_destination_location), destination)
+        MovementReviewRow(strings.common.fieldQuantity, quantity)
+        if (delta != null) {
+            if (locationQuantity != null && movementType != "transfer") {
+                MovementReviewRow(stringResource(R.string.prototype_movement_at_location), stockChangeText(locationQuantity, delta))
             }
-            if (index != fields.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (totalQuantity != null) {
+                MovementReviewRow(stringResource(R.string.prototype_movement_total), stockChangeText(totalQuantity, delta))
+            }
         }
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-            shape = RoundedCornerShape(15.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-        ) {
-            Text(stringResource(R.string.prototype_movement_review_hint),
-                Modifier.padding(horizontal = 15.dp, vertical = 13.dp), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        MovementReviewRow(strings.common.fieldReason, reason)
+        if (note.isNotBlank()) MovementReviewRow(strings.common.fieldNote, note)
+        if (purchaseAmount != null) MovementReviewRow(stringResource(R.string.prototype_movement_paid), purchaseAmount)
+    }
+}
+
+internal fun stockChangeText(before: Int, delta: Long): String = "$before → ${before.toLong() + delta}"
+
+@Composable
+internal fun MovementReviewRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 13.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+internal fun MovementReviewNote() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(15.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Text(stringResource(R.string.prototype_movement_review_hint),
+            Modifier.padding(horizontal = 15.dp, vertical = 13.dp), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -835,6 +862,7 @@ internal fun AdaptiveFormSurface(
     footerDismissLabel: String? = null,
     dismissEnabled: Boolean = true,
     footerError: String? = null,
+    onCancelReview: (() -> Unit)? = null,
     modal: Boolean = false,
     caption: String? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
@@ -875,6 +903,13 @@ internal fun AdaptiveFormSurface(
                         .then(if (footerTestTag == null) Modifier else Modifier.testTag(footerTestTag)),
                     shape = RoundedCornerShape(15.dp),
                 ) { Text(footerSaveLabel) }
+            }
+            if (onCancelReview != null) {
+                TextButton(
+                    onClick = onCancelReview,
+                    enabled = dismissEnabled,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.prototype_movement_cancel)) }
             }
         }
     }

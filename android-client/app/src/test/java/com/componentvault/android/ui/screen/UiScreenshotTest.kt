@@ -58,7 +58,7 @@ class UiScreenshotTest {
         }
 
         saveScreenshot("import-workflow-chooser-light.png") {
-            captureView(::latestDialogDecorView)
+            captureView { compose.activity.window.decorView }
         }
     }
 
@@ -264,18 +264,6 @@ class UiScreenshotTest {
         }
         failure?.let { throw it }
         return requireNotNull(captured)
-    }
-
-    private fun latestDialogDecorView(): View {
-        val managerClass = Class.forName("android.view.WindowManagerGlobal")
-        val manager = managerClass.getDeclaredMethod("getInstance").invoke(null)
-        val viewsField = managerClass.getDeclaredField("mViews").apply { isAccessible = true }
-        val activityDecor = compose.activity.window.decorView
-        return (viewsField.get(manager) as? List<*>)
-            .orEmpty()
-            .filterIsInstance<View>()
-            .lastOrNull { it !== activityDecor }
-            ?: error("No dialog window was attached to WindowManagerGlobal.")
     }
 
     private fun saveScreenshot(fileName: String, capture: () -> Bitmap) {

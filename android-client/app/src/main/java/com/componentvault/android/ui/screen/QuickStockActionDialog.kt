@@ -53,6 +53,7 @@ internal fun QuickStockActionDialog(
     var busy by remember { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf("") }
     val layoutMode = rememberInventoryLayoutMode()
+    val operation = movementTypeLabel(movementType)
     val available = allocations.filter { it.componentId == item.id && it.locationId == locationId }
         .sumOf { it.quantity }
     val quantity = quantityText.toIntOrNull()
@@ -80,10 +81,11 @@ internal fun QuickStockActionDialog(
         caption = stringResource(if (reviewing) R.string.prototype_movement_review_hint else R.string.v2_movement_choose_location),
         layoutMode = layoutMode,
         onDismiss = leave,
-        footerSaveLabel = stringResource(if (reviewing) R.string.prototype_movement_confirm
-            else R.string.prototype_movement_review),
+        footerSaveLabel = stringResource(if (reviewing) R.string.prototype_movement_confirm_action
+            else R.string.prototype_movement_review_action, operation),
         footerTestTag = if (reviewing) "quick_confirm" else "quick_submit",
-        footerDismissLabel = stringResource(if (reviewing) R.string.action_back else R.string.action_cancel),
+        footerDismissLabel = stringResource(if (reviewing) R.string.prototype_movement_modify else R.string.action_cancel),
+        onCancelReview = onDismiss.takeIf { reviewing },
         dismissEnabled = !busy,
         footerError = visibleError,
         saveEnabled = valid && !busy,
@@ -123,6 +125,8 @@ internal fun QuickStockActionDialog(
                         quantity = quantityText,
                         reason = reason.trim().ifBlank { defaultReason },
                         note = note.trim(),
+                        locationQuantity = available,
+                        totalQuantity = item.quantity,
                         purchaseAmount = if (inbound && quantity != null && quantity > 0)
                             purchaseTotal(purchaseText, purchaseIsUnit, quantity) else null,
                     )
@@ -131,13 +135,14 @@ internal fun QuickStockActionDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(Modifier.testTag("quick_location")) {
                         MovementLocationSelector(
-                            title = stringResource(R.string.movement_source_location),
+                            title = stringResource(if (inbound) R.string.prototype_movement_inbound_location
+                                else R.string.prototype_movement_outbound_location),
                             value = locationId,
                             locations = options,
                             onSelect = { locationId = it; error = "" },
                         )
                     }
-                    if (!inbound) Text(stringResource(R.string.inventory_quick_available, available),
+                    Text(stringResource(R.string.prototype_movement_stock_before, available),
                         style = MaterialTheme.typography.bodySmall)
                     QuantityInputField(
                         value = quantityText,

@@ -608,7 +608,7 @@ internal fun InventoryFilterHeader(
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("inventory_filter_bar"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             InventoryFilterButton(
                 value = strings.inventory.filterAll,
@@ -699,12 +699,16 @@ private fun InventoryDropdownFilters(
     FilterMenuButton(
         label = strings.inventory.filterSortLabel,
         value = inventorySortLabel(sort),
+        visibleValue = strings.inventory.filterSortLabel,
         expanded = sortMenuExpanded,
         onExpandedChange = { sortMenuExpanded = it },
     ) {
         InventorySortOption.entries.forEach { option ->
             DropdownMenuItem(
                 text = { FilterMenuItemText(inventorySortLabel(option)) },
+                trailingIcon = if (option == sort) {
+                    { Icon(painterResource(R.drawable.v2_check), contentDescription = null, modifier = Modifier.size(16.dp)) }
+                } else null,
                 onClick = {
                     onSortChange(option)
                     sortMenuExpanded = false
@@ -718,6 +722,7 @@ private fun InventoryDropdownFilters(
 private fun FilterMenuButton(
     label: String,
     value: String,
+    visibleValue: String = value,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     menuContent: @Composable ColumnScope.() -> Unit,
@@ -728,7 +733,7 @@ private fun FilterMenuButton(
 
     Box {
         InventoryFilterButton(
-            value = value,
+            value = visibleValue,
             selected = expanded,
             onClick = { onExpandedChange(true) },
             modifier = Modifier.widthIn(max = maxMenuWidth).semantics { contentDescription = "$label: $value" },
@@ -771,15 +776,15 @@ private fun InventoryFilterButton(
     Surface(shape = RoundedCornerShape(13.dp), color = container, contentColor = foreground) {
         Row(
             modifier.heightIn(min = 48.dp).selectable(selected, onClick = onClick)
-                .padding(horizontal = 11.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(value, modifier = if (dropdown) Modifier.weight(1f, fill = false) else Modifier,
                 style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (count != null) Text(count.toString(), style = MaterialTheme.typography.bodySmall)
             if (dropdown) Icon(painterResource(R.drawable.v2_chevron_down), contentDescription = null,
-                modifier = Modifier.size(14.dp))
+                modifier = Modifier.size(12.dp))
         }
     }
 }

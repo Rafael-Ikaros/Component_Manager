@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenu
@@ -98,10 +97,11 @@ internal fun BatchTransferDialog(
         }),
         layoutMode = layoutMode,
         onDismiss = leave,
-        footerDismissLabel = stringResource(if (reviewing) R.string.action_back else R.string.action_cancel),
+        footerDismissLabel = stringResource(if (reviewing) R.string.prototype_movement_modify else R.string.action_cancel),
         footerSaveLabel = stringResource(if (reviewing) R.string.batch_transfer_submit else R.string.batch_transfer_review),
         footerTestTag = "transfer_confirm".takeIf { reviewing },
         dismissEnabled = !busy,
+        onCancelReview = onDismiss.takeIf { reviewing },
         saveEnabled = valid && !busy,
         onSave = {
             if (valid && !busy) {
@@ -174,17 +174,30 @@ internal fun BatchTransferDialog(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 } else {
-                    TransferReviewRow(
-                        stringResource(R.string.batch_transfer_source),
-                        locations.firstOrNull { it.id == reviewedSourceId }?.name ?: reviewedSourceId,
-                    )
-                    TransferReviewRow(
-                        stringResource(R.string.batch_transfer_destination),
-                        locations.firstOrNull { it.id == reviewedDestinationId }?.name ?: reviewedDestinationId,
-                    )
+                    MovementReviewNote()
+                    val from = locations.firstOrNull { it.id == reviewedSourceId }?.name ?: reviewedSourceId
+                    val to = locations.firstOrNull { it.id == reviewedDestinationId }?.name ?: reviewedDestinationId
                     items.forEach { item ->
                         val count = reviewedLines.orEmpty().firstOrNull { it.componentId == item.id }?.quantity
-                        TransferReviewRow("${item.name} · ${item.sku}", count?.toString().orEmpty())
+                        if (count != null) {
+                            val sourceQuantity = allocations.firstOrNull {
+                                it.componentId == item.id && it.locationId == reviewedSourceId
+                            }?.quantity ?: 0
+                            val destinationQuantity = allocations.firstOrNull {
+                                it.componentId == item.id && it.locationId == reviewedDestinationId
+                            }?.quantity ?: 0
+                            Column {
+                                Text(item.name, Modifier.padding(top = 12.dp, bottom = 8.dp),
+                                    style = MaterialTheme.typography.titleSmall)
+                                MovementReviewRow(stringResource(R.string.batch_transfer_quantity), count.toString())
+                                MovementReviewRow(stringResource(R.string.batch_transfer_source),
+                                    "$from · ${stockChangeText(sourceQuantity, -count.toLong())}")
+                                MovementReviewRow(stringResource(R.string.batch_transfer_destination),
+                                    "$to · ${stockChangeText(destinationQuantity, count.toLong())}")
+                                MovementReviewRow(stringResource(R.string.prototype_movement_total),
+                                    stockChangeText(item.quantity, 0L))
+                            }
+                        }
                     }
                     Text(stringResource(if (singleItemMode) R.string.inventory_quick_transfer_review
                         else R.string.batch_transfer_review_prompt),
@@ -193,19 +206,6 @@ internal fun BatchTransferDialog(
             }
         }
     }
-}
-
-@Composable
-private fun TransferReviewRow(label: String, value: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
-    }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @Composable

@@ -24,4 +24,12 @@
     <string name="v2_feedback_preview">Preview feedback</string>
     <string name="v2_feedback_preview_title">Feedback preview</string>
     <string name="v2_feedback_caption">Preview the report before choosing how to submit it</string>
+    <string name="v2_settings_default_location">Default import location</string>
+    <string name="v2_settings_no_default_location">No default location</string>
+    <string name="v2_settings_manual_location">Enter a location code</string>
+    <string name="v2_settings_language_zh">简体中文</string>
+    <string name="v2_settings_language_en">English</string>
+    <string name="v2_settings_language_zh_hint">Use the Simplified Chinese interface</string>
+    <string name="v2_settings_language_en_hint">Use the English interface</string>
+    <string name="v2_settings_language_note">Save to apply the selected language.</string>
 </resources>

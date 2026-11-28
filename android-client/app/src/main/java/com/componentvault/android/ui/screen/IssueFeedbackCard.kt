@@ -159,7 +159,7 @@ internal fun IssueFeedbackCard() {
         val body = report()
         Dialog(
             onDismissRequest = { previewVisible = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
             SettingsRouteScaffold(
                 title = stringResource(R.string.v2_feedback_preview_title),
@@ -170,13 +170,30 @@ internal fun IssueFeedbackCard() {
                         .verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Surface(shape = RoundedCornerShape(15.dp), color = MaterialTheme.colorScheme.surface) {
-                        SelectionContainer {
-                            Text(body, Modifier.fillMaxWidth().padding(15.dp),
-                                style = MaterialTheme.typography.bodySmall)
-                        }
+                    Column {
+                        SettingsStatusRow(stringResource(R.string.v2_feedback_kind), stringResource(kind.label))
+                        SettingsStatusRow(stringResource(R.string.v2_feedback_title), title.trim())
                     }
-                    Button(onClick = { copy(body); message = copiedText }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.v2_feedback_steps), style = MaterialTheme.typography.titleSmall)
+                    SelectionContainer {
+                        Text(description.trim(), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (includeDiagnostics) {
+                        Text(stringResource(R.string.feedback_diagnostics_preview), style = MaterialTheme.typography.titleSmall)
+                        SelectionContainer { Text(diagnostics, style = MaterialTheme.typography.bodySmall) }
+                    }
+                    if (includeDevice) {
+                        Text(stringResource(R.string.feedback_device_preview), style = MaterialTheme.typography.titleSmall)
+                        SelectionContainer { Text(deviceInfo, style = MaterialTheme.typography.bodySmall) }
+                    }
+                    SettingsFormNote(stringResource(R.string.feedback_public_notice))
+                    Button(
+                        onClick = { previewVisible = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(15.dp),
+                    ) {
+                        Text(stringResource(R.string.prototype_movement_modify))
+                    }
+                    TextButton(onClick = { copy(body); message = copiedText }, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.feedback_copy))
                     }
                     OutlinedButton(onClick = {

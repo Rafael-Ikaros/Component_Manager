@@ -5,4 +5,13 @@
     <string name="prototype_movement_kind">变动类型</string>
     <string name="prototype_movement_paid">购买总金额（CNY）</string>
     <string name="prototype_movement_review_hint">核对库位与数量。确认后才会更新库存。</string>
+    <string name="prototype_movement_review_action">复核%1$s</string>
+    <string name="prototype_movement_confirm_action">确认%1$s</string>
+    <string name="prototype_movement_modify">返回修改</string>
+    <string name="prototype_movement_cancel">取消本次操作</string>
+    <string name="prototype_movement_at_location">此库位</string>
+    <string name="prototype_movement_total">总库存</string>
+    <string name="prototype_movement_stock_before">此库位当前 %1$d 件</string>
+    <string name="prototype_movement_inbound_location">入库库位</string>
+    <string name="prototype_movement_outbound_location">出库库位</string>
 </resources>

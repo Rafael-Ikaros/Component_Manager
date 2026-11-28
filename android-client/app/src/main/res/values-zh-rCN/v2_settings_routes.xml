@@ -24,4 +24,12 @@
     <string name="v2_feedback_preview">预览反馈内容</string>
     <string name="v2_feedback_preview_title">反馈预览</string>
     <string name="v2_feedback_caption">先预览，再决定如何提交</string>
+    <string name="v2_settings_default_location">默认导入库位</string>
+    <string name="v2_settings_no_default_location">不指定</string>
+    <string name="v2_settings_manual_location">手动输入库位码</string>
+    <string name="v2_settings_language_zh">简体中文</string>
+    <string name="v2_settings_language_en">English</string>
+    <string name="v2_settings_language_zh_hint">使用简体中文界面</string>
+    <string name="v2_settings_language_en_hint">使用英文界面</string>
+    <string name="v2_settings_language_note">保存设置后应用所选语言。</string>
 </resources>

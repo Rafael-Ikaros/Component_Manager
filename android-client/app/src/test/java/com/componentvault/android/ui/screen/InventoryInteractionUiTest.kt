@@ -279,7 +279,7 @@ class InventoryInteractionUiTest {
             assertEquals(0, dismissals)
         }
         compose.onNodeWithTag("quick_confirm").assertIsNotEnabled()
-        compose.onNodeWithText(context.getString(R.string.action_back)).assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.prototype_movement_modify)).assertIsNotEnabled()
         compose.runOnIdle { completion?.invoke(OperationResult(false, "temporary failure")) }
         compose.onNodeWithText("temporary failure").assertIsDisplayed()
         compose.onNodeWithText("购买总金额（CNY）").performScrollTo().assertTextContains("1.25")
