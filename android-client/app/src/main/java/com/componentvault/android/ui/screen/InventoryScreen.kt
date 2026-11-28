@@ -1,6 +1,7 @@
 package com.componentvault.android.ui.screen
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.remember
@@ -9,14 +10,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
-import com.componentvault.android.ui.theme.VaultPageTitle
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -46,14 +44,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,8 +59,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -89,6 +84,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.componentvault.android.ui.theme.LocalVaultWarning
 import com.componentvault.android.R
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.InventoryDetailUiState
@@ -291,7 +288,7 @@ internal fun InventoryContent(
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding)
                 .imePadding(),
-            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 12.dp,
+            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 8.dp,
                 bottom = if (imeOccludesBottom) 0.dp else 12.dp),
             uiState = uiState,
             statusMessage = statusMessage,
@@ -340,38 +337,25 @@ internal fun InventoryDetailRoute(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = strings.inventory.selectedComponentTitle,
-                        style = VaultPageTitle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.common.actionBack)
-                    }
-                },
+            VaultScreenHeader(
+                title = strings.inventory.selectedComponentTitle,
+                onBack = onDismiss,
                 actions = {
                     Box {
                         IconButton(onClick = { actionsExpanded = true }) {
-                            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions))
+                            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions),
+                                modifier = Modifier.size(18.dp))
                         }
                         DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
                             DropdownMenuItem(text = { Text(strings.common.actionImport) },
                                 onClick = { actionsExpanded = false; onAddComponent() })
-                            component?.let { current ->
-                                DropdownMenuItem(text = { Text(strings.common.actionDelete, color = MaterialTheme.colorScheme.error) },
-                                    onClick = { actionsExpanded = false; onRequestDeleteComponent(current.id) })
+                            if (component != null && onDetailAction != null) {
+                                DropdownMenuItem(text = { Text(strings.common.actionRecordMovement) },
+                                    onClick = { actionsExpanded = false; onRecordMovement(component.id) })
                             }
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
@@ -387,12 +371,13 @@ internal fun InventoryDetailRoute(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(padding),
-            contentPadding = rememberContentPadding(padding, horizontal = 16.dp, vertical = 16.dp),
+            contentPadding = rememberContentPadding(padding, horizontal = 18.dp, vertical = 8.dp),
             onEditComponent = onEditComponent,
             onGenerateLabel = onGenerateLabel,
             onRequestDeleteComponent = onRequestDeleteComponent,
             onRecordMovement = onRecordMovement,
             onDetailAction = onDetailAction,
+            showMovementShortcut = false,
         )
     }
 }
@@ -448,7 +433,7 @@ private fun InventoryListPane(
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
-            Column(modifier = Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 InventoryFilterHeader(
                     uiState = uiState,
                     statusMessage = statusMessage,
@@ -482,7 +467,8 @@ private fun InventoryListPane(
                     if (!selecting) {
                         Box {
                             IconButton(onClick = { actionsExpanded = true }) {
-                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions))
+                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions),
+                                modifier = Modifier.size(18.dp))
                             }
                             DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
                                 DropdownMenuItem(
@@ -602,11 +588,11 @@ internal fun InventoryFilterHeader(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
             decorationBox = { field ->
-                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
                     border = if (searchFocused) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 12.dp, end = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp),
+                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Box(Modifier.weight(1f).padding(vertical = 12.dp)) {
                             if (uiState.filters.query.isEmpty()) Text(searchLabel,
@@ -628,21 +614,16 @@ internal fun InventoryFilterHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilterChip(
-                border = null,
-                shape = RoundedCornerShape(12.dp),
-                colors = inventoryFilterChipColors(),
+            InventoryFilterButton(
+                value = strings.inventory.filterAll,
                 selected = uiState.filters.stockFilter == InventoryStockFilter.All,
                 onClick = { onStockFilterChange(InventoryStockFilter.All) },
-                label = { Text(strings.inventory.filterAll) },
             )
-            FilterChip(
-                border = null,
-                shape = RoundedCornerShape(12.dp),
-                colors = inventoryFilterChipColors(),
+            InventoryFilterButton(
+                value = strings.inventory.filterLowStock,
                 selected = uiState.filters.stockFilter == InventoryStockFilter.LowStock,
+                warning = true,
                 onClick = { onStockFilterChange(InventoryStockFilter.LowStock) },
-                label = { Text(strings.inventory.filterLowStock) },
             )
             InventoryDropdownFilters(
                 uiState = uiState, category = uiState.filters.category,
@@ -749,15 +730,12 @@ private fun FilterMenuButton(
     val maxMenuHeight = minOf(320.dp, configuration.screenHeightDp.dp * 0.45f)
 
     Box {
-        FilterChip(
-            modifier = Modifier.widthIn(max = maxMenuWidth).semantics { contentDescription = "$label: $value" },
+        InventoryFilterButton(
+            value = value,
             selected = expanded,
             onClick = { onExpandedChange(true) },
-            border = null,
-            shape = RoundedCornerShape(12.dp),
-            colors = inventoryFilterChipColors(),
-            label = { Text(value, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            trailingIcon = { Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            modifier = Modifier.widthIn(max = maxMenuWidth).semantics { contentDescription = "$label: $value" },
+            dropdown = true,
         )
         DropdownMenu(
             expanded = expanded,
@@ -772,14 +750,40 @@ private fun FilterMenuButton(
 }
 
 @Composable
-private fun inventoryFilterChipColors() = FilterChipDefaults.filterChipColors(
-    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-)
+private fun InventoryFilterButton(
+    value: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    dropdown: Boolean = false,
+    warning: Boolean = false,
+) {
+    val colors = MaterialTheme.colorScheme
+    val warningColors = LocalVaultWarning.current
+    val container = when {
+        !selected -> colors.surface
+        warning -> warningColors.container
+        else -> colors.primaryContainer
+    }
+    val foreground = when {
+        !selected -> colors.onSurface
+        warning -> warningColors.foreground
+        else -> colors.onPrimaryContainer
+    }
+    Surface(shape = RoundedCornerShape(13.dp), color = container, contentColor = foreground) {
+        Row(
+            modifier.heightIn(min = 48.dp).selectable(selected, onClick = onClick)
+                .padding(horizontal = 11.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(value, modifier = if (dropdown) Modifier.weight(1f, fill = false) else Modifier,
+                style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (dropdown) Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null,
+                modifier = Modifier.size(14.dp))
+        }
+    }
+}
 
 @Composable
 private fun FilterMenuItemText(value: String) {
@@ -799,6 +803,7 @@ internal fun InventoryDetailPane(
     onRequestDeleteComponent: (String) -> Unit,
     onRecordMovement: (String) -> Unit,
     onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
+    showMovementShortcut: Boolean = true,
 ) {
     val strings = vaultStrings()
     val priceLanguage = if (LocalConfiguration.current.locales[0].language.equals("zh", ignoreCase = true))
@@ -807,7 +812,7 @@ internal fun InventoryDetailPane(
     LazyColumn(
         modifier = modifier.testTag("inventory_detail_list"),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val component = detail.component
         if (component == null) {
@@ -828,9 +833,9 @@ internal fun InventoryDetailPane(
                 component = component,
                 onEditComponent = onEditComponent,
                 onGenerateLabel = onGenerateLabel,
-                onRequestDeleteComponent = onRequestDeleteComponent,
                 onRecordMovement = onRecordMovement,
                 onDetailAction = onDetailAction,
+                showMovementShortcut = showMovementShortcut,
             )
         }
         item {
@@ -903,6 +908,14 @@ internal fun InventoryDetailPane(
                 }
             }
         }
+        item(key = "usage_${component.id}") {
+            InventoryDetailSection(title = stringResource(R.string.inventory_usage_title)) {
+                Column {
+                    InventoryDetailValueRow(stringResource(R.string.inventory_usage_remaining), component.quantity.toString())
+                    InventoryDetailValueRow(stringResource(R.string.inventory_usage_issued), detail.issuedQuantity.toString())
+                }
+            }
+        }
         item {
             InventoryDetailSection(title = strings.inventory.detailNotesTitle) {
                 val notes = remember(component.description) {
@@ -917,54 +930,58 @@ internal fun InventoryDetailPane(
                 )
             }
         }
-        item(key = "usage_${component.id}") {
-            InventoryDetailSection(title = stringResource(R.string.inventory_usage_title)) {
-                InventoryDetailFieldGrid(listOf(
-                    stringResource(R.string.inventory_usage_remaining) to component.quantity.toString(),
-                    stringResource(R.string.inventory_usage_issued) to detail.issuedQuantity.toString(),
-                ))
-            }
-        }
         item {
             InventoryDetailSection(title = strings.inventory.detailRecentMovementsTitle) {
                 if (detail.recentMovements.isEmpty()) {
                     EmptyPane(strings.inventory.detailRecentMovementsEmpty)
                 } else {
-                    detail.recentMovements.forEachIndexed { index, movement ->
-                        if (index > 0) {
-                            HorizontalDivider()
-                        }
-                        Column(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                MovementTypePill(movement.movementType)
-                                MovementQuantityPill(movement)
+                    Column {
+                        detail.recentMovements.forEach { movement ->
+                            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(movementTypeLabel(movement.movementType), Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Text(formatMovementQuantity(movement.quantityChange),
+                                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                }
+                                Text(movement.reason.ifBlank { strings.common.labelNoReasonRecorded },
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (movement.note.isNotBlank()) {
+                                    Text(movement.note, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(formatShortLocalTimestamp(movement.happenedAt),
+                                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Text(
-                                text = movement.reason.ifBlank { strings.common.labelNoReasonRecorded },
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                text = movement.note.ifBlank { strings.common.labelNoNote },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = formatShortLocalTimestamp(movement.happenedAt),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }
             }
         }
+        item(key = "delete_${component.id}") {
+            val colors = MaterialTheme.colorScheme
+            TextButton(
+                onClick = { onRequestDeleteComponent(component.id) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("inventory_detail_delete"),
+                shape = RoundedCornerShape(15.dp),
+                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                    containerColor = colors.surfaceVariant, contentColor = colors.error,
+                ),
+            ) {
+                Text(strings.common.actionDelete)
+            }
+        }
     }
+}
+
+@Composable
+private fun InventoryDetailValueRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }

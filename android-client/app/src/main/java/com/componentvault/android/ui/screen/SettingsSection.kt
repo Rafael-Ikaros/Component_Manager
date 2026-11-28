@@ -11,6 +11,15 @@ internal enum class SettingsSection {
     Feedback,
     About,
     Appearance,
+    Theme,
+    Accent,
+    ;
+
+    val parent: SettingsSection?
+        get() = when (this) {
+            Theme, Accent -> Appearance
+            else -> null
+        }
 }
 
 @Composable
@@ -21,6 +30,8 @@ internal fun SettingsSection.title(strings: ComponentVaultStrings): String = whe
     SettingsSection.Feedback -> stringResource(R.string.feedback_title)
     SettingsSection.About -> stringResource(R.string.appearance_about_updates)
     SettingsSection.Appearance -> stringResource(R.string.appearance_title)
+    SettingsSection.Theme -> stringResource(R.string.appearance_theme)
+    SettingsSection.Accent -> stringResource(R.string.appearance_accent)
 }
 
 @Composable
@@ -39,5 +50,7 @@ internal fun SettingsSection.listSupporting(): String = stringResource(
         SettingsSection.Feedback -> R.string.appearance_feedback_hint
         SettingsSection.About -> R.string.appearance_about_hint
         SettingsSection.Appearance -> R.string.appearance_description
+        SettingsSection.Theme -> R.string.appearance_theme_hint
+        SettingsSection.Accent -> R.string.appearance_accent_hint
     },
 )

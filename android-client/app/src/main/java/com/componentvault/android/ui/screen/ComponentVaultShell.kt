@@ -1,6 +1,13 @@
 package com.componentvault.android.ui.screen
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,11 +30,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -36,7 +42,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -225,38 +236,28 @@ internal fun ComponentVaultAppShellContent(
     val destinationStateHolder = rememberSaveableStateHolder()
 
     val topBar: @Composable () -> Unit = {
-        TopAppBar(
-            title = {
-                if (isFirstPhasePage) {
-                    Column {
-                        Text(title, style = VaultPageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (caption != null && LocalDensity.current.fontScale < 1.5f) {
-                            Text(caption, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                } else Text(title)
-            },
-            navigationIcon = {
-                if (settingsDetail != null) {
-                    IconButton(onClick = onBackFromSettingsSection) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.common.actionBack,
-                            tint = colors.primary)
-                    }
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background),
-            actions = {
-                if (uiState.isBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(20.dp),
-                        strokeWidth = 2.dp,
+        if (isFirstPhasePage) {
+            VaultScreenHeader(
+                title = title,
+                caption = caption,
+                onBack = onBackFromSettingsSection.takeIf { settingsDetail != null },
+                actions = {
+                    if (uiState.isBusy) CircularProgressIndicator(
+                        Modifier.size(20.dp), strokeWidth = 2.dp,
                     )
-                }
-            },
-        )
+                },
+            )
+        } else {
+            TopAppBar(
+                title = { Text(title) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background),
+                actions = {
+                    if (uiState.isBusy) CircularProgressIndicator(
+                        Modifier.padding(end = 8.dp).size(20.dp), strokeWidth = 2.dp,
+                    )
+                },
+            )
+        }
     }
 
     val adaptiveNavigationType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
@@ -266,18 +267,10 @@ internal fun ComponentVaultAppShellContent(
     val imeOccludesBottom = WindowInsets.isImeVisible &&
         WindowInsets.ime.getBottom(density) > WindowInsets.navigationBars.getBottom(density)
     val usesBottomNavigation = adaptiveNavigationType == NavigationSuiteType.NavigationBar
-    val navigationType = if (usesBottomNavigation && (imeOccludesBottom || settingsDetail != null)) {
-        NavigationSuiteType.None
-    } else {
-        adaptiveNavigationType
-    }
+    val showPhoneNavigation = usesBottomNavigation && !imeOccludesBottom && settingsDetail == null
+    val navigationType = if (usesBottomNavigation) NavigationSuiteType.None else adaptiveNavigationType
     val dockInventoryAction = usesBottomNavigation && layoutMode.widthClass == InventoryWidthClass.Compact
     val navigationItemColors = NavigationSuiteDefaults.itemColors(
-        navigationBarItemColors = NavigationBarItemDefaults.colors(
-            indicatorColor = colors.primaryContainer,
-            selectedIconColor = colors.onPrimaryContainer,
-            selectedTextColor = colors.primary,
-        ),
         navigationRailItemColors = NavigationRailItemDefaults.colors(
             indicatorColor = colors.primaryContainer,
             selectedIconColor = colors.onPrimaryContainer,
@@ -286,7 +279,6 @@ internal fun ComponentVaultAppShellContent(
     )
     NavigationSuiteScaffold(
         layoutType = navigationType,
-        navigationSuiteColors = NavigationSuiteDefaults.colors(navigationBarContainerColor = colors.background),
         navigationSuiteItems = {
             InventoryDestination.entries.forEach { item ->
                 val label = strings.shell.destinationLabel(item)
@@ -305,17 +297,21 @@ internal fun ComponentVaultAppShellContent(
         Scaffold(
             topBar = topBar,
             bottomBar = {
-                if (dockInventoryAction && destination == InventoryDestination.Inventory && !imeOccludesBottom) {
-                    Surface(color = colors.background) {
-                        Button(
-                            onClick = onAddComponent,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-                                .heightIn(min = 48.dp),
-                            shape = RoundedCornerShape(16.dp),
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Text(stringResource(R.string.shell_add_import), Modifier.padding(start = 6.dp))
+                if (showPhoneNavigation) {
+                    Column(Modifier.fillMaxWidth().background(colors.background)
+                        .windowInsetsPadding(WindowInsets.navigationBars)) {
+                        if (dockInventoryAction && destination == InventoryDestination.Inventory) {
+                            Button(
+                                onClick = onAddComponent,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 17.dp, vertical = 8.dp)
+                                    .heightIn(min = 48.dp),
+                                shape = RoundedCornerShape(15.dp),
+                            ) {
+                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text(stringResource(R.string.shell_add_import), Modifier.padding(start = 6.dp))
+                            }
                         }
+                        VaultBottomNavigation(destination, onDestinationChange)
                     }
                 }
             },
@@ -380,6 +376,75 @@ internal fun ComponentVaultAppShellContent(
                         settingsContent = settingsContent,
                     )
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun VaultScreenHeader(
+    title: String,
+    caption: String? = null,
+    onBack: (() -> Unit)? = null,
+    actions: @Composable () -> Unit = {},
+) {
+    val colors = MaterialTheme.colorScheme
+    val strings = vaultStrings()
+    Row(
+        Modifier.fillMaxWidth().background(colors.background)
+            .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+            .padding(start = if (onBack == null) 18.dp else 8.dp, end = 18.dp)
+            .heightIn(min = 64.dp).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (onBack != null) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.common.actionBack,
+                    modifier = Modifier.size(18.dp), tint = colors.primary)
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = VaultPageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (caption != null) {
+                Text(caption, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 17.sp),
+                    color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        actions()
+    }
+}
+
+@Composable
+private fun VaultBottomNavigation(
+    destination: InventoryDestination,
+    onDestinationChange: (InventoryDestination) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val strings = vaultStrings()
+    HorizontalDivider(color = colors.outlineVariant)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).selectableGroup()) {
+        InventoryDestination.entries.forEach { item ->
+            val selected = destination == item
+            val label = strings.shell.destinationLabel(item)
+            val tint = if (selected) colors.primary else colors.onSurfaceVariant
+            Column(
+                Modifier.weight(1f).heightIn(min = 55.dp)
+                    .selectable(selected, role = Role.Tab, onClick = { onDestinationChange(item) })
+                    .semantics { contentDescription = label },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+            ) {
+                Box(
+                    Modifier.widthIn(max = 62.dp).fillMaxWidth().heightIn(min = 31.dp)
+                        .background(if (selected) colors.primaryContainer else colors.background,
+                            RoundedCornerShape(18.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(item.icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = tint)
+                }
+                Text(label, color = tint, style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

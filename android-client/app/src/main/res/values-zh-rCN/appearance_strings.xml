@@ -34,4 +34,6 @@
     <string name="appearance_backup_hint">Excel 库存与标签工作簿</string>
     <string name="appearance_feedback_hint">整理问题与复现过程</string>
     <string name="appearance_about_hint">版本、项目与更新通道</string>
+    <string name="appearance_theme_hint">跟随设备或选择固定主题</string>
+    <string name="appearance_accent_hint">用于主要操作和选中状态</string>
 </resources>

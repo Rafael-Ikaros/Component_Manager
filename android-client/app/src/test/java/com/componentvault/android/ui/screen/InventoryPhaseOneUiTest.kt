@@ -231,7 +231,7 @@ class InventoryPhaseOneUiTest {
             Box(Modifier.width(320.dp)) {
                 InventoryTabletDetailSummary(component,
                     onEditComponent = { edited = it }, onGenerateLabel = { labelled = it },
-                    onRequestDeleteComponent = {}, onRecordMovement = {}, onDetailAction = { _, _ -> })
+                    onRecordMovement = {}, onDetailAction = { _, _ -> })
             }
         }
         val bounds = listOf("inbound", "outbound", "transfer").map {

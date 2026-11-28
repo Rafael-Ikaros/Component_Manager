@@ -51,6 +51,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.componentvault.android.R
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.InventoryListItemUiState
@@ -80,13 +81,13 @@ internal fun InventoryDetailIdentity(component: ComponentRecord) {
         if (maxWidth < 280.dp || largeText) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ProductThumbnail(sku = component.sku, imageUrl = component.productImageUrl,
-                    description = component.description, imageSize = 88.dp, compactPlaceholder = true)
+                    description = component.description, imageSize = 94.dp, compactPlaceholder = true, cornerRadius = 17.dp)
                 InventoryDetailIdentityText(component)
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
                 ProductThumbnail(sku = component.sku, imageUrl = component.productImageUrl,
-                    description = component.description, imageSize = 88.dp, compactPlaceholder = true)
+                    description = component.description, imageSize = 94.dp, compactPlaceholder = true, cornerRadius = 17.dp)
                 Column(Modifier.weight(1f)) { InventoryDetailIdentityText(component) }
             }
         }
@@ -97,16 +98,18 @@ internal fun InventoryDetailIdentity(component: ComponentRecord) {
 private fun InventoryDetailIdentityText(component: ComponentRecord) {
     val identity = remember(component.description) { com.componentvault.android.model.parseImportDescription(component.description) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(component.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-        identity.model?.takeIf { it != component.name }?.let { model ->
+        Text(component.name, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp),
+            fontWeight = FontWeight.Medium)
+        identity.model?.takeIf { it.isNotBlank() && !component.name.contains(it, ignoreCase = true) }?.let { model ->
             Text(model, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         }
-        Text(component.sku, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(listOfNotNull(identity.brand, localizedCategoryLabel(component.category), component.packageName)
+        Text(listOf(component.sku, localizedCategoryLabel(component.category), component.packageName)
             .filter { it.isNotBlank() }.joinToString(" · "),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+        identity.brand?.takeIf { it.isNotBlank() && !component.name.contains(it, ignoreCase = true) }?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -116,9 +119,9 @@ internal fun InventoryTabletDetailSummary(
     component: ComponentRecord,
     onEditComponent: (String) -> Unit,
     onGenerateLabel: (ComponentRecord) -> Unit,
-    onRequestDeleteComponent: (String) -> Unit,
     onRecordMovement: (String) -> Unit,
     onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
+    showMovementShortcut: Boolean = true,
 ) {
     val strings = vaultStrings()
     val warning = LocalVaultWarning.current
@@ -128,7 +131,7 @@ internal fun InventoryTabletDetailSummary(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(component.quantity.toString(), style = MaterialTheme.typography.displayMedium,
+                Text(component.quantity.toString(), style = MaterialTheme.typography.displaySmall.copy(fontSize = 44.sp, lineHeight = 48.sp),
                     fontWeight = FontWeight.Medium, modifier = Modifier.testTag("inventory_detail_quantity"))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.inventory_usage_remaining), style = MaterialTheme.typography.bodySmall,
@@ -146,16 +149,14 @@ internal fun InventoryTabletDetailSummary(
                     }
                 }
             }
-            Box {
+            if (showMovementShortcut && onDetailAction != null) Box {
                 IconButton(onClick = { expanded = true }, modifier = Modifier.size(48.dp)
                     .testTag("inventory_detail_more")) {
                     Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions))
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    if (onDetailAction != null) DropdownMenuItem(text = { Text(strings.common.actionRecordMovement) },
+                    DropdownMenuItem(text = { Text(strings.common.actionRecordMovement) },
                         onClick = { expanded = false; onRecordMovement(component.id) })
-                    DropdownMenuItem(text = { Text(strings.common.actionDelete, color = MaterialTheme.colorScheme.error) },
-                        onClick = { expanded = false; onRequestDeleteComponent(component.id) })
                 }
             }
         }
@@ -180,7 +181,7 @@ internal fun InventoryTabletDetailSummary(
                 }
             }
         }
-        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainer) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
             Column {
                 InventoryDetailActionRow(strings.common.actionEdit, stringResource(R.string.inventory_edit_supporting),
                     Icons.Outlined.Edit, Modifier.testTag("inventory_detail_edit")) { onEditComponent(component.id) }
@@ -232,7 +233,7 @@ private fun InventoryDetailActionRow(
     onClick: () -> Unit,
 ) {
     Row(modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)
-        .heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+        .heightIn(min = 77.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -252,7 +253,7 @@ internal fun InventoryDetailSection(
 ) {
     Column(modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+        Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp), fontWeight = FontWeight.Medium)
         content()
     }
 }

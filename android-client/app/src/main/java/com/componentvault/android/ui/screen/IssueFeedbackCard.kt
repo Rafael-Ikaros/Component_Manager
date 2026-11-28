@@ -55,13 +55,13 @@ internal fun IssueFeedbackCard() {
             }
         }
     }
-    SectionPane(title=stringResource(R.string.feedback_title),supporting=stringResource(R.string.feedback_public_notice)) {
-        OutlinedTextField(title,{title=it},label={Text(stringResource(R.string.feedback_issue_title))},modifier=Modifier.fillMaxWidth(),singleLine=true)
-        OutlinedTextField(description,{description=it},label={Text(stringResource(R.string.feedback_reproduction))},modifier=Modifier.fillMaxWidth(),minLines=4)
+    SettingsFormSection(supporting=stringResource(R.string.feedback_public_notice)) {
+        SettingsTextField(title,{title=it},label={Text(stringResource(R.string.feedback_issue_title))},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        SettingsTextField(description,{description=it},label={Text(stringResource(R.string.feedback_reproduction))},modifier=Modifier.fillMaxWidth(),minLines=4)
         Row(verticalAlignment=Alignment.CenterVertically){Checkbox(includeDiagnostics,{includeDiagnostics=it});Text(stringResource(R.string.feedback_attach_diagnostics))}
-        if(includeDiagnostics)OutlinedTextField(diagnostics,{diagnostics=it},label={Text(stringResource(R.string.feedback_diagnostics_preview))},modifier=Modifier.fillMaxWidth(),minLines=5)
+        if(includeDiagnostics)SettingsTextField(diagnostics,{diagnostics=it},label={Text(stringResource(R.string.feedback_diagnostics_preview))},modifier=Modifier.fillMaxWidth(),minLines=5)
         Row(verticalAlignment=Alignment.CenterVertically){Checkbox(includeDevice,{includeDevice=it});Text(stringResource(R.string.feedback_attach_device))}
-        if(includeDevice)OutlinedTextField(deviceInfo,{deviceInfo=it},label={Text(stringResource(R.string.feedback_device_preview))},modifier=Modifier.fillMaxWidth())
+        if(includeDevice)SettingsTextField(deviceInfo,{deviceInfo=it},label={Text(stringResource(R.string.feedback_device_preview))},modifier=Modifier.fillMaxWidth())
         Button(onClick={copy(report());message=copiedText},modifier=Modifier.fillMaxWidth(),enabled=title.isNotBlank()&&description.isNotBlank()){Text(stringResource(R.string.feedback_copy))}
         OutlinedButton(onClick={pendingExport=report();export.launch("component-vault-issue.txt")},modifier=Modifier.fillMaxWidth(),enabled=title.isNotBlank()&&description.isNotBlank()){Text(stringResource(R.string.feedback_export))}
         OutlinedButton(onClick={val body=report();when(val result=IssueReportBuilder.issueUrl(title,body)){is IssueUrlResult.Full->runCatching{uriHandler.openUri(result.url)}.onFailure{copy(body);message=browserFailedText};is IssueUrlResult.TooLong->{copy(body);runCatching{uriHandler.openUri(result.titleOnlyUrl)}.onFailure{message=browserFailedText}.onSuccess{message=tooLongText}}}},modifier=Modifier.fillMaxWidth(),enabled=title.isNotBlank()&&description.isNotBlank()){Text(stringResource(R.string.feedback_open_github))}

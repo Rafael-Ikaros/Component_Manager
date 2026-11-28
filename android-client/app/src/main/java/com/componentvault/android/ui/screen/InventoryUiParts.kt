@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.componentvault.android.R
 import com.componentvault.android.data.PublicProductImageStore
@@ -379,7 +380,8 @@ internal fun InventoryFlatListRowContent(
             .testTag("inventory_row_${item.id}")
             .selectable(selected = selected, role = if (selectionMode) Role.Checkbox else Role.Button, onClick = onClick),
         shape = RectangleShape,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.background,
+        color = if (selected && (selectionMode || compact)) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.background,
     ) {
         Column {
             Row(
@@ -394,7 +396,7 @@ internal fun InventoryFlatListRowContent(
                     if (selectionMode) Checkbox(checked = selected, onCheckedChange = null)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(item.name, style = MaterialTheme.typography.titleSmall,
+                    Text(item.name, style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp, lineHeight = 21.sp),
                         fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(item.sku, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -421,7 +423,7 @@ internal fun InventoryFlatListRowContent(
                 }
                 Column(Modifier.widthIn(max = 88.dp), horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(item.quantity.toString(), style = MaterialTheme.typography.headlineSmall,
+                    Text(item.quantity.toString(), style = MaterialTheme.typography.headlineSmall.copy(fontSize = 23.sp, lineHeight = 28.sp),
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.testTag("inventory_row_quantity_${item.id}")
                             .semantics { contentDescription = quantityDescription })
@@ -441,7 +443,8 @@ internal fun InventoryFlatListRowContent(
                     IconButton(onClick = { menuExpanded = true },
                         modifier = Modifier.size(48.dp).testTag("inventory_row_more_${item.id}")) {
                         Icon(Icons.Outlined.MoreVert,
-                            contentDescription = stringResource(R.string.inventory_ui_more_actions) + " · " + item.sku)
+                            contentDescription = stringResource(R.string.inventory_ui_more_actions) + " · " + item.sku,
+                            modifier = Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         actions.forEach { action ->
@@ -467,6 +470,7 @@ internal fun ProductThumbnail(
     modifier: Modifier = Modifier,
     imageSize: Dp = 60.dp,
     compactPlaceholder: Boolean = false,
+    cornerRadius: Dp = 10.dp,
 ) {
     val context = LocalContext.current
     val imageStore = remember(context) { PublicProductImageStore.get(context) }
@@ -495,7 +499,7 @@ internal fun ProductThumbnail(
 
     Surface(
         modifier = modifier.size(imageSize),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         val loadedBitmap = bitmap

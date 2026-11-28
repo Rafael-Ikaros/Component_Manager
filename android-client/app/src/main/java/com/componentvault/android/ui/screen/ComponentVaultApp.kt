@@ -302,7 +302,7 @@ internal fun ComponentVaultApp(
         focusManager.clearFocus()
         keyboardController?.hide()
         if (selectedSettingsSection != null && !settingsTwoPane) {
-            selectedSettingsSectionName = null
+            selectedSettingsSectionName = selectedSettingsSection.parent?.name
         } else {
             destination = InventoryDestination.Inventory
             resetSecondaryRoutes()
@@ -670,7 +670,7 @@ internal fun ComponentVaultApp(
                         onOpenSettingsHome = { openSettingsRoute() },
                         onOpenSyncSettings = { openSettingsRoute(SettingsSection.Sync) },
                         selectedSettingsSection = selectedSettingsSection,
-                        onBackFromSettingsSection = { selectedSettingsSectionName = null },
+                        onBackFromSettingsSection = { selectedSettingsSectionName = selectedSettingsSection?.parent?.name },
                         settingsTwoPane = settingsTwoPane,
                         settingsContent = { padding ->
                             SettingsContent(

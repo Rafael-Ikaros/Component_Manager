@@ -3,7 +3,9 @@ package com.componentvault.android.ui.screen
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.activity.compose.BackHandler
@@ -27,6 +29,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Brightness6
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Dns
@@ -38,6 +44,7 @@ import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.Warehouse
 import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
@@ -47,7 +54,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -92,6 +100,8 @@ import com.componentvault.android.data.AppearanceMode
 import com.componentvault.android.data.AppearanceAccent
 import com.componentvault.android.ui.theme.LocalAppearance
 import com.componentvault.android.ui.theme.LocalOnAppearanceChange
+import com.componentvault.android.ui.theme.isDarkTheme
+import com.componentvault.android.ui.theme.vaultAccentColors
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.shape.RoundedCornerShape
 import kotlinx.coroutines.launch
@@ -128,7 +138,7 @@ internal fun SettingsRouteScreen(
                     TextButton(
                         onClick = {
                             if (canStepBackToSectionList) {
-                                onSelectSection(null)
+                                onSelectSection(selectedSection?.parent)
                             } else {
                                 onDismiss()
                             }
@@ -326,13 +336,13 @@ internal fun SettingsContent(
             .padding(contentPadding)
             .consumeWindowInsets(contentPadding)
             .imePadding()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
     ) {
         // Budget the content left after the shell, insets and page margins.
         val showTwoPanes = layoutMode.showsListDetail && maxWidth >= 700.dp
         androidx.compose.runtime.SideEffect { onSplitLayoutChanged(showTwoPanes) }
         BackHandler(enabled = !showTwoPanes && selectedSection != null) {
-            onSelectSection(null)
+            onSelectSection(selectedSection?.parent)
         }
         val detail: @Composable (Modifier) -> Unit = { modifier ->
             sectionStateHolder.SaveableStateProvider(section.name) {
@@ -342,7 +352,15 @@ internal fun SettingsContent(
                     contentPadding = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (showTwoPanes && section.parent != null) {
+                        item {
+                            TextButton(onClick = { onSelectSection(section.parent) }) {
+                                Text(stringResource(R.string.appearance_title))
+                            }
+                        }
+                    }
                     settingsSectionDetailItems(
+                        onSelectSection = onSelectSection,
                         section = section,
                         showSectionHeading = showTwoPanes,
                         strings = strings,
@@ -438,7 +456,7 @@ internal fun SettingsContent(
                     }
                     item {
                         SettingsSectionList(
-                            selectedSection = section,
+                            selectedSection = section.parent ?: section,
                             onSelectSection = onSelectSection,
                             onManageLocations = onManageLocations,
                             onBackupRestore = onBackupRestore,
@@ -607,7 +625,8 @@ private fun SettingsSectionList(
 }
 
 private fun SettingsSection.icon(): ImageVector = when (this) {
-    SettingsSection.Appearance -> Icons.Outlined.Brightness6
+    SettingsSection.Appearance, SettingsSection.Theme -> Icons.Outlined.Brightness6
+    SettingsSection.Accent -> Icons.Outlined.Palette
     SettingsSection.ImportAndOcr -> Icons.Outlined.DocumentScanner
     SettingsSection.App -> Icons.Outlined.Translate
     SettingsSection.Sync -> Icons.Outlined.Dns
@@ -620,7 +639,7 @@ private fun SettingsLocalWarehouseSummary(localComponentCount: Int?) {
     val colors = MaterialTheme.colorScheme
     Card(
         modifier = Modifier.fillMaxWidth().testTag("settings_local_warehouse"),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
     ) {
         Row(
@@ -668,7 +687,7 @@ private fun SettingsRouteGroup(title: String, content: @Composable () -> Unit) {
             color = MaterialTheme.colorScheme.primary,
         )
         Card(
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         ) { content() }
     }
@@ -676,7 +695,8 @@ private fun SettingsRouteGroup(title: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun SettingsRowDivider(compact: Boolean) {
-    HorizontalDivider(Modifier.padding(start = if (compact) 38.dp else 48.dp, end = 16.dp))
+    HorizontalDivider(Modifier.padding(start = if (compact) 38.dp else 51.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @Composable
@@ -688,6 +708,7 @@ private fun SettingsSectionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     summary: String? = null,
+    summarySwatch: Color? = null,
     compact: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -707,7 +728,7 @@ private fun SettingsSectionCard(
             Icon(
                 icon,
                 contentDescription = null,
-                modifier = Modifier.size(if (compact) 18.dp else 20.dp),
+                modifier = Modifier.size(18.dp),
                 tint = supportingColor,
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -724,6 +745,7 @@ private fun SettingsSectionCard(
                     color = supportingColor,
                 )
             }
+            summarySwatch?.let { Box(Modifier.size(14.dp).background(it, CircleShape)) }
             if (summary != null) {
                 Text(
                     summary,
@@ -750,7 +772,7 @@ private fun SettingsSyncStatusPane(
 ) {
     val strings = vaultStrings()
 
-    SectionPane(
+    SettingsFormSection(
         title = stringResource(R.string.sync_run_label),
         supporting = strings.settings.summarySubtitle,
     ) {
@@ -798,7 +820,7 @@ private fun SettingsAboutPane(
         browserError = runCatching { uriHandler.openUri(url) }.isFailure
     }
 
-    SectionPane(
+    SettingsFormSection(
         title = strings.settings.aboutTitle.takeIf { showHeading },
         supporting = strings.settings.aboutSubtitle,
     ) {
@@ -848,7 +870,7 @@ private fun SettingsAboutPane(
             Text(stringResource(R.string.settings_about_open_source))
         }
     }
-    SectionPane(title = stringResource(R.string.settings_update_title)) {
+    SettingsFormSection(title = stringResource(R.string.settings_update_title)) {
         SettingsToggleRow(
             title = stringResource(R.string.settings_update_startup_prompt),
             subtitle = stringResource(R.string.settings_update_startup_prompt_description),
@@ -1021,6 +1043,7 @@ private const val OPEN_SOURCE_URL = "https://github.com/Rafael-Ikaros/Component_
 private const val RELEASES_URL = "https://github.com/Rafael-Ikaros/Component_Manager/releases"
 
 private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetailItems(
+    onSelectSection: (SettingsSection?) -> Unit,
     section: SettingsSection,
     showSectionHeading: Boolean,
     strings: ComponentVaultStrings,
@@ -1073,11 +1096,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
         SettingsSection.Sync -> {
             item {
                 ValueBlock(label = stringResource(R.string.sync_run_label), value = syncSummary)
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.connectionTitle.takeIf { showSectionHeading },
                     supporting = strings.settings.connectionSubtitle,
                 ) {
-                    OutlinedTextField(
+                    SettingsTextField(
                         value = serverUrl,
                         onValueChange = onServerUrlChange,
                         modifier = Modifier.fillMaxWidth(),
@@ -1085,7 +1108,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                         placeholder = { Text(strings.settings.serverUrlPlaceholder) },
                         singleLine = true,
                     )
-                    OutlinedTextField(
+                    SettingsTextField(
                         value = externalServerUrl,
                         onValueChange = onExternalServerUrlChange,
                         modifier = Modifier.fillMaxWidth().testTag("external-server-url"),
@@ -1098,11 +1121,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
             item {
                 val context = LocalContext.current
                 var tokenCopied by remember(apiToken) { mutableStateOf(false) }
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.authTitle,
                     supporting = strings.settings.authSubtitle,
                 ) {
-                    OutlinedTextField(
+                    SettingsTextField(
                         value = apiToken,
                         onValueChange = {
                             tokenCopied = false
@@ -1149,7 +1172,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.syncBehaviorTitle,
                     supporting = strings.settings.syncBehaviorSubtitle,
                 ) {
@@ -1168,7 +1191,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.summaryTitle,
                     supporting = strings.settings.summarySubtitle,
                 ) {
@@ -1214,18 +1237,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
 
         SettingsSection.ImportAndOcr -> {
             item {
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.importPreferencesTitle.takeIf { showSectionHeading },
                     supporting = strings.settings.importPreferencesSubtitle,
                 ) {
-                    OutlinedTextField(
+                    SettingsTextField(
                         value = defaultImportLocation,
                         onValueChange = onDefaultImportLocationChange,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(strings.common.fieldLocation) },
                         singleLine = true,
                     )
-                    OutlinedTextField(
+                    SettingsTextField(
                         value = defaultImportMinStockText,
                         onValueChange = onDefaultImportMinStockChange,
                         modifier = Modifier.fillMaxWidth(),
@@ -1265,7 +1288,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.ocrEngineLabel,
                     supporting = strings.settings.importPreferencesSubtitle,
                 ) {
@@ -1284,7 +1307,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                 }
             }
             item {
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.learnedMappingsCount,
                     supporting = strings.settings.localImportLearningDescription,
                 ) {
@@ -1322,22 +1345,22 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
 
         SettingsSection.App -> {
             item {
-                SectionPane(
+                SettingsFormSection(
                     title = strings.settings.languageTitle.takeIf { showSectionHeading },
                     supporting = strings.settings.languageSubtitle,
                 ) {
-                    SettingsChoiceRow(
-                        title = strings.settings.languageChinese,
-                        subtitle = strings.settings.languageSubtitle,
-                        selected = appLanguage == AppLanguage.ZhCn,
-                        onClick = { onAppLanguageChange(AppLanguage.ZhCn) },
-                    )
-                    SettingsChoiceRow(
-                        title = strings.settings.languageEnglish,
-                        subtitle = strings.settings.languageSubtitle,
-                        selected = appLanguage == AppLanguage.English,
-                        onClick = { onAppLanguageChange(AppLanguage.English) },
-                    )
+                    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        AppLanguage.entries.forEach { language ->
+                            val label = when (language) {
+                                AppLanguage.ZhCn -> strings.settings.languageChinese
+                                AppLanguage.English -> strings.settings.languageEnglish
+                            }
+                            AppearanceChoice(label, appLanguage == language, "settings_language_${language.name}",
+                                leading = { Icon(Icons.Outlined.Translate, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = { onAppLanguageChange(language) },
+                            )
+                        }
+                    }
                     if (!errorMessage.isNullOrBlank()) {
                         Text(
                             text = errorMessage,
@@ -1371,7 +1394,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
             item { IssueFeedbackCard() }
         }
 
-        SettingsSection.Appearance -> item { SettingsAppearancePane() }
+        SettingsSection.Appearance -> item { SettingsAppearancePane { onSelectSection(it) } }
+        SettingsSection.Theme -> item { ThemeChoices() }
+        SettingsSection.Accent -> item { AccentChoices() }
     }
 }
 
@@ -1388,40 +1413,148 @@ private fun AppearanceAccent.label(): Int = when (this) {
 }
 
 @Composable
-private fun SettingsAppearancePane() {
+private fun SettingsAppearancePane(onSelectSection: (SettingsSection) -> Unit) {
+    val appearance = LocalAppearance.current
+    val strings = vaultStrings()
+    val darkTheme = appearance.isDarkTheme()
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        SettingsSectionCard(
+            title = SettingsSection.Theme.title(strings),
+            supporting = SettingsSection.Theme.listSupporting(),
+            icon = SettingsSection.Theme.icon(),
+            selected = false,
+            summary = stringResource(appearance.mode.label()),
+            onClick = { onSelectSection(SettingsSection.Theme) },
+            modifier = Modifier.testTag("appearance_open_theme"),
+        )
+        SettingsRowDivider(compact = false)
+        SettingsSectionCard(
+            title = SettingsSection.Accent.title(strings),
+            supporting = SettingsSection.Accent.listSupporting(),
+            icon = SettingsSection.Accent.icon(),
+            selected = false,
+            summary = stringResource(appearance.accent.label()),
+            summarySwatch = vaultAccentColors(appearance.accent, darkTheme).primary,
+            onClick = { onSelectSection(SettingsSection.Accent) },
+            modifier = Modifier.testTag("appearance_open_accent"),
+        )
+    }
+}
+
+@Composable
+private fun ThemeChoices() {
     val appearance = LocalAppearance.current
     val change = LocalOnAppearanceChange.current
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionPane(title = stringResource(R.string.appearance_theme)) {
-            Column(Modifier.selectableGroup()) {
-                AppearanceMode.entries.forEach { mode ->
-                    AppearanceChoice(stringResource(mode.label()), appearance.mode == mode,
-                        "appearance_mode_${mode.name}") { change(appearance.copy(mode = mode)) }
-                }
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AppearanceMode.entries.forEach { mode ->
+            val icon = when (mode) {
+                AppearanceMode.System -> Icons.Outlined.Brightness6
+                AppearanceMode.Light -> Icons.Outlined.LightMode
+                AppearanceMode.Dark -> Icons.Outlined.DarkMode
             }
-        }
-        SectionPane(title = stringResource(R.string.appearance_accent)) {
-            Column(Modifier.selectableGroup()) {
-                AppearanceAccent.entries.forEach { accent ->
-                    AppearanceChoice(stringResource(accent.label()), appearance.accent == accent,
-                        "appearance_accent_${accent.name}") { change(appearance.copy(accent = accent)) }
-                }
-            }
+            AppearanceChoice(stringResource(mode.label()), appearance.mode == mode, "appearance_mode_${mode.name}",
+                leading = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                onClick = { change(appearance.copy(mode = mode)) },
+            )
         }
     }
 }
 
 @Composable
-private fun AppearanceChoice(label: String, selected: Boolean, tag: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(tag)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+private fun AccentChoices() {
+    val appearance = LocalAppearance.current
+    val change = LocalOnAppearanceChange.current
+    val darkTheme = appearance.isDarkTheme()
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        AppearanceAccent.entries.forEach { accent ->
+            val color = vaultAccentColors(accent, darkTheme).primary
+            AppearanceChoice(stringResource(accent.label()), appearance.accent == accent, "appearance_accent_${accent.name}",
+                leading = { Box(Modifier.size(27.dp).background(color, CircleShape)) },
+                onClick = { change(appearance.copy(accent = accent)) },
+            )
+        }
     }
+}
+
+@Composable
+private fun AppearanceChoice(
+    label: String,
+    selected: Boolean,
+    tag: String,
+    leading: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    androidx.compose.material3.Surface(
+        shape = RoundedCornerShape(15.dp),
+        color = if (selected) colors.primaryContainer else colors.background,
+        contentColor = if (selected) colors.onPrimaryContainer else colors.onSurface,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 65.dp).testTag(tag)
+                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            leading()
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            if (selected) Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+internal fun SettingsFormSection(
+    title: String? = null,
+    supporting: String? = null,
+    content: @Composable () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        title?.let { Text(it, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium) }
+        supporting?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        content()
+    }
+}
+
+@Composable
+internal fun SettingsTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: (@Composable () -> Unit)? = null,
+    supportingText: (@Composable () -> Unit)? = null,
+    singleLine: Boolean = false,
+    minLines: Int = 1,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+) {
+    val colors = MaterialTheme.colorScheme
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        label = label,
+        placeholder = placeholder,
+        supportingText = supportingText,
+        singleLine = singleLine,
+        minLines = minLines,
+        visualTransformation = visualTransformation,
+        shape = RoundedCornerShape(15.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = colors.surfaceVariant,
+            unfocusedContainerColor = colors.surface,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+    )
 }
 
 @Composable

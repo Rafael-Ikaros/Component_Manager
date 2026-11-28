@@ -36,4 +36,6 @@
     <string name="appearance_about_hint">Version, project and update channel</string>
     <string name="appearance_channel_stable" translatable="false">Stable</string>
     <string name="appearance_channel_dev" translatable="false">Dev</string>
+    <string name="appearance_theme_hint">Follow the device or choose a fixed theme</string>
+    <string name="appearance_accent_hint">Colors for actions and selected items</string>
 </resources>

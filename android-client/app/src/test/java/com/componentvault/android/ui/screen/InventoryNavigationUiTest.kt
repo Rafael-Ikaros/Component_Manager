@@ -48,8 +48,12 @@ class InventoryNavigationUiTest {
         settingsTab.performClick()
         compose.onNodeWithTag("settings_group_Appearance").assertIsDisplayed().performClick()
         settingsTab.assertDoesNotExist()
+        compose.onNodeWithTag("appearance_open_theme").performClick()
         compose.onNodeWithTag("appearance_mode_System").assertIsDisplayed()
         compose.onNodeWithContentDescription(context.getString(R.string.action_back)).performClick()
+        compose.onNodeWithTag("appearance_open_theme").assertIsDisplayed()
+        settingsTab.assertDoesNotExist()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("settings_group_Appearance").assertIsDisplayed()
         settingsTab.assertIsDisplayed()
     }
