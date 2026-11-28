@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -893,7 +895,16 @@ internal fun AdaptiveFormSurface(
                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextButton(onClick = onDismiss, enabled = dismissEnabled, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                FilledTonalButton(
+                    onClick = onDismiss,
+                    enabled = dismissEnabled,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(15.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                ) {
                     Text(footerDismissLabel ?: strings.common.actionBack)
                 }
                 Button(

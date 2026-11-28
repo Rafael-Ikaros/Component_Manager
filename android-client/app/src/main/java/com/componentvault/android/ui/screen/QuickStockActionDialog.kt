@@ -78,7 +78,7 @@ internal fun QuickStockActionDialog(
         modal = true,
         title = if (reviewing) stringResource(if (inbound) R.string.v2_confirm_inbound else R.string.v2_confirm_outbound)
             else movementTypeLabel(movementType),
-        caption = stringResource(if (reviewing) R.string.prototype_movement_review_hint else R.string.v2_movement_choose_location),
+        caption = stringResource(if (reviewing) R.string.prototype_movement_review_caption else R.string.v2_movement_choose_location),
         layoutMode = layoutMode,
         onDismiss = leave,
         footerSaveLabel = stringResource(if (reviewing) R.string.prototype_movement_confirm_action

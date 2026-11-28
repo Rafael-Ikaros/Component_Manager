@@ -89,7 +89,7 @@ internal fun BatchTransferDialog(
     BackHandler(enabled = !layoutMode.prefersDialogForms, onBack = leave)
     AdaptiveFormSurface(
         modal = true,
-        caption = stringResource(if (reviewing) R.string.prototype_movement_review_hint else R.string.v2_transfer_hint),
+        caption = stringResource(if (reviewing) R.string.prototype_movement_review_caption else R.string.v2_transfer_hint),
         title = stringResource(when {
             reviewing -> R.string.v2_confirm_transfer
             singleItemMode -> R.string.inventory_quick_transfer
@@ -125,10 +125,10 @@ internal fun BatchTransferDialog(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (singleItemMode) {
+                if (!reviewing && singleItemMode) {
                     Text(items.singleOrNull()?.sku.orEmpty(), modifier = Modifier.testTag("inventory_quick_transfer_sku"),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else Text(stringResource(R.string.batch_transfer_count, items.size),
+                } else if (!reviewing) Text(stringResource(R.string.batch_transfer_count, items.size),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
                 if (!reviewing) {
@@ -199,9 +199,6 @@ internal fun BatchTransferDialog(
                             }
                         }
                     }
-                    Text(stringResource(if (singleItemMode) R.string.inventory_quick_transfer_review
-                        else R.string.batch_transfer_review_prompt),
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

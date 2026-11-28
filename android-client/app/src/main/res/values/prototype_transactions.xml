@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="prototype_movement_review_caption">Review stock changes</string>
     <string name="prototype_movement_review">Review movement</string>
     <string name="prototype_movement_confirm">Confirm movement</string>
     <string name="prototype_movement_kind">Movement type</string>

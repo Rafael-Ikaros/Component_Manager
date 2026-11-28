@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="prototype_movement_review_caption">核对库存变动</string>
     <string name="prototype_movement_review">复核变动</string>
     <string name="prototype_movement_confirm">确认变动</string>
     <string name="prototype_movement_kind">变动类型</string>
