@@ -574,7 +574,7 @@ class BluetoothLabelPrintUiTest {
                 LabelToolTemplatePicker(onSelect = { selected = it }, onBack = {})
             }
         }
-        compose.onNodeWithText(context.getString(R.string.label_tool_text)).performClick()
+        compose.onNodeWithText(context.getString(R.string.label_tool_text)).performScrollTo().performClick()
         compose.runOnIdle { assertEquals(LabelToolTemplate.Text, selected) }
     }
     @Test

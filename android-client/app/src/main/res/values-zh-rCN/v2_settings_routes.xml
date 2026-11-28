@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="v2_locations_count">%1$d 个库位</string>
+    <string name="v2_backup_export">导出 Excel 备份</string>
+    <string name="v2_backup_export_hint">元件、库位与分配</string>
+    <string name="v2_backup_restore">选择工作簿恢复</string>
+    <string name="v2_backup_restore_hint">先预览再确认合并</string>
+    <string name="v2_backup_labels">导出标签工作簿</string>
+    <string name="v2_backup_labels_hint">全部或指定库位</string>
+    <string name="v2_label_component_hint">型号、封装与识别码</string>
+    <string name="v2_label_location">库位二维码</string>
+    <string name="v2_label_location_hint">以库位编码定位</string>
+    <string name="v2_label_bluetooth">蓝牙打印</string>
+    <string name="v2_label_bluetooth_hint">打印机、纸张与队列</string>
+    <string name="v2_label_other_templates">其他标签模板</string>
+    <string name="v2_feedback_kind">问题类型</string>
+    <string name="v2_feedback_interface">界面与交互</string>
+    <string name="v2_feedback_import">导入与识别</string>
+    <string name="v2_feedback_sync">同步与连接</string>
+    <string name="v2_feedback_other">其他</string>
+    <string name="v2_feedback_title">简要描述</string>
+    <string name="v2_feedback_steps">复现过程</string>
+    <string name="v2_feedback_steps_hint">操作步骤、预期与实际结果</string>
+    <string name="v2_feedback_preview">预览反馈内容</string>
+    <string name="v2_feedback_preview_title">反馈预览</string>
+    <string name="v2_feedback_caption">先预览，再决定如何提交</string>
+</resources>

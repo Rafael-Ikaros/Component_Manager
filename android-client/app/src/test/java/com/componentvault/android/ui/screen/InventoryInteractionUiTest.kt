@@ -228,13 +228,13 @@ class InventoryInteractionUiTest {
         val card = compose.onNodeWithTag("inventory_reveal_card")
         card.performTouchInput { swipeLeft() }
         compose.onNodeWithTag("inventory_quick_inbound").performClick()
-        compose.onNodeWithText(context.getString(R.string.inventory_quick_inbound) + " · " + item.sku)
+        compose.onNodeWithText(item.name + " · " + item.sku)
             .assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.action_cancel)).performClick()
 
         card.performTouchInput { swipeLeft() }
         compose.onNodeWithTag("inventory_quick_outbound").performClick()
-        compose.onNodeWithText(context.getString(R.string.inventory_quick_outbound) + " · " + item.sku)
+        compose.onNodeWithText(item.name + " · " + item.sku)
             .assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.action_cancel)).performClick()
 
@@ -267,6 +267,8 @@ class InventoryInteractionUiTest {
         compose.onNodeWithTag("quick_quantity").performTextReplacement("3")
         compose.onNodeWithText("购买总金额（CNY）").performScrollTo().performTextReplacement("1.25")
         compose.onNodeWithTag("quick_submit").performClick()
+        compose.runOnIdle { assertEquals(0, submits) }
+        compose.onNodeWithTag("quick_confirm").performClick()
         compose.runOnIdle {
             assertEquals("inbound", draft?.movementType)
             assertEquals(item.id, draft?.componentId)
@@ -276,14 +278,15 @@ class InventoryInteractionUiTest {
             assertEquals(1, submits)
             assertEquals(0, dismissals)
         }
-        compose.onNodeWithTag("quick_submit").assertIsNotEnabled()
-        compose.onNodeWithText(context.getString(R.string.action_cancel)).assertIsNotEnabled()
+        compose.onNodeWithTag("quick_confirm").assertIsNotEnabled()
+        compose.onNodeWithText(context.getString(R.string.action_back)).assertIsNotEnabled()
         compose.runOnIdle { completion?.invoke(OperationResult(false, "temporary failure")) }
         compose.onNodeWithText("temporary failure").assertIsDisplayed()
         compose.onNodeWithText("购买总金额（CNY）").performScrollTo().assertTextContains("1.25")
         assertEquals("3", compose.onNodeWithTag("quick_quantity")
             .fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         compose.onNodeWithTag("quick_submit").performClick()
+        compose.onNodeWithTag("quick_confirm").performClick()
         compose.runOnIdle { completion?.invoke(OperationResult(true, "saved")) }
         compose.runOnIdle { assertEquals(1, dismissals) }
     }
@@ -349,7 +352,7 @@ class InventoryInteractionUiTest {
                 )
             }
         }
-        val save = context.getString(R.string.action_save)
+        val save = context.getString(R.string.prototype_movement_review)
         val outbound = context.getString(R.string.movement_type_outbound)
         compose.onNodeWithText(save).assertIsEnabled()
         compose.onNodeWithTag("component_editor_fields").performScrollToNode(hasText("Shelf A"))
@@ -362,6 +365,8 @@ class InventoryInteractionUiTest {
         compose.onNode(hasSetTextAction() and hasText(context.getString(R.string.field_quantity)))
             .performScrollTo().performTextReplacement("2")
         compose.onNodeWithText(save).performClick()
+        compose.runOnIdle { assertEquals(null, submitted) }
+        compose.onNodeWithText(context.getString(R.string.prototype_movement_confirm)).performClick()
         compose.runOnIdle {
             assertEquals("B", submitted?.locationId)
             assertEquals(2, submitted?.quantity)
@@ -495,7 +500,7 @@ class InventoryInteractionUiTest {
             }
         }
         compose.onNodeWithText(context.getString(R.string.batch_transfer_review)).performClick()
-        compose.onNodeWithText(context.getString(R.string.batch_transfer_submit)).assertIsDisplayed().performClick()
+        compose.onNodeWithTag("transfer_confirm").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, submitted) }
     }
 

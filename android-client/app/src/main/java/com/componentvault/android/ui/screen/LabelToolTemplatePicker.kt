@@ -1,22 +1,18 @@
 package com.componentvault.android.ui.screen
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -39,34 +35,64 @@ internal enum class LabelToolTemplate(
 internal fun LabelToolTemplatePicker(
     onSelect: (LabelToolTemplate) -> Unit,
     onBack: () -> Unit,
+    onOpenLocationLabels: (() -> Unit)? = null,
 ) {
-    SecondaryPageScaffold(title = stringResource(R.string.label_tool_title), onBack = onBack) { padding ->
+    SettingsRouteScaffold(
+        title = stringResource(R.string.appearance_printing),
+        caption = stringResource(R.string.appearance_printing_hint),
+        onBack = onBack,
+    ) { padding ->
         Column(
-            Modifier.padding(padding).consumeWindowInsets(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(padding).consumeWindowInsets(padding).verticalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            LabelToolTemplate.entries.chunked(2).forEach { pair ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    pair.forEach { template ->
-                        Card(onClick = { onSelect(template) }, modifier = Modifier.weight(1f)) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Box(
-                                    Modifier.fillMaxWidth().height(80.dp)
-                                        .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(template.sample, style = MaterialTheme.typography.titleMedium)
-                                }
-                                Text(stringResource(template.title), style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    stringResource(template.description), style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    SettingsSectionCard(
+                        title = stringResource(LabelToolTemplate.Component.title),
+                        supporting = stringResource(R.string.v2_label_component_hint),
+                        icon = R.drawable.v2_tag,
+                        selected = false,
+                        onClick = { onSelect(LabelToolTemplate.Component) },
+                    )
+                    if (onOpenLocationLabels != null) {
+                        HorizontalDivider(Modifier.padding(start = 51.dp, end = 16.dp))
+                        SettingsSectionCard(
+                            title = stringResource(R.string.v2_label_location),
+                            supporting = stringResource(R.string.v2_label_location_hint),
+                            icon = R.drawable.v2_qr_code,
+                            selected = false,
+                            onClick = onOpenLocationLabels,
+                        )
+                    }
+                    HorizontalDivider(Modifier.padding(start = 51.dp, end = 16.dp))
+                    SettingsSectionCard(
+                        title = stringResource(R.string.v2_label_bluetooth),
+                        supporting = stringResource(R.string.v2_label_bluetooth_hint),
+                        icon = R.drawable.v2_printer,
+                        selected = false,
+                        onClick = { onSelect(LabelToolTemplate.Free) },
+                    )
+                }
+            }
+            Text(
+                stringResource(R.string.v2_label_other_templates),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 14.dp),
+            )
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    LabelToolTemplate.entries.filter { it != LabelToolTemplate.Component }.forEachIndexed { index, template ->
+                        if (index > 0) HorizontalDivider(Modifier.padding(start = 51.dp, end = 16.dp))
+                        SettingsSectionCard(
+                            title = stringResource(template.title),
+                            supporting = stringResource(template.description),
+                            icon = if (template == LabelToolTemplate.Qr) R.drawable.v2_qr_code else R.drawable.v2_tag,
+                            selected = false,
+                            onClick = { onSelect(template) },
+                        )
                     }
                 }
             }

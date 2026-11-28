@@ -119,31 +119,34 @@ class UiScreenshotTest {
     }
 
     @Test
-    fun captureStorageLocationCreateDialogLight() {
+    @Config(qualifiers = "zh-rCN-w360dp-h640dp-normal-port-xhdpi")
+    fun captureStorageLocationCreatePageLight() {
         compose.setContent {
             ComponentVaultTheme(darkTheme = false) {
-                LocationEditorDialog(LocationEditor(), false, {}, { _, _, _ -> })
+                StorageLocationsScreen(emptyList(), {}, { _, _, _, _ -> }, { _, _ -> })
             }
         }
+        compose.onNodeWithTag("locations_add").performClick()
+        compose.onNodeWithTag("locations_code").assertIsDisplayed()
 
-        saveScreenshot("storage-locations-create-dialog-light.png") {
-            captureView(::latestDialogDecorView)
+        saveScreenshot("storage-locations-create-page-light.png") {
+            captureView { compose.activity.window.decorView }
         }
     }
 
     @Test
-    fun captureStorageLocationEditDialogLight() {
+    @Config(qualifiers = "zh-rCN-w360dp-h640dp-normal-port-xhdpi")
+    fun captureStorageLocationEditPageLight() {
         compose.setContent {
             ComponentVaultTheme(darkTheme = false) {
-                LocationEditorDialog(
-                    LocationEditor("BIN-A01", "常用元件抽屉", isEditing = true),
-                    false, {}, { _, _, _ -> },
-                )
+                StorageLocationsScreen(sampleLocations, {}, { _, _, _, _ -> }, { _, _ -> })
             }
         }
+        compose.onNodeWithTag("locations_edit_BIN-A01").performClick()
+        compose.onNodeWithTag("locations_name").assertIsDisplayed()
 
-        saveScreenshot("storage-locations-edit-dialog-light.png") {
-            captureView(::latestDialogDecorView)
+        saveScreenshot("storage-locations-edit-page-light.png") {
+            captureView { compose.activity.window.decorView }
         }
     }
 

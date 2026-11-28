@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
@@ -62,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +72,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.componentvault.android.R
 import com.componentvault.android.data.PublicProductImageStore
@@ -243,12 +246,16 @@ internal fun InventoryListRow(
     onDelete: (() -> Unit)? = null,
     storageLocations: List<StorageLocationRecord> = emptyList(),
     compact: Boolean = false,
+    onEdit: (() -> Unit)? = null,
+    onLabel: (() -> Unit)? = null,
 ) {
     val actions = if (selectionMode) emptyList() else listOfNotNull(
-        onInbound?.let { InventoryRowAction(R.string.inventory_quick_inbound, Icons.Outlined.Add, it) },
-        onOutbound?.let { InventoryRowAction(R.string.inventory_quick_outbound, Icons.Outlined.Remove, it) },
-        onTransfer?.let { InventoryRowAction(R.string.inventory_quick_transfer, Icons.Outlined.SwapHoriz, it) },
-        onDelete?.let { InventoryRowAction(R.string.action_delete, Icons.Outlined.Delete, it) },
+        onInbound?.let { VaultMenuAction(R.string.inventory_quick_inbound, R.string.v2_inbound_hint, R.drawable.v2_plus, it) },
+        onOutbound?.let { VaultMenuAction(R.string.inventory_quick_outbound, R.string.v2_outbound_hint, R.drawable.v2_minus, it) },
+        onTransfer?.let { VaultMenuAction(R.string.inventory_quick_transfer, R.string.v2_transfer_hint, R.drawable.v2_arrow_left_right, it) },
+        onEdit?.let { VaultMenuAction(R.string.v2_edit_action, R.string.inventory_edit_supporting, R.drawable.v2_pencil, it) },
+        onLabel?.let { VaultMenuAction(R.string.v2_label_action, R.string.inventory_label_supporting, R.drawable.v2_tag, it) },
+        onDelete?.let { VaultMenuAction(R.string.action_delete, R.string.v2_delete_hint, R.drawable.v2_trash2, it) },
     )
     if (actions.isNotEmpty()) {
         BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -329,12 +336,6 @@ internal fun InventoryListRow(
         InventoryListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations, compact, actions)
     }
 }
-internal data class InventoryRowAction(
-    val labelResource: Int,
-    val icon: ImageVector,
-    val onClick: () -> Unit,
-)
-
 @Composable
 private fun InventoryListRowContent(
     item: InventoryListItemUiState,
@@ -344,7 +345,7 @@ private fun InventoryListRowContent(
     selectionMode: Boolean,
     storageLocations: List<StorageLocationRecord>,
     compact: Boolean,
-    actions: List<InventoryRowAction>,
+    actions: List<VaultMenuAction>,
     showOverflow: Boolean = true,
 ) {
     if (compact) {
@@ -363,12 +364,15 @@ internal fun InventoryFlatListRowContent(
     onClick: () -> Unit,
     selectionMode: Boolean,
     storageLocations: List<StorageLocationRecord>,
-    actions: List<InventoryRowAction> = emptyList(),
+    actions: List<VaultMenuAction> = emptyList(),
     compact: Boolean = false,
     showOverflow: Boolean = true,
 ) {
     val strings = vaultStrings()
     val warning = LocalVaultWarning.current
+    val narrow = !compact && LocalConfiguration.current.screenWidthDp <= 340
+    val rowCaption = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp)
+    val thumbWidth = if (narrow) 34.dp else 42.dp
     var menuExpanded by remember(item.id) { mutableStateOf(false) }
     val quantityDescription = stringResource(R.string.inventory_usage_remaining) + ": " + item.quantity
     val locationName = displayLocationName(item.inStockLocationIds.firstOrNull() ?: item.location,
@@ -385,54 +389,58 @@ internal fun InventoryFlatListRowContent(
     ) {
         Column {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = if (compact) 8.dp else 12.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = if (compact) 80.dp else 100.dp)
+                    .padding(start = if (compact) 0.dp else if (narrow) 7.dp else 9.dp)
+                    .padding(vertical = if (compact) 8.dp else 14.dp)
                     .then(if (compact) Modifier.testTag("inventory_tablet_row") else Modifier),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compact || narrow) 8.dp else 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     ProductThumbnail(sku = item.sku, imageUrl = item.productImageUrl,
-                        description = item.description, imageSize = 40.dp, compactPlaceholder = true)
+                        description = item.description, imageSize = thumbWidth,
+                        imageHeight = if (narrow) 44.dp else 49.dp, compactPlaceholder = true,
+                        cornerRadius = if (narrow) 9.dp else 11.dp, crop = true)
                     if (selectionMode) Checkbox(checked = selected, onCheckedChange = null)
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(item.name, style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp, lineHeight = 21.sp),
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(item.name, style = MaterialTheme.typography.titleSmall.copy(fontSize = if (narrow) 14.sp else 15.sp, lineHeight = 21.sp),
                         fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(item.sku, style = MaterialTheme.typography.bodySmall,
+                    Text(item.sku, style = rowCaption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         val specification = listOfNotNull(item.packageName,
                             item.specificationSummary?.takeIf { it.isNotBlank() }).filter { it.isNotBlank() }.joinToString(" · ")
                         if (specification.isNotBlank()) {
-                            Text(specification, modifier = Modifier.weight(1f, fill = false),
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Text(specification, modifier = Modifier.weight(0.9f, fill = false),
+                                style = rowCaption, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(" · ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(" · ", style = rowCaption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Row(Modifier.weight(1f).testTag("inventory_row_location_${item.id}")
+                        Row(Modifier.weight(1.1f, fill = false).testTag("inventory_row_location_${item.id}")
                             .semantics(mergeDescendants = true) { contentDescription = locationName + locationSuffix },
                             verticalAlignment = Alignment.CenterVertically) {
                             Text(locationName, modifier = Modifier.weight(1f, fill = false),
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = rowCaption, color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (locationSuffix.isNotEmpty()) Text(locationSuffix, style = MaterialTheme.typography.bodySmall,
+                            if (locationSuffix.isNotEmpty()) Text(locationSuffix, style = rowCaption,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
-                Column(Modifier.widthIn(max = 88.dp), horizontalAlignment = Alignment.End,
+                Column(Modifier.widthIn(min = if (narrow) 53.dp else 60.dp, max = if (narrow) 64.dp else 78.dp), horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(item.quantity.toString(), style = MaterialTheme.typography.headlineSmall.copy(fontSize = 23.sp, lineHeight = 28.sp),
+                    Text(item.quantity.toString(), style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (narrow) 21.sp else 23.sp, lineHeight = 27.sp),
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.testTag("inventory_row_quantity_${item.id}")
                             .semantics { contentDescription = quantityDescription })
                     Text(strings.inventory.componentMinStock(item.minStock),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = rowCaption,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (item.isLowStock) Surface(color = warning.container, shape = RoundedCornerShape(6.dp)) {
                         Text(if (item.quantity == 0) stringResource(R.string.inventory_zero_stock) else strings.common.statusLowStock,
-                            color = warning.foreground, style = MaterialTheme.typography.labelSmall,
+                            color = warning.foreground, style = rowCaption.copy(lineHeight = 16.sp),
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
                     }
                 }
@@ -442,16 +450,24 @@ internal fun InventoryFlatListRowContent(
                 } else if (actions.isNotEmpty()) Box {
                     IconButton(onClick = { menuExpanded = true },
                         modifier = Modifier.size(48.dp).testTag("inventory_row_more_${item.id}")) {
-                        Icon(Icons.Outlined.MoreVert,
+                        Icon(painterResource(R.drawable.v2_ellipsis_vertical),
                             contentDescription = stringResource(R.string.inventory_ui_more_actions) + " · " + item.sku,
                             modifier = Modifier.size(17.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        actions.forEach { action ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(action.labelResource)) },
-                                leadingIcon = { Icon(action.icon, contentDescription = null) },
-                                onClick = { menuExpanded = false; action.onClick() },
+                    if (menuExpanded) {
+                        androidx.compose.ui.window.Dialog(
+                            onDismissRequest = { menuExpanded = false },
+                            properties = androidx.compose.ui.window.DialogProperties(
+                                usePlatformDefaultWidth = false, decorFitsSystemWindows = false,
+                            ),
+                        ) {
+                            VaultMenuPage(
+                                title = stringResource(R.string.v2_component_actions),
+                                intro = "${item.name} · ${item.sku}",
+                                actions = actions.map { action ->
+                                    action.copy(invoke = { menuExpanded = false; action.invoke() })
+                                },
+                                onBack = { menuExpanded = false },
                             )
                         }
                     }
@@ -462,6 +478,8 @@ internal fun InventoryFlatListRowContent(
     }
 }
 
+internal enum class ProductThumbnailStatus { Loading, Available, Pending, Missing }
+
 @Composable
 internal fun ProductThumbnail(
     sku: String,
@@ -471,6 +489,11 @@ internal fun ProductThumbnail(
     imageSize: Dp = 60.dp,
     compactPlaceholder: Boolean = false,
     cornerRadius: Dp = 10.dp,
+    imageHeight: Dp = imageSize,
+    crop: Boolean = false,
+    placeholderIconSize: Dp = 19.dp,
+    placeholderGap: Dp = 2.dp,
+    onStatusChanged: ((ProductThumbnailStatus) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val imageStore = remember(context) { PublicProductImageStore.get(context) }
@@ -497,8 +520,16 @@ internal fun ProductThumbnail(
         loading = false
     }
 
+    val status = when {
+        loading -> ProductThumbnailStatus.Loading
+        bitmap != null -> ProductThumbnailStatus.Available
+        localStore.key(description) != null -> ProductThumbnailStatus.Pending
+        else -> ProductThumbnailStatus.Missing
+    }
+    androidx.compose.runtime.SideEffect { onStatusChanged?.invoke(status) }
+
     Surface(
-        modifier = modifier.size(imageSize),
+        modifier = modifier.size(width = imageSize, height = imageHeight),
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
@@ -510,8 +541,8 @@ internal fun ProductThumbnail(
                     com.componentvault.android.R.string.product_image_description,
                     sku,
                 ),
-                modifier = Modifier.padding(4.dp),
-                contentScale = ContentScale.Fit,
+                modifier = if (crop) Modifier.fillMaxSize() else Modifier.padding(4.dp),
+                contentScale = if (crop) ContentScale.Crop else ContentScale.Fit,
             )
         } else if (compactPlaceholder) {
             val descriptionText = when {
@@ -522,10 +553,10 @@ internal fun ProductThumbnail(
             Column(
                 modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = descriptionText },
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.spacedBy(placeholderGap, Alignment.CenterVertically),
             ) {
-                Icon(Icons.Outlined.HideImage, contentDescription = null,
-                    modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(painterResource(R.drawable.v2_image_off), contentDescription = null,
+                    modifier = Modifier.size(placeholderIconSize), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(if (loading) "…" else stringResource(R.string.inventory_no_image_short),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

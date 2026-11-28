@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="v2_locations_count">%1$d storage locations</string>
+    <string name="v2_backup_export">Export Excel backup</string>
+    <string name="v2_backup_export_hint">Components, locations and allocations</string>
+    <string name="v2_backup_restore">Restore from workbook</string>
+    <string name="v2_backup_restore_hint">Review before confirming the merge</string>
+    <string name="v2_backup_labels">Export label workbook</string>
+    <string name="v2_backup_labels_hint">All or selected locations</string>
+    <string name="v2_label_component_hint">Model, package and identification code</string>
+    <string name="v2_label_location">Location QR code</string>
+    <string name="v2_label_location_hint">Find storage by location code</string>
+    <string name="v2_label_bluetooth">Bluetooth printing</string>
+    <string name="v2_label_bluetooth_hint">Printers, paper and queue</string>
+    <string name="v2_label_other_templates">Other label templates</string>
+    <string name="v2_feedback_kind">Issue type</string>
+    <string name="v2_feedback_interface">Interface and interaction</string>
+    <string name="v2_feedback_import">Import and recognition</string>
+    <string name="v2_feedback_sync">Sync and connection</string>
+    <string name="v2_feedback_other">Other</string>
+    <string name="v2_feedback_title">Brief summary</string>
+    <string name="v2_feedback_steps">Steps to reproduce</string>
+    <string name="v2_feedback_steps_hint">Steps, expected result, and actual result</string>
+    <string name="v2_feedback_preview">Preview feedback</string>
+    <string name="v2_feedback_preview_title">Feedback preview</string>
+    <string name="v2_feedback_caption">Preview the report before choosing how to submit it</string>
+</resources>

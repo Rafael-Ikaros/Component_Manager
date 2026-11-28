@@ -19,13 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.Label
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Remove
-import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,9 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +62,7 @@ internal fun InventoryTabletListRowContent(
     onClick: () -> Unit,
     selectionMode: Boolean,
     storageLocations: List<StorageLocationRecord>,
-    actions: List<InventoryRowAction> = emptyList(),
+    actions: List<VaultMenuAction> = emptyList(),
     showOverflow: Boolean = true,
 ) {
     InventoryFlatListRowContent(item, selected, modifier, onClick, selectionMode,
@@ -75,40 +70,74 @@ internal fun InventoryTabletListRowContent(
 }
 
 @Composable
-internal fun InventoryDetailIdentity(component: ComponentRecord) {
+internal fun InventoryDetailIdentity(component: ComponentRecord, onEditPhoto: (() -> Unit)? = null) {
     val largeText = LocalDensity.current.fontScale >= 1.5f
-    BoxWithConstraints(Modifier.fillMaxWidth().testTag("inventory_detail_identity")) {
+    var photoStatus by remember(component.id) { mutableStateOf(ProductThumbnailStatus.Loading) }
+    val thumbnail: @Composable () -> Unit = {
+        ProductThumbnail(
+            sku = component.sku,
+            imageUrl = component.productImageUrl,
+            description = component.description,
+            imageSize = 94.dp,
+            imageHeight = 96.dp,
+            compactPlaceholder = true,
+            cornerRadius = 17.dp,
+            crop = true,
+            placeholderIconSize = 29.dp,
+            placeholderGap = 7.dp,
+            onStatusChanged = { photoStatus = it },
+        )
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 19.dp)
+        .testTag("inventory_detail_identity")) {
         if (maxWidth < 280.dp || largeText) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ProductThumbnail(sku = component.sku, imageUrl = component.productImageUrl,
-                    description = component.description, imageSize = 94.dp, compactPlaceholder = true, cornerRadius = 17.dp)
-                InventoryDetailIdentityText(component)
+                thumbnail()
+                InventoryDetailIdentityText(component, photoStatus, onEditPhoto)
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                ProductThumbnail(sku = component.sku, imageUrl = component.productImageUrl,
-                    description = component.description, imageSize = 94.dp, compactPlaceholder = true, cornerRadius = 17.dp)
-                Column(Modifier.weight(1f)) { InventoryDetailIdentityText(component) }
+                thumbnail()
+                Column(Modifier.weight(1f)) { InventoryDetailIdentityText(component, photoStatus, onEditPhoto) }
             }
         }
     }
 }
 
 @Composable
-private fun InventoryDetailIdentityText(component: ComponentRecord) {
+private fun InventoryDetailIdentityText(
+    component: ComponentRecord,
+    photoStatus: ProductThumbnailStatus,
+    onEditPhoto: (() -> Unit)?,
+) {
     val identity = remember(component.description) { com.componentvault.android.model.parseImportDescription(component.description) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val caption = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp)
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(component.name, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp),
             fontWeight = FontWeight.Medium)
         identity.model?.takeIf { it.isNotBlank() && !component.name.contains(it, ignoreCase = true) }?.let { model ->
-            Text(model, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(model, style = caption, color = muted)
         }
-        Text(listOf(component.sku, localizedCategoryLabel(component.category), component.packageName)
-            .filter { it.isNotBlank() }.joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val specification = listOf(localizedCategoryLabel(component.category), component.packageName)
+            .filter(String::isNotBlank).joinToString(" / ")
+        Text(listOf(component.sku, specification).filter(String::isNotBlank).joinToString(" · "),
+            style = caption, color = muted)
         identity.brand?.takeIf { it.isNotBlank() && !component.name.contains(it, ignoreCase = true) }?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(it, style = caption, color = muted)
+        }
+        Text(stringResource(when (photoStatus) {
+            ProductThumbnailStatus.Loading -> R.string.v2_photo_loading
+            ProductThumbnailStatus.Available -> R.string.v2_photo_available
+            ProductThumbnailStatus.Pending -> R.string.inventory_photo_pending_sync
+            ProductThumbnailStatus.Missing -> R.string.v2_photo_missing
+        }), style = caption, color = muted)
+        if (onEditPhoto != null) {
+            TextButton(onClick = onEditPhoto, modifier = Modifier.heightIn(min = 48.dp)
+                .testTag("inventory_detail_photo"),
+                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp)) {
+                Text(stringResource(R.string.v2_photo_edit), fontSize = 13.sp)
+            }
         }
     }
 }
@@ -127,8 +156,8 @@ internal fun InventoryTabletDetailSummary(
     val warning = LocalVaultWarning.current
     val largeText = LocalDensity.current.fontScale >= 1.5f
     var expanded by remember(component.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 3.dp), verticalAlignment = Alignment.Bottom) {
             FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(component.quantity.toString(), style = MaterialTheme.typography.displaySmall.copy(fontSize = 44.sp, lineHeight = 48.sp),
@@ -169,40 +198,40 @@ internal fun InventoryTabletDetailSummary(
             } else if (!largeText && availableWidth >= 260.dp) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     InventoryDetailAction.entries.forEach { action ->
-                        InventoryDetailStockButton(action, Modifier.weight(1f)) { onDetailAction(component.id, action) }
+                        InventoryDetailStockButton(action, Modifier.weight(1f), action != InventoryDetailAction.Outbound || component.quantity > 0) { onDetailAction(component.id, action) }
                     }
                 }
             } else {
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     InventoryDetailAction.entries.forEach { action ->
-                        InventoryDetailStockButton(action, Modifier.widthIn(max = availableWidth)) { onDetailAction(component.id, action) }
+                        InventoryDetailStockButton(action, Modifier.widthIn(max = availableWidth), action != InventoryDetailAction.Outbound || component.quantity > 0) { onDetailAction(component.id, action) }
                     }
                 }
             }
         }
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
             Column {
-                InventoryDetailActionRow(strings.common.actionEdit, stringResource(R.string.inventory_edit_supporting),
-                    Icons.Outlined.Edit, Modifier.testTag("inventory_detail_edit")) { onEditComponent(component.id) }
+                InventoryDetailActionRow(stringResource(R.string.v2_edit_action), stringResource(R.string.inventory_edit_supporting),
+                    R.drawable.v2_pencil, Modifier.testTag("inventory_detail_edit")) { onEditComponent(component.id) }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                InventoryDetailActionRow(strings.common.actionGenerateLabel, stringResource(R.string.inventory_label_supporting),
-                    Icons.AutoMirrored.Outlined.Label, Modifier.testTag("inventory_detail_label")) { onGenerateLabel(component) }
+                InventoryDetailActionRow(stringResource(R.string.v2_label_action), stringResource(R.string.inventory_label_supporting),
+                    R.drawable.v2_tag, Modifier.testTag("inventory_detail_label")) { onGenerateLabel(component) }
             }
         }
     }
 }
 
 @Composable
-private fun InventoryDetailStockButton(action: InventoryDetailAction, modifier: Modifier, onClick: () -> Unit) {
+private fun InventoryDetailStockButton(action: InventoryDetailAction, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
     val (label, icon, tag) = when (action) {
-        InventoryDetailAction.Inbound -> Triple(R.string.inventory_quick_inbound, Icons.Outlined.Add, "inbound")
-        InventoryDetailAction.Outbound -> Triple(R.string.inventory_quick_outbound, Icons.Outlined.Remove, "outbound")
-        InventoryDetailAction.Transfer -> Triple(R.string.inventory_transfer_short, Icons.Outlined.SwapHoriz, "transfer")
+        InventoryDetailAction.Inbound -> Triple(R.string.inventory_quick_inbound, R.drawable.v2_plus, "inbound")
+        InventoryDetailAction.Outbound -> Triple(R.string.inventory_quick_outbound, R.drawable.v2_minus, "outbound")
+        InventoryDetailAction.Transfer -> Triple(R.string.inventory_transfer_short, R.drawable.v2_arrow_left_right, "transfer")
     }
     val content: @Composable RowScope.() -> Unit = {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Text(stringResource(label), Modifier.padding(start = 4.dp))
+        Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(17.dp))
+        Text(stringResource(label), Modifier.padding(start = 8.dp), fontSize = 13.sp)
     }
     val buttonModifier = modifier.heightIn(min = 48.dp).testTag("inventory_detail_$tag")
     val padding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
@@ -212,6 +241,7 @@ private fun InventoryDetailStockButton(action: InventoryDetailAction, modifier: 
     } else {
         FilledTonalButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = buttonModifier,
             shape = shape,
             colors = ButtonDefaults.filledTonalButtonColors(
@@ -228,19 +258,20 @@ private fun InventoryDetailStockButton(action: InventoryDetailAction, modifier: 
 private fun InventoryDetailActionRow(
     title: String,
     supporting: String,
-    icon: ImageVector,
+    icon: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Row(modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick)
         .heightIn(min = 77.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(21.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Text(supporting, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(painterResource(R.drawable.v2_chevron_right), contentDescription = null, modifier = Modifier.size(15.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -253,7 +284,7 @@ internal fun InventoryDetailSection(
 ) {
     Column(modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp), fontWeight = FontWeight.Medium)
+        Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp, lineHeight = 24.sp), fontWeight = FontWeight.Medium)
         content()
     }
 }
@@ -279,10 +310,16 @@ internal fun InventoryDetailFieldGrid(fields: List<Pair<String, String>>) {
                 if (pending.isNotEmpty()) add(pending.toList())
             }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
             rows.forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    row.forEach { (label, value) -> ValueBlock(label, value, Modifier.weight(1f)) }
+                    row.forEach { (label, value) ->
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(label, fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(value.ifBlank { vaultStrings().common.labelNotConfigured },
+                                fontSize = 15.sp, lineHeight = 22.5.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
                     if (twoColumns && row.size == 1 && row[0].second.length <= 64 && '\n' !in row[0].second) {
                         Spacer(Modifier.weight(1f))
                     }

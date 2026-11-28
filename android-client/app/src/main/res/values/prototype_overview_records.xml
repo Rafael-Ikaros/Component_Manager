@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="v2_overview_parts">Component types</string>
+    <string name="v2_overview_quantity">Total quantity</string>
+    <string name="v2_overview_attention">Needs attention</string>
+    <string name="v2_overview_recent">Recent activity</string>
+    <string name="v2_overview_low_stock_caption">%1$s · In stock %2$d / Minimum %3$d</string>
+    <string name="v2_overview_view_records">View records (%1$d)</string>
+    <string name="v2_overview_open_inventory">Open inventory</string>
+    <string name="v2_records_empty">No stock movements yet</string>
+    <string name="v2_records_empty_note">Confirmed inbound, outbound and transfer movements will appear here.</string>
+    <string name="v2_records_find_component">Find a component</string>
+    <string name="v2_log_transfer">Transfer %1$d</string>
+</resources>

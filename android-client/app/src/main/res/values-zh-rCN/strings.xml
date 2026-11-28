@@ -9,7 +9,7 @@
     <string name="top_bar_title">元件仓库</string>
     <string name="destination_inventory">库存</string>
     <string name="destination_movements">记录</string>
-    <string name="destination_overview">首页</string>
+    <string name="destination_overview">概览</string>
     <string name="destination_settings">设置</string>
     <string name="shell_settings_local_first">本地优先，按需连接</string>
     <string name="shell_add_import">添加 / 导入</string>
@@ -52,7 +52,7 @@
     <string name="empty_no_components_match_filter">当前筛选条件下没有匹配的元器件。</string>
     <string name="empty_no_movements">暂未记录库存变动。</string>
     <string name="search_components_label">搜索元件</string>
-    <string name="search_components_placeholder">SKU、名称、分类、封装、仓位</string>
+    <string name="search_components_placeholder">搜索型号、SKU、规格</string>
     <string name="filter_all">全部</string>
     <string name="filter_low_stock">低库存</string>
     <string name="filter_category_label">分类</string>

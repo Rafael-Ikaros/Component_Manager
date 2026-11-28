@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="inventory_ui_result_count">共 %1$d 项元件</string>
-    <string name="inventory_ui_select">选择</string>
+    <string name="inventory_ui_select">多选</string>
     <string name="inventory_ui_more_actions">更多库存操作</string>
     <string name="inventory_ui_clear_search">清除搜索</string>
     <string name="inventory_ui_route">库位</string>

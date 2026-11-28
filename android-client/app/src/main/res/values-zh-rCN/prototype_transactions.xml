@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prototype_movement_review">复核变动</string>
+    <string name="prototype_movement_confirm">确认变动</string>
+    <string name="prototype_movement_kind">变动类型</string>
+    <string name="prototype_movement_paid">购买总金额（CNY）</string>
+    <string name="prototype_movement_review_hint">核对库位与数量。确认后才会更新库存。</string>
+</resources>

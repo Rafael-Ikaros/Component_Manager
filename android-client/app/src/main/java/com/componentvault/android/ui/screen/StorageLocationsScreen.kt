@@ -1,6 +1,11 @@
 package com.componentvault.android.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,17 +13,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,97 +59,10 @@ internal fun StorageLocationsScreen(
     var operationFailed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
-    SecondaryPageScaffold(
-        title = stringResource(R.string.locations_title),
-        onBack = {
-            when {
-                editor != null -> editor = null
-                deleteTarget != null -> deleteTarget = null
-                else -> onDismiss()
-            }
-        },
-        navigationEnabled = !busy,
-    ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Button(
-                onClick = { operationMessage = ""; editor = LocationEditor() },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().testTag("locations_add"),
-            ) { Text(stringResource(R.string.locations_add)) }
-
-            if (operationMessage.isNotBlank()) {
-                Text(
-                    text = operationMessage,
-                    color = if (operationFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.testTag("locations_operation_message"),
-                )
-            }
-
-            if (locations.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp, horizontal = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(stringResource(R.string.locations_empty_title), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.locations_empty_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().testTag("locations_list"),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(locations, key = { it.id }) { location ->
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(location.name, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    location.id,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                                ) {
-                                    TextButton(
-                                        onClick = { onPrintLabel(location) },
-                                        enabled = !busy,
-                                        modifier = Modifier.testTag("locations_print_${location.id}"),
-                                    ) { Text(stringResource(R.string.location_qr_print)) }
-                                    TextButton(
-                                        onClick = {
-                                            operationMessage = ""
-                                            editor = LocationEditor(location.id, location.name, isEditing = true)
-                                        },
-                                        enabled = !busy,
-                                        modifier = Modifier.testTag("locations_edit_${location.id}"),
-                                    ) { Text(stringResource(R.string.action_edit)) }
-                                    TextButton(
-                                        onClick = { deleteTarget = location },
-                                        enabled = !busy,
-                                        modifier = Modifier.testTag("locations_delete_${location.id}"),
-                                    ) { Text(stringResource(R.string.action_delete)) }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    editor?.let { value ->
-        LocationEditorDialog(
+    val listState = rememberLazyListState()
+    val value = editor
+    if (value != null) {
+        LocationEditorPage(
             initial = value,
             busy = busy,
             onDismiss = { if (!busy) editor = null },
@@ -157,6 +81,100 @@ internal fun StorageLocationsScreen(
                 }
             },
         )
+    } else {
+        SettingsRouteScaffold(
+            title = stringResource(R.string.locations_title),
+            caption = stringResource(R.string.v2_locations_count, locations.size),
+            onBack = onDismiss,
+            navigationEnabled = !busy,
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
+                    .padding(horizontal = 18.dp).testTag("locations_list"),
+                state = listState,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 20.dp),
+            ) {
+                if (operationMessage.isNotBlank()) {
+                    item {
+                        Text(
+                            operationMessage,
+                            color = if (operationFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.testTag("locations_operation_message").padding(bottom = 12.dp),
+                        )
+                    }
+                }
+                if (locations.isEmpty()) {
+                    item {
+                        Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(R.string.locations_empty_title), style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.locations_empty_description),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                itemsIndexed(locations, key = { _, location -> location.id }) { index, location ->
+                    val top = if (index == 0) 24.dp else 0.dp
+                    val bottom = if (index == locations.lastIndex) 24.dp else 0.dp
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
+                        color = MaterialTheme.colorScheme.surface,
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) {
+                                    SettingsSectionCard(
+                                        title = location.id,
+                                        supporting = location.name,
+                                        icon = R.drawable.v2_map_pin,
+                                        selected = false,
+                                        onClick = {
+                                            operationMessage = ""
+                                            editor = LocationEditor(location.id, location.name, isEditing = true)
+                                        },
+                                        enabled = !busy,
+                                        modifier = Modifier.testTag("locations_edit_${location.id}"),
+                                    )
+                                }
+                                var actionsExpanded by remember(location.id) { mutableStateOf(false) }
+                                Box(Modifier.padding(end = 6.dp)) {
+                                    IconButton(onClick = { actionsExpanded = true }, enabled = !busy) {
+                                        Icon(painterResource(R.drawable.v2_ellipsis_vertical),
+                                            stringResource(R.string.inventory_ui_more_actions), Modifier.size(18.dp))
+                                    }
+                                    DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.location_qr_print)) },
+                                            onClick = { actionsExpanded = false; onPrintLabel(location) },
+                                            modifier = Modifier.testTag("locations_print_${location.id}"),
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.action_delete)) },
+                                            onClick = { actionsExpanded = false; deleteTarget = location },
+                                            modifier = Modifier.testTag("locations_delete_${location.id}"),
+                                        )
+                                    }
+                                }
+                            }
+                            if (index != locations.lastIndex) {
+                                HorizontalDivider(Modifier.padding(start = 51.dp, end = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                        }
+                    }
+                }
+                item {
+                    Button(
+                        onClick = { operationMessage = ""; editor = LocationEditor() },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().padding(top = 21.dp).heightIn(min = 48.dp)
+                            .testTag("locations_add"),
+                        shape = RoundedCornerShape(15.dp),
+                    ) { Text(stringResource(R.string.locations_add)) }
+                }
+            }
+        }
     }
 
     deleteTarget?.let { location ->
@@ -194,7 +212,7 @@ internal data class LocationEditor(
 )
 
 @Composable
-internal fun LocationEditorDialog(
+private fun LocationEditorPage(
     initial: LocationEditor,
     busy: Boolean,
     onDismiss: () -> Unit,
@@ -206,57 +224,65 @@ internal fun LocationEditorDialog(
     val codeInvalid = code.isBlank() || code.length > 120
     val nameInvalid = name.isBlank() || name.length > 200
 
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = {
-            Text(stringResource(if (initial.isEditing) R.string.locations_edit_title else R.string.locations_create_title))
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedTextField(
+    SettingsRouteScaffold(
+        title = stringResource(if (initial.isEditing) R.string.locations_edit_title else R.string.locations_create_title),
+        caption = if (initial.isEditing) stringResource(R.string.locations_code_immutable_hint) else null,
+        navigationEnabled = !busy,
+        onBack = onDismiss,
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()
+                .verticalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (initial.isEditing) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 13.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(stringResource(R.string.locations_code_label), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(code, Modifier.testTag("locations_code"))
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            } else {
+                SettingsTextField(
                     value = code,
                     onValueChange = { code = it.trim(); error = "" },
                     label = { Text(stringResource(R.string.locations_code_label)) },
-                    supportingText = if (initial.isEditing) {
-                        { Text(stringResource(R.string.locations_code_immutable_hint)) }
-                    } else null,
                     isError = codeInvalid && code.isNotEmpty(),
-                    readOnly = initial.isEditing,
                     enabled = !busy,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("locations_code"),
                 )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it; error = "" },
-                    label = { Text(stringResource(R.string.locations_name_label)) },
-                    isError = nameInvalid && name.isNotEmpty(),
-                    enabled = !busy,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("locations_name"),
-                )
-                if (error.isNotBlank()) {
-                    Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("locations_editor_error"))
-                }
-                if (busy) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator()
-                        Text(stringResource(R.string.locations_saving))
-                    }
+            }
+            SettingsTextField(
+                value = name,
+                onValueChange = { name = it; error = "" },
+                label = { Text(stringResource(R.string.locations_name_label)) },
+                isError = nameInvalid && name.isNotEmpty(),
+                enabled = !busy,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("locations_name"),
+            )
+            if (error.isNotBlank()) {
+                Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("locations_editor_error"))
+            }
+            if (busy) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(Modifier.size(20.dp))
+                    Text(stringResource(R.string.locations_saving))
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                enabled = !busy && !codeInvalid && !nameInvalid,
-                onClick = { onSave(code.trim(), name.trim()) { error = it } },
-            ) { Text(stringResource(R.string.action_save)) }
-        },
-        dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                TextButton(
+                    enabled = !busy, onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.action_cancel)) }
+                Button(
+                    enabled = !busy && !codeInvalid && !nameInvalid,
+                    onClick = { onSave(code.trim(), name.trim()) { error = it } },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(15.dp),
+                ) { Text(stringResource(R.string.action_save)) }
+            }
+        }
+    }
 }

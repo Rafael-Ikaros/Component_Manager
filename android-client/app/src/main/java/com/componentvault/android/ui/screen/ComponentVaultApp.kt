@@ -1,20 +1,10 @@
 package com.componentvault.android.ui.screen
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.res.stringResource
 import com.componentvault.android.R
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,11 +15,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.unit.dp
 import com.componentvault.android.data.ComponentImportParser
 import com.componentvault.android.data.LabelPrintQueueCodec
 import com.componentvault.android.data.LocationQrCodec
@@ -113,6 +101,7 @@ internal fun ComponentVaultApp(
     var batchJlcVisible by rememberSaveable { mutableStateOf(false) }
     var deleteTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
+    var componentEditorPhotoFirst by rememberSaveable { mutableStateOf(false) }
     var componentEditorInitialDraft by rememberSaveable(stateSaver = ComponentDraftSaver) { mutableStateOf<ComponentDraft?>(null) }
     var componentEditorImportCandidate by rememberSaveable(stateSaver = ComponentImportCandidateSaver) { mutableStateOf<ComponentImportCandidate?>(null) }
     var labelPrintSeed by rememberSaveable(stateSaver = LabelSeedSaver) { mutableStateOf<ComponentLabelSeed?>(null) }
@@ -168,6 +157,7 @@ internal fun ComponentVaultApp(
     }
 
     fun closeComponentEditor() {
+        componentEditorPhotoFirst = false
         componentEditorVisible = false
         componentEditorTargetId = null
         componentEditorExpectedUpdatedAt = null
@@ -208,7 +198,9 @@ internal fun ComponentVaultApp(
         componentId: String?,
         initialDraft: ComponentDraft? = null,
         importCandidate: ComponentImportCandidate? = null,
+        photoFirst: Boolean = false,
     ) {
+        componentEditorPhotoFirst = photoFirst
         componentEditorTargetId = componentId
         componentEditorExpectedUpdatedAt =
             uiState.availableComponents.firstOrNull { it.id == componentId }?.updatedAt
@@ -508,6 +500,10 @@ internal fun ComponentVaultApp(
                     labelPrintVisible = true
                 },
                 onBack = { labelToolPickerVisible = false; labelPrintFromToolPicker = false },
+                onOpenLocationLabels = {
+                    labelToolPickerVisible = false
+                    storageLocationsVisible = true
+                },
             )
 
             labelPrintVisible -> BluetoothLabelPrintScreen(
@@ -531,6 +527,31 @@ internal fun ComponentVaultApp(
                 },
             )
 
+            showAddEntrySheet -> AddComponentEntrySheet(
+                onDismiss = { showAddEntrySheet = false },
+                onImportComponent = {
+                    showAddEntrySheet = false
+                    importSurfaceVisible = true
+                },
+                onImportBom = {
+                    showAddEntrySheet = false
+                    bomImportInitialMode = BomImportMode.Bom
+                    bomImportVisible = true
+                },
+                onBatchJlc = {
+                    showAddEntrySheet = false
+                    batchJlcVisible = true
+                },
+                onRestoreBackup = {
+                    showAddEntrySheet = false
+                    inventoryBackupVisible = true
+                },
+                onManual = {
+                    showAddEntrySheet = false
+                    openComponentEditor(null)
+                },
+            )
+
             destination == InventoryDestination.Inventory && compactDetailComponentId != null && !layoutMode.showsListDetail -> {
                 InventoryDetailRoute(
                     component = compactDetail.component,
@@ -540,6 +561,7 @@ internal fun ComponentVaultApp(
                     storageLocations = uiState.inventory.storageLocations,
                     onDismiss = { compactDetailComponentId = null },
                     onEditComponent = { componentId -> openComponentEditor(componentId) },
+                    onEditPhoto = { componentId -> openComponentEditor(componentId, photoFirst = true) },
                     onGenerateLabel = { component ->
                         labelPrintSeed = component.toLabelSeed()
                         labelPrintVisible = true
@@ -709,6 +731,7 @@ internal fun ComponentVaultApp(
             existing = editingComponent,
             editingId = componentEditorTargetId,
             expectedUpdatedAt = componentEditorExpectedUpdatedAt,
+            photoFirst = componentEditorPhotoFirst,
             initialDraft = componentEditorInitialDraft,
             availableCategories = uiState.inventory.availableCategories,
             storageLocations = uiState.inventory.storageLocations,
@@ -781,25 +804,6 @@ internal fun ComponentVaultApp(
 
         }
 
-        if (showAddEntrySheet) {
-            AddComponentEntrySheet(
-                onDismiss = { showAddEntrySheet = false },
-                onImportComponent = {
-                    showAddEntrySheet = false
-                    importSurfaceVisible = true
-                },
-                onImportBom = {
-                    showAddEntrySheet = false
-                    bomImportInitialMode = BomImportMode.Bom
-                    bomImportVisible = true
-                },
-                onBatchJlc = {
-                    showAddEntrySheet = false
-                    batchJlcVisible = true
-                },
-            )
-        }
-
         val pendingDeleteId = deleteTargetId
         if (pendingDeleteId != null && uiState.inventory.isLoaded &&
             uiState.availableComponents.any { it.id == pendingDeleteId && !it.deleted }
@@ -839,12 +843,14 @@ internal fun ComponentEditorRoute(
     onSaveAndGenerateLabel: (ComponentDraft, (OperationResult) -> Unit) -> Unit,
     editingId: String? = existing?.id,
     expectedUpdatedAt: String? = existing?.updatedAt,
+    photoFirst: Boolean = false,
 ) {
     if (visible && !scannerVisible) {
         ComponentEditorSurface(
             existing = existing,
             editingId = editingId,
             expectedUpdatedAt = expectedUpdatedAt,
+            photoFirst = photoFirst,
             initialDraft = initialDraft,
             availableCategories = availableCategories,
             storageLocations = storageLocations,
@@ -856,34 +862,30 @@ internal fun ComponentEditorRoute(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AddComponentEntrySheet(
     onDismiss: () -> Unit,
     onImportComponent: () -> Unit,
     onImportBom: () -> Unit,
     onBatchJlc: () -> Unit,
+    onRestoreBackup: (() -> Unit)? = null,
+    onManual: (() -> Unit)? = null,
 ) {
-    BackHandler(onBack = onDismiss)
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
-            Text(
-                stringResource(R.string.import_menu_title),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-            )
-            ImportMenuRow(R.string.import_menu_single, R.string.import_menu_single_hint, onImportComponent)
-            ImportMenuRow(R.string.import_menu_batch, R.string.import_menu_batch_hint, onBatchJlc)
-            ImportMenuRow(R.string.import_menu_bom, R.string.import_menu_bom_hint, onImportBom)
-        }
-    }
-}
-
-@Composable
-private fun ImportMenuRow(title: Int, description: Int, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(stringResource(title)) },
-        supportingContent = { Text(stringResource(description)) },
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    val actions = listOfNotNull(
+        VaultMenuAction(R.string.import_menu_single, R.string.import_menu_single_hint, R.drawable.v2_scan_text, onImportComponent),
+        VaultMenuAction(R.string.import_menu_batch, R.string.import_menu_batch_hint, R.drawable.v2_boxes, onBatchJlc),
+        VaultMenuAction(R.string.import_menu_bom, R.string.import_menu_bom_hint, R.drawable.v2_file_spreadsheet, onImportBom),
+        onRestoreBackup?.let {
+            VaultMenuAction(R.string.v2_restore_stock, R.string.v2_restore_stock_summary, R.drawable.v2_folder_open, it)
+        },
+        onManual?.let {
+            VaultMenuAction(R.string.v2_manual_entry, R.string.v2_manual_entry_summary, R.drawable.v2_pencil, it)
+        },
+    )
+    VaultMenuPage(
+        title = stringResource(R.string.shell_add_import),
+        subtitle = stringResource(R.string.v2_add_caption),
+        actions = actions,
+        onBack = onDismiss,
     )
 }

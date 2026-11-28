@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
@@ -100,25 +102,50 @@ internal fun InventoryBackupScreen(
             }
         }
     }
-    SecondaryPageScaffold(
-        title = stringResource(R.string.backup_title),
+    SettingsRouteScaffold(
+        title = stringResource(R.string.appearance_backup_title),
+        caption = stringResource(R.string.appearance_backup_hint),
         onBack = onDismiss,
     ) { padding ->
         Column(
-            Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
+            Modifier.padding(padding).consumeWindowInsets(padding).verticalScroll(rememberScrollState())
+                .padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(stringResource(R.string.backup_description))
-            Button(
-                onClick = { create.launch("component-vault-backup.xlsx") },
-                enabled = !state.loading,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.backup_create)) }
-            OutlinedButton(
-                onClick = { open.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip")) },
-                enabled = !state.loading,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.backup_choose)) }
+            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    SettingsSectionCard(
+                        title = stringResource(R.string.v2_backup_export),
+                        supporting = stringResource(R.string.v2_backup_export_hint),
+                        icon = R.drawable.v2_download,
+                        selected = false,
+                        enabled = !state.loading,
+                        onClick = { create.launch("component-vault-backup.xlsx") },
+                    )
+                    HorizontalDivider(Modifier.padding(start = 51.dp, end = 16.dp))
+                    SettingsSectionCard(
+                        title = stringResource(R.string.v2_backup_restore),
+                        supporting = stringResource(R.string.v2_backup_restore_hint),
+                        icon = R.drawable.v2_folder_open,
+                        selected = false,
+                        enabled = !state.loading,
+                        onClick = { open.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip")) },
+                    )
+                    HorizontalDivider(Modifier.padding(start = 51.dp, end = 16.dp))
+                    SettingsSectionCard(
+                        title = stringResource(R.string.v2_backup_labels),
+                        supporting = stringResource(R.string.v2_backup_labels_hint),
+                        icon = R.drawable.v2_file_spreadsheet,
+                        selected = false,
+                        enabled = !state.loading && !labelExportBusy && activeComponents.isNotEmpty(),
+                        onClick = { labelExportDialogVisible = true },
+                    )
+                }
+            }
+            if (activeComponents.isEmpty()) {
+                Text(stringResource(R.string.label_workbook_export_empty), style = MaterialTheme.typography.bodySmall)
+            }
+            if (labelExportMessage.isNotBlank()) Text(labelExportMessage)
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.preview?.let { preview ->
                 Card(Modifier.fillMaxWidth()) {
@@ -139,19 +166,6 @@ internal fun InventoryBackupScreen(
                 }
             }
             if (state.message.isNotBlank()) Text(state.message)
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.label_workbook_export_title), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.label_workbook_export_description), style = MaterialTheme.typography.bodyMedium)
-                    Button(
-                        onClick = { labelExportDialogVisible = true },
-                        enabled = !state.loading && !labelExportBusy && components.any { !it.deleted },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.label_workbook_export_action)) }
-                    if (components.none { !it.deleted }) Text(stringResource(R.string.label_workbook_export_empty), style = MaterialTheme.typography.bodySmall)
-                    if (labelExportMessage.isNotBlank()) Text(labelExportMessage)
-                }
-            }
         }
     }
     if (labelExportDialogVisible) {

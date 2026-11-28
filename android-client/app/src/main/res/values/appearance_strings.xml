@@ -3,8 +3,8 @@
     <string name="appearance_title">Appearance</string>
     <string name="appearance_description">Theme and accent color</string>
     <string name="appearance_summary">%1$s · %2$s</string>
-    <string name="appearance_theme">Theme</string>
-    <string name="appearance_accent">Accent color</string>
+    <string name="appearance_theme">Theme mode</string>
+    <string name="appearance_accent">Theme accent</string>
     <string name="appearance_system">Follow system</string>
     <string name="appearance_light">Light</string>
     <string name="appearance_dark">Dark</string>
@@ -36,6 +36,15 @@
     <string name="appearance_about_hint">Version, project and update channel</string>
     <string name="appearance_channel_stable" translatable="false">Stable</string>
     <string name="appearance_channel_dev" translatable="false">Dev</string>
-    <string name="appearance_theme_hint">Follow the device or choose a fixed theme</string>
-    <string name="appearance_accent_hint">Colors for actions and selected items</string>
+    <string name="appearance_theme_hint">Coordinate with the appearance of this device</string>
+    <string name="appearance_accent_hint">Color for primary actions and selected items</string>
+    <string name="appearance_header_caption">Theme and muted accent colors</string>
+    <string name="appearance_import_caption">Defaults for imports, recognition and labels</string>
+    <string name="appearance_stock_color_note">Low stock keeps its orange color and text label with every accent color.</string>
+    <string name="appearance_system_description">Follow the appearance of this device</string>
+    <string name="appearance_light_description">Warm, neutral and bright</string>
+    <string name="appearance_dark_description">Graphite tones with soft contrast</string>
+    <string name="appearance_teal_description">Calm and natural</string>
+    <string name="appearance_blue_description">Cool and understated</string>
+    <string name="appearance_sand_description">Warm and soft</string>
 </resources>

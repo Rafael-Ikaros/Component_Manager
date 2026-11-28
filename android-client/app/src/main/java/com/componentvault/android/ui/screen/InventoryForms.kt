@@ -2,6 +2,9 @@ package com.componentvault.android.ui.screen
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -70,6 +73,7 @@ internal fun ComponentEditorSurface(
     onSaveAndGenerateLabel: ((ComponentDraft, (OperationResult) -> Unit) -> Unit)? = null,
     editingId: String? = existing?.id,
     expectedUpdatedAt: String? = existing?.updatedAt,
+    photoFirst: Boolean = false,
 ) {
     val strings = vaultStrings()
     val isEditing = editingId != null
@@ -119,6 +123,7 @@ internal fun ComponentEditorSurface(
         } else {
             strings.common.actionSaveAndGenerateLabel
         },
+        footerSaveLabel = strings.common.actionSave,
         onSave = {
             sku = LocalComponentSku.ensure(sku)
             validateComponentDraft(
@@ -172,19 +177,15 @@ internal fun ComponentEditorSurface(
             }
         },
     ) {
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !valuationIsTotal, onClick = { valuationIsTotal = false }, label = { Text(if (!isEditing) "购买单价" else "补录单价") })
-                FilterChip(selected = valuationIsTotal, onClick = { valuationIsTotal = true }, label = { Text(if (!isEditing) "购买总金额" else "补录当前总额") })
-            }
-            OutlinedTextField(value = valuationText, onValueChange = { valuationText = it }, label = { Text(if (!isEditing) "实际采购金额（CNY）" else if (valuationIsTotal) "补录当前库存总额（CNY）" else "补录当前库存单价（CNY）") }, supportingText = { Text(if (!isEditing) "留空表示成本未知；0 表示赠品。" else "留空保留现有成本；填写将按当前库存估值并记录调整，不修改历史采购。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        if (photoFirst) item(key = "photo_first") {
+            ComponentPhotoEditor(description, { description = it }, session = photoSession)
         }
         item {
-            SectionPane(
+            SettingsFormSection(
                 title = strings.forms.componentBasicTitle,
                 supporting = strings.forms.componentBasicSubtitle,
             ) {
-                OutlinedTextField(
+                SettingsTextField(
                     value = sku,
                     onValueChange = { sku = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -192,7 +193,7 @@ internal fun ComponentEditorSurface(
                     supportingText = { Text(androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.component_internal_sku_help)) },
                     singleLine = true,
                 )
-                OutlinedTextField(
+                SettingsTextField(
                     value = name,
                     onValueChange = { name = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -207,7 +208,7 @@ internal fun ComponentEditorSurface(
                     optionLabel = { localizedCategoryLabel(it) },
                     tag = "component_editor_category",
                 )
-                OutlinedTextField(
+                SettingsTextField(
                     value = packageName,
                     onValueChange = { packageName = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -217,7 +218,7 @@ internal fun ComponentEditorSurface(
             }
         }
         item {
-            SectionPane(title = strings.forms.componentStockTitle) {
+            SettingsFormSection(title = strings.forms.componentStockTitle) {
                 QuantityInputField(
                     value = quantityText,
                     onValueChange = { quantityText = it },
@@ -236,14 +237,14 @@ internal fun ComponentEditorSurface(
             }
         }
         item {
-            SectionPane(title = strings.forms.componentStorageTitle) {
+            SettingsFormSection(title = strings.forms.componentStorageTitle) {
                 ImportLocationPicker(
                     value = location,
                     onValueChange = { location = it },
                     storageLocations = storageLocations,
                 )
-                ComponentPhotoEditor(description, { description = it }, session = photoSession)
-                OutlinedTextField(
+                if (!photoFirst) ComponentPhotoEditor(description, { description = it }, session = photoSession)
+                SettingsTextField(
                     value = description,
                     onValueChange = { description = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -251,6 +252,13 @@ internal fun ComponentEditorSurface(
                     minLines = 3,
                 )
             }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !valuationIsTotal, onClick = { valuationIsTotal = false }, label = { Text(if (!isEditing) "购买单价" else "补录单价") })
+                FilterChip(selected = valuationIsTotal, onClick = { valuationIsTotal = true }, label = { Text(if (!isEditing) "购买总金额" else "补录当前总额") })
+            }
+            SettingsTextField(value = valuationText, onValueChange = { valuationText = it }, label = { Text(if (!isEditing) "实际采购金额（CNY）" else if (valuationIsTotal) "补录当前库存总额（CNY）" else "补录当前库存单价（CNY）") }, supportingText = { Text(if (!isEditing) "留空表示成本未知；0 表示赠品。" else "留空保留现有成本；填写将按当前库存估值并记录调整，不修改历史采购。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         }
         if (!errorMessage.isNullOrBlank()) {
             item {
@@ -432,7 +440,7 @@ internal fun MovementEntryFields(
     sourceMessage: String? = null,
 ) {
     val strings = vaultStrings()
-    SectionPane(title = strings.forms.movementEntryTitle) {
+    SettingsFormSection(title = strings.forms.movementEntryTitle) {
         MovementLocationSelector(
             title = stringResource(R.string.movement_source_location),
             value = state.locationId,
@@ -471,12 +479,12 @@ internal fun MovementEntryFields(
                 FilterChip(selected = !state.purchaseIsUnit, onClick = { onStateChange(state.copy(purchaseIsUnit = false)) }, label = { Text("购买总金额") })
                 FilterChip(selected = state.purchaseIsUnit, onClick = { onStateChange(state.copy(purchaseIsUnit = true)) }, label = { Text("购买单价") })
             }
-            OutlinedTextField(value = state.purchaseText, onValueChange = { onStateChange(state.copy(purchaseText = it, errorMessage = null)) }, label = { Text(if (state.purchaseIsUnit) "购买单价（CNY）" else "购买总金额（CNY）") }, supportingText = { Text("留空表示成本未知；0 表示赠品。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            SettingsTextField(value = state.purchaseText, onValueChange = { onStateChange(state.copy(purchaseText = it, errorMessage = null)) }, label = { Text(if (state.purchaseIsUnit) "购买单价（CNY）" else "购买总金额（CNY）") }, supportingText = { Text("留空表示成本未知；0 表示赠品。") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             val entered = state.purchaseText.toBigDecimalOrNull()
             val count = state.quantityText.toIntOrNull()
             if (entered != null && count != null && count > 0) Text(if (state.purchaseIsUnit) "折算总金额（CNY）：${entered.multiply(java.math.BigDecimal(count)).toPlainString()}" else "折算单价（CNY）：${entered.divide(java.math.BigDecimal(count), 16, java.math.RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString()}")
         }
-        OutlinedTextField(
+        SettingsTextField(
             value = state.reason,
             onValueChange = {
                 onStateChange(state.copy(reason = it, errorMessage = null))
@@ -485,7 +493,7 @@ internal fun MovementEntryFields(
             label = { Text(strings.common.fieldReason) },
             singleLine = true,
         )
-        OutlinedTextField(
+        SettingsTextField(
             value = state.note,
             onValueChange = {
                 onStateChange(state.copy(note = it, errorMessage = null))
@@ -552,7 +560,14 @@ internal fun MovementEditorSurface(
     storageLocations: List<StorageLocationRecord> = emptyList(),
     allocations: List<ComponentAllocationRecord> = emptyList(),
 ) {
-    BackHandler(enabled = !layoutMode.prefersDialogForms, onBack = onDismiss)
+    var reviewing by rememberSaveable(selectedComponentId, initialMovementType) { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    val leave = {
+        if (!saving) {
+            if (reviewing) reviewing = false else onDismiss()
+        }
+    }
+    BackHandler(enabled = !layoutMode.prefersDialogForms, onBack = leave)
     val strings = vaultStrings()
     val defaultReasons = listOf("inbound", "outbound", "adjustment", "transfer")
         .associateWith { movementTypeLabel(it) }
@@ -560,7 +575,6 @@ internal fun MovementEditorSurface(
     var chosenComponentId by rememberSaveable(selectedComponentId) { mutableStateOf(selectedComponentId) }
     val selectedComponent = if (chosenComponentId == null) components.firstOrNull()
         else components.firstOrNull { it.id == chosenComponentId }
-    var saving by remember { mutableStateOf(false) }
     var editorState by rememberSaveable(initialMovementType, stateSaver = MovementEditorStateSaver) {
         mutableStateOf(
             MovementEditorState(
@@ -603,10 +617,13 @@ internal fun MovementEditorSurface(
         else -> null
     }
 
+    val movementTitle = initialMovementType?.let { movementTypeLabel(it) } ?: strings.forms.recordStockMovementTitle
     AdaptiveFormSurface(
-        title = strings.forms.recordStockMovementTitle,
+        title = if (reviewing) stringResource(R.string.prototype_movement_review) else movementTitle,
         layoutMode = layoutMode,
-        onDismiss = onDismiss,
+        onDismiss = leave,
+        footerSaveLabel = stringResource(if (reviewing) R.string.prototype_movement_confirm
+            else R.string.prototype_movement_review),
         saveEnabled = !saving && selectedComponent != null && sourceIsValid && stockError == null,
         onSave = {
             validateMovementEditorState(
@@ -614,12 +631,16 @@ internal fun MovementEditorSurface(
                 selectedComponentId = selectedComponent?.id,
                 state = stateWithSource,
             ).onSuccess { draft ->
-                saving = true
                 editorState = stateWithSource.copy(errorMessage = null)
-                onSave(draft) { result ->
-                    saving = false
-                    if (!result.isSuccess) {
-                        editorState = editorState.copy(errorMessage = result.message)
+                if (!reviewing) reviewing = true
+                else {
+                    saving = true
+                    onSave(draft) { result ->
+                        saving = false
+                        if (!result.isSuccess) {
+                            reviewing = false
+                            editorState = editorState.copy(errorMessage = result.message)
+                        }
                     }
                 }
             }.onFailure { throwable ->
@@ -629,8 +650,32 @@ internal fun MovementEditorSurface(
             }
         },
     ) {
+        if (reviewing) {
+            item {
+                val component = selectedComponent
+                val from = displayLocationName(sourceId, activeLocations, strings.common.labelNotConfigured)
+                val to = editorState.destinationLocationId.takeIf(String::isNotBlank)?.let {
+                    displayLocationName(it, activeLocations, strings.common.labelNotConfigured)
+                }
+                MovementReviewContent(
+                    component = component?.let { "${it.name} · ${it.sku}" }.orEmpty(),
+                    movementType = editorState.movementType,
+                    location = from,
+                    destination = to,
+                    quantity = editorState.quantityText,
+                    reason = editorState.reason,
+                    note = editorState.note,
+                    purchaseAmount = if (editorState.movementType == "inbound" && quantity != null && quantity > 0)
+                        purchaseTotal(editorState.purchaseText, editorState.purchaseIsUnit, quantity)
+                    else null,
+                )
+                stockError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                sourceMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+            return@AdaptiveFormSurface
+        }
         item {
-            SectionPane(
+            SettingsFormSection(
                 title = strings.forms.movementScopeTitle,
                 supporting = strings.forms.movementScopeSubtitle,
             ) {
@@ -705,6 +750,53 @@ internal fun MovementEditorSurface(
 }
 
 @Composable
+internal fun MovementReviewContent(
+    component: String,
+    movementType: String,
+    location: String,
+    destination: String?,
+    quantity: String,
+    reason: String,
+    note: String,
+    purchaseAmount: String?,
+) {
+    val strings = vaultStrings()
+    val fields = buildList {
+        add(strings.common.fieldComponent to component)
+        add(stringResource(R.string.prototype_movement_kind) to movementTypeLabel(movementType))
+        add(stringResource(R.string.movement_source_location) to location)
+        if (destination != null) add(stringResource(R.string.movement_destination_location) to destination)
+        add(strings.common.fieldQuantity to quantity)
+        add(strings.common.fieldReason to reason)
+        if (note.isNotBlank()) add(strings.common.fieldNote to note)
+        if (purchaseAmount != null) add(stringResource(R.string.prototype_movement_paid) to purchaseAmount)
+    }
+    Column {
+        fields.forEachIndexed { index, (label, value) ->
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 13.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            }
+            if (index != fields.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            shape = RoundedCornerShape(15.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Text(stringResource(R.string.prototype_movement_review_hint),
+                Modifier.padding(horizontal = 15.dp, vertical = 13.dp), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
 internal fun DeleteComponentConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
@@ -738,9 +830,54 @@ internal fun AdaptiveFormSurface(
     onSave: () -> Unit,
     onSecondarySave: (() -> Unit)? = null,
     saveEnabled: Boolean = true,
+    footerSaveLabel: String? = null,
+    footerTestTag: String? = null,
+    footerDismissLabel: String? = null,
+    dismissEnabled: Boolean = true,
+    footerError: String? = null,
+    modal: Boolean = false,
+    caption: String? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     val strings = vaultStrings()
+
+    @Composable
+    fun Footer() {
+        if (footerSaveLabel == null) return
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Column {
+            footerError?.takeIf(String::isNotBlank)?.let { message ->
+                Text(
+                    text = message,
+                    modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            if (saveLabel != null && onSecondarySave != null) {
+                TextButton(
+                    onClick = onSecondarySave,
+                    enabled = saveEnabled,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text(saveLabel) }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = onDismiss, enabled = dismissEnabled, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Text(footerDismissLabel ?: strings.common.actionBack)
+                }
+                Button(
+                    onClick = onSave,
+                    enabled = saveEnabled,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                        .then(if (footerTestTag == null) Modifier else Modifier.testTag(footerTestTag)),
+                    shape = RoundedCornerShape(15.dp),
+                ) { Text(footerSaveLabel) }
+            }
+        }
+    }
 
     if (layoutMode.prefersDialogForms) {
         Dialog(
@@ -765,7 +902,9 @@ internal fun AdaptiveFormSurface(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(0.dp),
                     ) {
-                        TopAppBar(
+                        if (footerSaveLabel != null) {
+                            VaultScreenHeader(title = title, caption = caption, onBack = onDismiss)
+                        } else TopAppBar(
                             title = { Text(title) },
                             navigationIcon = {
                                 TextButton(onClick = onDismiss) {
@@ -792,48 +931,60 @@ internal fun AdaptiveFormSurface(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             content = content,
                         )
+                        Footer()
                     }
                 }
             }
         }
     } else {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(title) },
-                    navigationIcon = {
-                        TextButton(onClick = onDismiss) {
-                            Text(strings.common.actionBack)
-                        }
-                    },
-                    actions = {
-                        if (saveLabel != null && onSecondarySave != null) {
-                            TextButton(onClick = onSecondarySave) {
-                                Text(saveLabel)
+        val page: @Composable () -> Unit = {
+            Scaffold(
+                topBar = {
+                    if (footerSaveLabel != null) {
+                        VaultScreenHeader(title = title, caption = caption, onBack = onDismiss)
+                    } else TopAppBar(
+                        title = { Text(title) },
+                        navigationIcon = {
+                            TextButton(onClick = onDismiss) {
+                                Text(strings.common.actionBack)
                             }
-                        }
-                        TextButton(onClick = onSave, enabled = saveEnabled) {
-                            Text(strings.common.actionSave)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                )
-            },
-            containerColor = MaterialTheme.colorScheme.background,
-        ) { padding ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .consumeWindowInsets(padding)
-                    .imePadding()
-                    .testTag("component_editor_fields"),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = content,
+                        },
+                        actions = {
+                            if (saveLabel != null && onSecondarySave != null) {
+                                TextButton(onClick = onSecondarySave) {
+                                    Text(saveLabel)
+                                }
+                            }
+                            TextButton(onClick = onSave, enabled = saveEnabled) {
+                                Text(strings.common.actionSave)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background,
+                        ),
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.background,
+            ) { padding ->
+                Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f).testTag("component_editor_fields"),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        content = content,
+                    )
+                    Footer()
+                }
+            }
+        }
+        if (modal) {
+            Dialog(
+                onDismissRequest = onDismiss,
+                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                content = page,
             )
+        } else {
+            page()
         }
     }
 }

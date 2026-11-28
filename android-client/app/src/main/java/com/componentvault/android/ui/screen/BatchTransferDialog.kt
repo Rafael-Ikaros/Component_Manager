@@ -1,26 +1,18 @@
 package com.componentvault.android.ui.screen
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,12 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.componentvault.android.R
 import com.componentvault.android.data.BatchTransferLine
 import com.componentvault.android.model.ComponentAllocationRecord
@@ -89,55 +77,68 @@ internal fun BatchTransferDialog(
             quantity != null && quantity > 0 && quantity <= availableById.getValue(item.id)
         }
 
-    Dialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.90f).widthIn(max = 560.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            tonalElevation = 6.dp,
-        ) {
-            Column {
-                Column(
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        stringResource(if (singleItemMode) R.string.inventory_quick_transfer
-                            else R.string.batch_transfer_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                    if (singleItemMode) Text(items.singleOrNull()?.sku.orEmpty(),
-                        modifier = Modifier.testTag("inventory_quick_transfer_sku"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else Text(stringResource(R.string.batch_transfer_count, items.size),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val layoutMode = rememberInventoryLayoutMode()
+    val leave = {
+        if (!busy) {
+            if (reviewing) {
+                reviewing = false
+                reviewedLines = null
+                error = ""
+            } else onDismiss()
+        }
+    }
+    BackHandler(enabled = !layoutMode.prefersDialogForms, onBack = leave)
+    AdaptiveFormSurface(
+        modal = true,
+        caption = stringResource(if (reviewing) R.string.prototype_movement_review_hint else R.string.v2_transfer_hint),
+        title = stringResource(when {
+            reviewing -> R.string.v2_confirm_transfer
+            singleItemMode -> R.string.inventory_quick_transfer
+            else -> R.string.batch_transfer_title
+        }),
+        layoutMode = layoutMode,
+        onDismiss = leave,
+        footerDismissLabel = stringResource(if (reviewing) R.string.action_back else R.string.action_cancel),
+        footerSaveLabel = stringResource(if (reviewing) R.string.batch_transfer_submit else R.string.batch_transfer_review),
+        footerTestTag = "transfer_confirm".takeIf { reviewing },
+        dismissEnabled = !busy,
+        saveEnabled = valid && !busy,
+        onSave = {
+            if (valid && !busy) {
+                if (!reviewing) {
+                    reviewedLines = items.map { item ->
+                        BatchTransferLine(item.id, requireNotNull(quantities[item.id]?.toIntOrNull()), item.updatedAt)
+                    }
+                    reviewedSourceId = sourceId
+                    reviewedDestinationId = destinationId
+                    reviewing = true
+                    error = ""
+                } else {
+                    busy = true
+                    onSubmit(reviewedSourceId, reviewedDestinationId, requireNotNull(reviewedLines)) { result ->
+                        busy = false
+                        if (result.isSuccess) onDismiss() else error = result.message
+                    }
                 }
-                HorizontalDivider()
-                Column(
-                    modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    if (locations.size < 2) {
-                        Text(stringResource(R.string.batch_transfer_need_two_locations))
-                    }
-                    if (sourceOptions.isEmpty()) {
-                        Text(stringResource(R.string.batch_transfer_no_common_source))
-                    }
-                    Text(
-                        stringResource(R.string.inventory_ui_route),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+            }
+        },
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (singleItemMode) {
+                    Text(items.singleOrNull()?.sku.orEmpty(), modifier = Modifier.testTag("inventory_quick_transfer_sku"),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else Text(stringResource(R.string.batch_transfer_count, items.size),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+                if (!reviewing) {
+                    if (locations.size < 2) Text(stringResource(R.string.batch_transfer_need_two_locations))
+                    if (sourceOptions.isEmpty()) Text(stringResource(R.string.batch_transfer_no_common_source))
                     LocationPicker(
                         label = stringResource(R.string.batch_transfer_source),
                         selectedId = sourceId,
                         options = sourceOptions,
-                        enabled = !reviewing && !busy,
+                        enabled = !busy,
                         onSelect = {
                             sourceId = it
                             if (destinationId == it) {
@@ -149,100 +150,62 @@ internal fun BatchTransferDialog(
                         label = stringResource(R.string.batch_transfer_destination),
                         selectedId = destinationId,
                         options = locations.filter { it.id != sourceId },
-                        enabled = !reviewing && !busy,
+                        enabled = !busy,
                         onSelect = { destinationId = it },
                     )
-                    HorizontalDivider()
-                    Text(
-                        stringResource(R.string.inventory_ui_transfer_items),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                    Text(stringResource(R.string.inventory_ui_transfer_items), style = MaterialTheme.typography.titleSmall)
+                    items.forEach { item ->
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text("${item.name} · ${item.sku}", style = MaterialTheme.typography.bodyMedium)
+                            QuantityInputField(
+                                value = quantities[item.id].orEmpty(),
+                                onValueChange = { value ->
+                                    if (value.all(Char::isDigit)) quantities = quantities + (item.id to value)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = stringResource(R.string.batch_transfer_quantity),
+                                minimum = 1,
+                                maximum = availableById.getValue(item.id),
+                                enabled = !busy,
+                            )
+                            Text(stringResource(R.string.batch_transfer_available, availableById.getValue(item.id)),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                } else {
+                    TransferReviewRow(
+                        stringResource(R.string.batch_transfer_source),
+                        locations.firstOrNull { it.id == reviewedSourceId }?.name ?: reviewedSourceId,
+                    )
+                    TransferReviewRow(
+                        stringResource(R.string.batch_transfer_destination),
+                        locations.firstOrNull { it.id == reviewedDestinationId }?.name ?: reviewedDestinationId,
                     )
                     items.forEach { item ->
-                        val available = availableById.getValue(item.id)
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(item.name, style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                item.sku,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                stringResource(R.string.batch_transfer_available, available),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            if (reviewing) {
-                                Text(stringResource(R.string.batch_transfer_quantity_review, quantities[item.id].orEmpty()))
-                            } else {
-                                OutlinedTextField(
-                                    value = quantities[item.id].orEmpty(),
-                                    onValueChange = { value ->
-                                        if (value.all(Char::isDigit)) quantities = quantities + (item.id to value)
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    label = { Text(stringResource(R.string.batch_transfer_quantity)) },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    enabled = !busy,
-                                )
-                            }
-                        }
-                        HorizontalDivider()
+                        val count = reviewedLines.orEmpty().firstOrNull { it.componentId == item.id }?.quantity
+                        TransferReviewRow("${item.name} · ${item.sku}", count?.toString().orEmpty())
                     }
-                    if (reviewing) {
-                        Text(stringResource(if (singleItemMode) R.string.inventory_quick_transfer_review
-                            else R.string.batch_transfer_review_prompt))
-                    }
-                    if (error.isNotBlank()) {
-                        Text(error, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-                HorizontalDivider()
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(
-                        enabled = !busy,
-                        onClick = {
-                            if (reviewing) {
-                                reviewing = false
-                                reviewedLines = null
-                            } else onDismiss()
-                        },
-                    ) {
-                        Text(stringResource(if (reviewing) R.string.action_back else R.string.action_cancel))
-                    }
-                    Button(
-                        enabled = valid && !busy,
-                        onClick = {
-                            if (!reviewing) {
-                                reviewedLines = items.map { item ->
-                                    BatchTransferLine(
-                                        item.id,
-                                        requireNotNull(quantities[item.id]?.toIntOrNull()),
-                                        item.updatedAt,
-                                    )
-                                }
-                                reviewedSourceId = sourceId
-                                reviewedDestinationId = destinationId
-                                reviewing = true
-                                error = ""
-                            } else {
-                                busy = true
-                                onSubmit(reviewedSourceId, reviewedDestinationId, requireNotNull(reviewedLines)) { result ->
-                                    busy = false
-                                    if (result.isSuccess) onDismiss() else error = result.message
-                                }
-                            }
-                        },
-                    ) {
-                        Text(stringResource(if (reviewing) R.string.batch_transfer_submit else R.string.batch_transfer_review))
-                    }
+                    Text(stringResource(if (singleItemMode) R.string.inventory_quick_transfer_review
+                        else R.string.batch_transfer_review_prompt),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TransferReviewRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @Composable

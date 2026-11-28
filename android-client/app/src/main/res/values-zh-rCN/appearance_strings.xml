@@ -3,8 +3,8 @@
     <string name="appearance_title">外观</string>
     <string name="appearance_description">主题与配色</string>
     <string name="appearance_summary">%1$s · %2$s</string>
-    <string name="appearance_theme">主题</string>
-    <string name="appearance_accent">强调色</string>
+    <string name="appearance_theme">主题模式</string>
+    <string name="appearance_accent">主题配色</string>
     <string name="appearance_system">跟随系统</string>
     <string name="appearance_light">浅色</string>
     <string name="appearance_dark">深色</string>
@@ -34,6 +34,15 @@
     <string name="appearance_backup_hint">Excel 库存与标签工作簿</string>
     <string name="appearance_feedback_hint">整理问题与复现过程</string>
     <string name="appearance_about_hint">版本、项目与更新通道</string>
-    <string name="appearance_theme_hint">跟随设备或选择固定主题</string>
-    <string name="appearance_accent_hint">用于主要操作和选中状态</string>
+    <string name="appearance_theme_hint">与当前设备外观协调</string>
+    <string name="appearance_accent_hint">仅强调主要操作与选中状态</string>
+    <string name="appearance_header_caption">主题与低饱和强调色</string>
+    <string name="appearance_import_caption">导入、识别与标签默认值</string>
+    <string name="appearance_stock_color_note">低库存始终使用橙色与文字提示，不随主题强调色改变。</string>
+    <string name="appearance_system_description">随当前设备外观变化</string>
+    <string name="appearance_light_description">暖中性底色，清晰明亮</string>
+    <string name="appearance_dark_description">石墨底色，柔和层次</string>
+    <string name="appearance_teal_description">平静、自然</string>
+    <string name="appearance_blue_description">清爽、克制</string>
+    <string name="appearance_sand_description">温暖、柔和</string>
 </resources>

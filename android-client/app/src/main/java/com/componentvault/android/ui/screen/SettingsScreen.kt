@@ -27,25 +27,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Brightness6
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.DarkMode
-import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.DocumentScanner
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Sell
-import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material.icons.outlined.Warehouse
 import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -54,8 +40,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -540,11 +529,7 @@ private fun SettingsSectionList(
     val appearance = LocalAppearance.current
     val route: @Composable (SettingsSection) -> Unit = { section ->
         val summary = when (section) {
-            SettingsSection.Appearance -> stringResource(
-                R.string.appearance_summary,
-                stringResource(appearance.mode.label()),
-                stringResource(appearance.accent.label()),
-            )
+            SettingsSection.Appearance -> stringResource(appearance.mode.label())
             SettingsSection.App -> when (appLanguage) {
                 AppLanguage.ZhCn -> stringResource(R.string.appearance_language_chinese)
                 AppLanguage.English -> "English"
@@ -561,7 +546,7 @@ private fun SettingsSectionList(
             else -> null
         }
         SettingsSectionCard(
-            title = section.listTitle(strings),
+            title = section.title(strings),
             supporting = section.listSupporting(),
             icon = section.icon(),
             selected = section == selectedSection,
@@ -572,7 +557,7 @@ private fun SettingsSectionList(
         )
     }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-        SettingsLocalWarehouseSummary(localComponentCount)
+        Box(Modifier.padding(bottom = 6.dp)) { SettingsLocalWarehouseSummary(localComponentCount) }
         SettingsRouteGroup(stringResource(R.string.appearance_group_habits)) {
             route(SettingsSection.Appearance)
             SettingsRowDivider(compact)
@@ -587,7 +572,7 @@ private fun SettingsSectionList(
                 SettingsSectionCard(
                     title = stringResource(R.string.appearance_locations_title),
                     supporting = stringResource(R.string.appearance_locations_hint),
-                    icon = Icons.Outlined.LocationOn,
+                    icon = R.drawable.v2_map_pin,
                     selected = false,
                     onClick = action,
                     compact = compact,
@@ -598,7 +583,7 @@ private fun SettingsSectionList(
                 SettingsSectionCard(
                     title = stringResource(R.string.appearance_backup_title),
                     supporting = stringResource(R.string.appearance_backup_hint),
-                    icon = Icons.Outlined.Storage,
+                    icon = R.drawable.v2_database,
                     selected = false,
                     onClick = action,
                     compact = compact,
@@ -609,7 +594,7 @@ private fun SettingsSectionList(
                 SettingsSectionCard(
                     title = stringResource(R.string.appearance_printing),
                     supporting = stringResource(R.string.appearance_printing_hint),
-                    icon = Icons.Outlined.Sell,
+                    icon = R.drawable.v2_tags,
                     selected = false,
                     onClick = action,
                     compact = compact,
@@ -624,14 +609,14 @@ private fun SettingsSectionList(
     }
 }
 
-private fun SettingsSection.icon(): ImageVector = when (this) {
-    SettingsSection.Appearance, SettingsSection.Theme -> Icons.Outlined.Brightness6
-    SettingsSection.Accent -> Icons.Outlined.Palette
-    SettingsSection.ImportAndOcr -> Icons.Outlined.DocumentScanner
-    SettingsSection.App -> Icons.Outlined.Translate
-    SettingsSection.Sync -> Icons.Outlined.Dns
-    SettingsSection.Feedback -> Icons.Outlined.ChatBubbleOutline
-    SettingsSection.About -> Icons.Outlined.Info
+private fun SettingsSection.icon(): Int = when (this) {
+    SettingsSection.Appearance, SettingsSection.Theme -> R.drawable.v2_sun_moon
+    SettingsSection.Accent -> R.drawable.v2_palette
+    SettingsSection.ImportAndOcr -> R.drawable.v2_scan_text
+    SettingsSection.App -> R.drawable.v2_languages
+    SettingsSection.Sync -> R.drawable.v2_server
+    SettingsSection.Feedback -> R.drawable.v2_message_square
+    SettingsSection.About -> R.drawable.v2_info
 }
 
 @Composable
@@ -653,7 +638,7 @@ private fun SettingsLocalWarehouseSummary(localComponentCount: Int?) {
                 contentColor = colors.onPrimaryContainer,
             ) {
                 Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.Warehouse, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(painterResource(R.drawable.v2_warehouse), contentDescription = null, modifier = Modifier.size(21.dp), tint = colors.primary)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -700,15 +685,16 @@ private fun SettingsRowDivider(compact: Boolean) {
 }
 
 @Composable
-private fun SettingsSectionCard(
+internal fun SettingsSectionCard(
     title: String,
     supporting: String,
-    icon: ImageVector,
+    icon: Int,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     summary: String? = null,
     summarySwatch: Color? = null,
+    enabled: Boolean = true,
     compact: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -719,16 +705,16 @@ private fun SettingsSectionCard(
     ) {
         Row(
             modifier = modifier.fillMaxWidth().heightIn(min = 77.dp)
-                .then(if (selected) Modifier.selectable(true, role = Role.Button, onClick = onClick)
-                    else Modifier.clickable(role = Role.Button, onClick = onClick))
+                .then(if (selected) Modifier.selectable(true, enabled = enabled, role = Role.Button, onClick = onClick)
+                    else Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick))
                 .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                icon,
+                painterResource(icon),
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(if (compact) 18.dp else 21.dp),
                 tint = supportingColor,
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -745,21 +731,23 @@ private fun SettingsSectionCard(
                     color = supportingColor,
                 )
             }
-            summarySwatch?.let { Box(Modifier.size(14.dp).background(it, CircleShape)) }
             if (summary != null) {
-                Text(
-                    summary,
-                    modifier = Modifier.widthIn(max = if (compact) 64.dp else 96.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 12.sp,
-                    color = supportingColor,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    summarySwatch?.let { Box(Modifier.size(16.dp).background(it, CircleShape)) }
+                    Text(
+                        summary,
+                        modifier = Modifier.widthIn(max = if (compact) 64.dp else 96.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        color = supportingColor,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    )
+                }
             }
             Icon(
-                Icons.Outlined.ChevronRight,
+                painterResource(R.drawable.v2_chevron_right),
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(15.dp),
                 tint = supportingColor,
             )
         }
@@ -881,38 +869,26 @@ private fun SettingsAboutPane(
             },
         )
         Text(stringResource(R.string.settings_update_channel_title), fontWeight = FontWeight.SemiBold)
-        Column {
-          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
-              onUpdateChannelChange(UpdateChannel.Stable)
-              updateResult = null
-          }) {
-            RadioButton(
-                selected = updateChannel == UpdateChannel.Stable,
-                onClick = null,
-                enabled = !isChecking,
-            )
-            Text(stringResource(R.string.settings_update_channel_stable))
-          }
-          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = !isChecking) {
-              onUpdateChannelChange(UpdateChannel.Dev)
-              updateResult = null
-          }) {
-            RadioButton(
-                selected = updateChannel == UpdateChannel.Dev,
-                onClick = null,
-                enabled = !isChecking,
-            )
-            Text(stringResource(R.string.settings_update_channel_dev))
-          }
+        Column(Modifier.selectableGroup()) {
+            UpdateChannel.entries.forEach { channel ->
+                val stable = channel == UpdateChannel.Stable
+                AppearanceChoice(
+                    label = stringResource(if (stable) R.string.settings_update_channel_stable else R.string.settings_update_channel_dev),
+                    supporting = stringResource(if (stable) R.string.settings_update_channel_stable_hint else R.string.settings_update_channel_dev_hint),
+                    selected = updateChannel == channel,
+                    tag = "settings_update_channel_${channel.name}",
+                    enabled = !isChecking,
+                    leading = {
+                        Icon(painterResource(if (stable) R.drawable.v2_check else R.drawable.v2_flask_conical),
+                            contentDescription = null, modifier = Modifier.size(21.dp))
+                    },
+                    onClick = {
+                        onUpdateChannelChange(channel)
+                        updateResult = null
+                    },
+                )
+            }
         }
-        Text(
-            stringResource(
-                if (updateChannel == UpdateChannel.Dev) R.string.settings_update_channel_dev_hint
-                else R.string.settings_update_channel_stable_hint,
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Button(
             onClick = {
                 if (!isChecking) {
@@ -1103,7 +1079,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                     SettingsTextField(
                         value = serverUrl,
                         onValueChange = onServerUrlChange,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("primary-server-url"),
                         label = { Text(strings.common.fieldServerUrl) },
                         placeholder = { Text(strings.settings.serverUrlPlaceholder) },
                         singleLine = true,
@@ -1251,7 +1227,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                     SettingsTextField(
                         value = defaultImportMinStockText,
                         onValueChange = onDefaultImportMinStockChange,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("import-min-stock"),
                         label = { Text(strings.common.fieldMinimumStock) },
                         singleLine = true,
                     )
@@ -1356,7 +1332,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.settingsSectionDetail
                                 AppLanguage.English -> strings.settings.languageEnglish
                             }
                             AppearanceChoice(label, appLanguage == language, "settings_language_${language.name}",
-                                leading = { Icon(Icons.Outlined.Translate, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                leading = { Icon(painterResource(R.drawable.v2_languages), contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = { onAppLanguageChange(language) },
                             )
                         }
@@ -1417,29 +1393,39 @@ private fun SettingsAppearancePane(onSelectSection: (SettingsSection) -> Unit) {
     val appearance = LocalAppearance.current
     val strings = vaultStrings()
     val darkTheme = appearance.isDarkTheme()
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        SettingsSectionCard(
-            title = SettingsSection.Theme.title(strings),
-            supporting = SettingsSection.Theme.listSupporting(),
-            icon = SettingsSection.Theme.icon(),
-            selected = false,
-            summary = stringResource(appearance.mode.label()),
-            onClick = { onSelectSection(SettingsSection.Theme) },
-            modifier = Modifier.testTag("appearance_open_theme"),
-        )
-        SettingsRowDivider(compact = false)
-        SettingsSectionCard(
-            title = SettingsSection.Accent.title(strings),
-            supporting = SettingsSection.Accent.listSupporting(),
-            icon = SettingsSection.Accent.icon(),
-            selected = false,
-            summary = stringResource(appearance.accent.label()),
-            summarySwatch = vaultAccentColors(appearance.accent, darkTheme).primary,
-            onClick = { onSelectSection(SettingsSection.Accent) },
-            modifier = Modifier.testTag("appearance_open_accent"),
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            SettingsSectionCard(
+                title = SettingsSection.Theme.title(strings),
+                supporting = SettingsSection.Theme.listSupporting(),
+                icon = SettingsSection.Theme.icon(),
+                selected = false,
+                summary = stringResource(appearance.mode.label()),
+                onClick = { onSelectSection(SettingsSection.Theme) },
+                modifier = Modifier.testTag("appearance_open_theme"),
+            )
+            SettingsRowDivider(compact = false)
+            SettingsSectionCard(
+                title = SettingsSection.Accent.title(strings),
+                supporting = SettingsSection.Accent.listSupporting(),
+                icon = SettingsSection.Accent.icon(),
+                selected = false,
+                summary = stringResource(appearance.accent.label()),
+                summarySwatch = vaultAccentColors(appearance.accent, darkTheme).primary,
+                onClick = { onSelectSection(SettingsSection.Accent) },
+                modifier = Modifier.testTag("appearance_open_accent"),
+            )
+        }
+        Text(
+            text = stringResource(R.string.appearance_stock_color_note),
+            modifier = Modifier.fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(15.dp))
+                .padding(horizontal = 15.dp, vertical = 13.dp),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -1448,15 +1434,21 @@ private fun SettingsAppearancePane(onSelectSection: (SettingsSection) -> Unit) {
 private fun ThemeChoices() {
     val appearance = LocalAppearance.current
     val change = LocalOnAppearanceChange.current
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.selectableGroup()) {
         AppearanceMode.entries.forEach { mode ->
             val icon = when (mode) {
-                AppearanceMode.System -> Icons.Outlined.Brightness6
-                AppearanceMode.Light -> Icons.Outlined.LightMode
-                AppearanceMode.Dark -> Icons.Outlined.DarkMode
+                AppearanceMode.System -> R.drawable.v2_sun_moon
+                AppearanceMode.Light -> R.drawable.v2_sun
+                AppearanceMode.Dark -> R.drawable.v2_moon
+            }
+            val description = when (mode) {
+                AppearanceMode.System -> R.string.appearance_system_description
+                AppearanceMode.Light -> R.string.appearance_light_description
+                AppearanceMode.Dark -> R.string.appearance_dark_description
             }
             AppearanceChoice(stringResource(mode.label()), appearance.mode == mode, "appearance_mode_${mode.name}",
-                leading = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                supporting = stringResource(description),
+                leading = { Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(20.dp)) },
                 onClick = { change(appearance.copy(mode = mode)) },
             )
         }
@@ -1468,10 +1460,16 @@ private fun AccentChoices() {
     val appearance = LocalAppearance.current
     val change = LocalOnAppearanceChange.current
     val darkTheme = appearance.isDarkTheme()
-    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.selectableGroup()) {
         AppearanceAccent.entries.forEach { accent ->
             val color = vaultAccentColors(accent, darkTheme).primary
+            val description = when (accent) {
+                AppearanceAccent.Teal -> R.string.appearance_teal_description
+                AppearanceAccent.Blue -> R.string.appearance_blue_description
+                AppearanceAccent.Sand -> R.string.appearance_sand_description
+            }
             AppearanceChoice(stringResource(accent.label()), appearance.accent == accent, "appearance_accent_${accent.name}",
+                supporting = stringResource(description),
                 leading = { Box(Modifier.size(27.dp).background(color, CircleShape)) },
                 onClick = { change(appearance.copy(accent = accent)) },
             )
@@ -1484,6 +1482,8 @@ private fun AppearanceChoice(
     label: String,
     selected: Boolean,
     tag: String,
+    supporting: String? = null,
+    enabled: Boolean = true,
     leading: @Composable () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -1491,19 +1491,25 @@ private fun AppearanceChoice(
     androidx.compose.material3.Surface(
         shape = RoundedCornerShape(15.dp),
         color = if (selected) colors.primaryContainer else colors.background,
-        contentColor = if (selected) colors.onPrimaryContainer else colors.onSurface,
+        contentColor = if (selected) colors.primary else colors.onSurface,
     ) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 65.dp).testTag(tag)
-                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+                .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             leading()
-            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            if (selected) Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(label, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.5.sp),
+                    fontWeight = FontWeight.Medium)
+                supporting?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                        color = colors.onSurfaceVariant)
+                }
+            }
+            if (selected) Icon(painterResource(R.drawable.v2_check), contentDescription = null, modifier = Modifier.size(21.dp))
         }
     }
 }
@@ -1534,26 +1540,55 @@ internal fun SettingsTextField(
     supportingText: (@Composable () -> Unit)? = null,
     singleLine: Boolean = false,
     minLines: Int = 1,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    isError: Boolean = false,
     visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     val colors = MaterialTheme.colorScheme
-    TextField(
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(13.dp)
+    val labelStyle = MaterialTheme.typography.bodySmall.copy(color = colors.onSurfaceVariant)
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier,
-        label = label,
-        placeholder = placeholder,
-        supportingText = supportingText,
+        modifier = modifier.fillMaxWidth(),
+        enabled = enabled,
+        readOnly = readOnly,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
         singleLine = singleLine,
         minLines = minLines,
         visualTransformation = visualTransformation,
-        shape = RoundedCornerShape(15.dp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = colors.surfaceVariant,
-            unfocusedContainerColor = colors.surface,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-        ),
+        interactionSource = interaction,
+        cursorBrush = SolidColor(colors.primary),
+        decorationBox = { input ->
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                CompositionLocalProvider(LocalTextStyle provides labelStyle) { label() }
+                Box(
+                    Modifier.fillMaxWidth()
+                        .heightIn(min = if (minLines > 1) 92.dp else 49.dp)
+                        .background(colors.surface, shape)
+                        .border(1.dp, when {
+                            isError -> colors.error
+                            focused -> colors.primary
+                            else -> colors.outlineVariant
+                        }, shape)
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    contentAlignment = if (minLines > 1) Alignment.TopStart else Alignment.CenterStart,
+                ) {
+                    if (value.isEmpty() && placeholder != null) {
+                        CompositionLocalProvider(LocalTextStyle provides labelStyle) { placeholder() }
+                    }
+                    input()
+                }
+                if (supportingText != null) {
+                    CompositionLocalProvider(
+                        LocalTextStyle provides labelStyle.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                    ) { supportingText() }
+                }
+            }
+        },
     )
 }
 

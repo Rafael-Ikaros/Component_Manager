@@ -21,9 +21,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,7 +34,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -48,7 +44,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -222,42 +220,33 @@ internal fun ComponentVaultAppShellContent(
     }
     val title = settingsDetail?.title(strings) ?: strings.shell.destinationLabel(destination)
     val colors = MaterialTheme.colorScheme
-    val isFirstPhasePage = destination == InventoryDestination.Inventory || destination == InventoryDestination.Settings
     val caption = when {
+        settingsDetail != null -> settingsDetail.caption()
         destination == InventoryDestination.Inventory && uiState.inventory.isLoaded -> {
             val count = uiState.inventory.totalComponentCount
             pluralStringResource(R.plurals.shell_local_inventory_count, count, count)
         }
-        destination == InventoryDestination.Settings && settingsDetail == null ->
+        destination == InventoryDestination.Settings ->
             stringResource(R.string.shell_settings_local_first)
+        destination == InventoryDestination.Overview ->
+            stringResource(if (uiState.syncConfiguration.serverBaseUrl.isBlank() ||
+                uiState.syncConfiguration.apiToken.isBlank()) R.string.v2_overview_offline
+                else R.string.appearance_sync_configured)
+        destination == InventoryDestination.Movements -> stringResource(R.string.v2_records_caption)
         else -> null
     }
     val effectiveSnackbarHostState = snackbarHostState ?: remember { SnackbarHostState() }
     val destinationStateHolder = rememberSaveableStateHolder()
 
     val topBar: @Composable () -> Unit = {
-        if (isFirstPhasePage) {
-            VaultScreenHeader(
-                title = title,
-                caption = caption,
-                onBack = onBackFromSettingsSection.takeIf { settingsDetail != null },
-                actions = {
-                    if (uiState.isBusy) CircularProgressIndicator(
-                        Modifier.size(20.dp), strokeWidth = 2.dp,
-                    )
-                },
-            )
-        } else {
-            TopAppBar(
-                title = { Text(title) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background),
-                actions = {
-                    if (uiState.isBusy) CircularProgressIndicator(
-                        Modifier.padding(end = 8.dp).size(20.dp), strokeWidth = 2.dp,
-                    )
-                },
-            )
-        }
+        VaultScreenHeader(
+            title = title,
+            caption = caption,
+            onBack = onBackFromSettingsSection.takeIf { settingsDetail != null },
+            actions = {
+                if (uiState.isBusy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            },
+        )
     }
 
     val adaptiveNavigationType = NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
@@ -307,7 +296,7 @@ internal fun ComponentVaultAppShellContent(
                                     .heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(15.dp),
                             ) {
-                                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(painterResource(R.drawable.v2_plus), contentDescription = null, modifier = Modifier.size(17.dp))
                                 Text(stringResource(R.string.shell_add_import), Modifier.padding(start = 6.dp))
                             }
                         }
@@ -320,7 +309,7 @@ internal fun ComponentVaultAppShellContent(
                     ExtendedFloatingActionButton(
                         onClick = onAddComponent,
                         text = { Text(stringResource(R.string.shell_add_import)) },
-                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        icon = { Icon(painterResource(R.drawable.v2_plus), contentDescription = null) },
                         containerColor = colors.primary,
                         contentColor = colors.onPrimary,
                     )
@@ -369,6 +358,7 @@ internal fun ComponentVaultAppShellContent(
                         onOpenLowStockInventory = onOpenLowStockInventory,
                         onSelectOverviewComponent = onSelectOverviewComponent,
                         onOpenMovements = onOpenMovements,
+                        onOpenInventory = { onDestinationChange(InventoryDestination.Inventory) },
                         onSelectMovement = onSelectMovement,
                         onOpenMovementDetail = onOpenMovementDetail,
                         onOpenSettings = onOpenSettingsHome,
@@ -390,24 +380,27 @@ internal fun VaultScreenHeader(
     actions: @Composable () -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
-    val strings = vaultStrings()
+    val narrow = LocalConfiguration.current.screenWidthDp <= 340
+    val edge = if (narrow) 15.dp else 21.dp
     Row(
         Modifier.fillMaxWidth().background(colors.background)
             .windowInsetsPadding(TopAppBarDefaults.windowInsets)
-            .padding(start = if (onBack == null) 18.dp else 8.dp, end = 18.dp)
-            .heightIn(min = 64.dp).padding(vertical = 8.dp),
+            .padding(start = if (onBack == null) edge else edge - 11.dp, end = edge,
+                top = if (narrow) 15.dp else 16.dp, bottom = if (narrow) 17.dp else 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
             IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.common.actionBack,
-                    modifier = Modifier.size(18.dp), tint = colors.primary)
+                Icon(painterResource(R.drawable.v2_arrow_left), contentDescription = stringResource(R.string.action_back),
+                    modifier = Modifier.size(16.dp), tint = colors.primary)
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = VaultPageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, style = if (narrow) VaultPageTitle.copy(fontSize = 24.sp, lineHeight = 30.sp)
+                else VaultPageTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (caption != null) {
-                Text(caption, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 17.sp),
+                Text(caption, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
                     color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -423,7 +416,10 @@ private fun VaultBottomNavigation(
     val colors = MaterialTheme.colorScheme
     val strings = vaultStrings()
     HorizontalDivider(color = colors.outlineVariant)
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).selectableGroup()) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 4.dp).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         InventoryDestination.entries.forEach { item ->
             val selected = destination == item
             val label = strings.shell.destinationLabel(item)
@@ -433,7 +429,7 @@ private fun VaultBottomNavigation(
                     .selectable(selected, role = Role.Tab, onClick = { onDestinationChange(item) })
                     .semantics { contentDescription = label },
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Box(
                     Modifier.widthIn(max = 62.dp).fillMaxWidth().heightIn(min = 31.dp)
@@ -441,9 +437,15 @@ private fun VaultBottomNavigation(
                             RoundedCornerShape(18.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(item.icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = tint)
+                    val icon = when (item) {
+                        InventoryDestination.Overview -> R.drawable.v2_home
+                        InventoryDestination.Inventory -> R.drawable.v2_boxes
+                        InventoryDestination.Movements -> R.drawable.v2_arrow_left_right
+                        InventoryDestination.Settings -> R.drawable.v2_sliders_horizontal
+                    }
+                    Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp), tint = tint)
                 }
-                Text(label, color = tint, style = MaterialTheme.typography.labelMedium,
+                Text(label, color = tint, style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -494,6 +496,7 @@ private fun ShellContent(
     onOpenSyncSettings: () -> Unit,
     settingsContent: @Composable (PaddingValues) -> Unit,
     onDetailAction: ((String, InventoryDetailAction) -> Unit)?,
+    onOpenInventory: () -> Unit,
 ) {
     when (destination) {
         InventoryDestination.Inventory -> InventoryContent(
@@ -519,6 +522,7 @@ private fun ShellContent(
             onQuickMovement = onQuickMovement,
             onDetailAction = onDetailAction,
             onRecordMovement = { componentId -> onRecordMovement(componentId) },
+            lowStockCount = uiState.overview.lowStockCount,
         )
 
         InventoryDestination.Movements -> MovementsContent(
@@ -542,6 +546,8 @@ private fun ShellContent(
             onSearchInventoryBySku = onSearchInventoryBySku,
             onImportComponent = onImportComponent,
             onRecordMovement = { onRecordMovement(uiState.inventory.list.selectedComponentId) },
+            onOpenInventory = onOpenInventory,
+            storageLocations = uiState.inventory.storageLocations,
         )
 
         InventoryDestination.Overview -> OverviewContent(
@@ -556,6 +562,7 @@ private fun ShellContent(
             onSelectMovement = { movementId -> onOpenMovements(movementId) },
             onOpenSettings = onOpenSettings,
             onOpenSyncSettings = onOpenSyncSettings,
+            onOpenInventory = onOpenInventory,
         )
 
         InventoryDestination.Settings -> settingsContent(contentPadding)

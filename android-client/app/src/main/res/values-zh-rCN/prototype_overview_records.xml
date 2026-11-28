@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="v2_overview_parts">元件种类</string>
+    <string name="v2_overview_quantity">当前总数量</string>
+    <string name="v2_overview_attention">需要留意</string>
+    <string name="v2_overview_recent">最近操作</string>
+    <string name="v2_overview_low_stock_caption">%1$s · 当前 %2$d / 最低 %3$d</string>
+    <string name="v2_overview_view_records">查看记录（%1$d）</string>
+    <string name="v2_overview_open_inventory">打开库存目录</string>
+    <string name="v2_records_empty">还没有库存记录</string>
+    <string name="v2_records_empty_note">确认入库、出库或转移后，记录会显示在这里。</string>
+    <string name="v2_records_find_component">查找元件</string>
+    <string name="v2_log_transfer">转移 %1$d</string>
+</resources>

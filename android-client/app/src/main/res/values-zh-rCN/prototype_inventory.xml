@@ -1,0 +1,24 @@
+<resources>
+    <string name="v2_overview_offline">本地仓库 · 可离线使用</string>
+    <string name="v2_records_caption">入库、出库与转移流水</string>
+    <string name="v2_restore_stock">恢复库存备份</string>
+    <string name="v2_restore_stock_summary">选择 Excel 工作簿，预览后合并</string>
+    <string name="v2_manual_entry">手工录入</string>
+    <string name="v2_manual_entry_summary">没有供应商料号也可录入</string>
+    <string name="v2_add_caption">入库、项目用料与库存恢复</string>
+    <string name="v2_component_actions">元件操作</string>
+    <string name="v2_inbound_hint">选择库位、数量与原因</string>
+    <string name="v2_outbound_hint">按库位可用量复核</string>
+    <string name="v2_transfer_hint">总库存保持不变</string>
+    <string name="v2_delete_hint">确认后删除这项元件</string>
+    <string name="v2_label_action">生成元件标签</string>
+    <string name="v2_edit_action">编辑资料</string>
+    <string name="v2_photo_loading">正在载入照片</string>
+    <string name="v2_photo_available">元件照片</string>
+    <string name="v2_photo_missing">没有照片 · 使用缺图占位</string>
+    <string name="v2_photo_edit">编辑元件照片</string>
+    <string name="v2_confirm_inbound">确认入库</string>
+    <string name="v2_confirm_outbound">确认出库</string>
+    <string name="v2_confirm_transfer">确认转移</string>
+    <string name="v2_movement_choose_location">选择库位与数量</string>
+</resources>

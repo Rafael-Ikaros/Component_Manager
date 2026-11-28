@@ -24,8 +24,8 @@ internal enum class SettingsSection {
 
 @Composable
 internal fun SettingsSection.title(strings: ComponentVaultStrings): String = when (this) {
-    SettingsSection.Sync -> strings.settings.connectionTitle
-    SettingsSection.ImportAndOcr -> strings.settings.importPreferencesTitle
+    SettingsSection.Sync -> stringResource(R.string.appearance_sync_title)
+    SettingsSection.ImportAndOcr -> stringResource(R.string.appearance_import_title)
     SettingsSection.App -> strings.settings.languageTitle
     SettingsSection.Feedback -> stringResource(R.string.feedback_title)
     SettingsSection.About -> stringResource(R.string.appearance_about_updates)
@@ -35,10 +35,11 @@ internal fun SettingsSection.title(strings: ComponentVaultStrings): String = whe
 }
 
 @Composable
-internal fun SettingsSection.listTitle(strings: ComponentVaultStrings): String = when (this) {
-    SettingsSection.Sync -> stringResource(R.string.appearance_sync_title)
-    SettingsSection.ImportAndOcr -> stringResource(R.string.appearance_import_title)
-    else -> title(strings)
+internal fun SettingsSection.caption(): String? = when (this) {
+    SettingsSection.Appearance -> stringResource(R.string.appearance_header_caption)
+    SettingsSection.ImportAndOcr -> stringResource(R.string.appearance_import_caption)
+    SettingsSection.Feedback -> stringResource(R.string.v2_feedback_caption)
+    else -> null
 }
 
 @Composable

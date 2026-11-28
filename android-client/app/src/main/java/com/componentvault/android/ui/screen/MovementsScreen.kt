@@ -1,6 +1,19 @@
 package com.componentvault.android.ui.screen
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import com.componentvault.android.model.StorageLocationRecord
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -129,6 +142,8 @@ internal fun MovementsContent(
     onSearchInventoryBySku: (String) -> Unit,
     onImportComponent: () -> Unit,
     onRecordMovement: () -> Unit,
+    storageLocations: List<StorageLocationRecord> = emptyList(),
+    onOpenInventory: (() -> Unit)? = null,
 ) {
     var includeDeletedComponents by rememberSaveable { mutableStateOf(false) }
     val visibleItems = visibleMovementsForActiveComponents(uiState.items, uiState.activeComponentIds, includeDeletedComponents)
@@ -188,6 +203,8 @@ internal fun MovementsContent(
                         onSearchInventoryBySku = onSearchInventoryBySku,
                         onImportComponent = onImportComponent,
                         onRecordMovement = onRecordMovement,
+                        storageLocations = storageLocations,
+                        onOpenInventory = onOpenInventory,
                     )
                 }
             },
@@ -205,7 +222,7 @@ internal fun MovementsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding),
-            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 16.dp),
+            contentPadding = rememberContentPadding(contentPadding, horizontal = 18.dp, vertical = 0.dp, bottom = 18.dp),
             uiState = visibleState,
             hiddenDeletedCount = hiddenDeletedCount,
             includeDeletedComponents = includeDeletedComponents,
@@ -229,6 +246,8 @@ internal fun MovementsContent(
             onSearchInventoryBySku = onSearchInventoryBySku,
             onImportComponent = onImportComponent,
             onRecordMovement = onRecordMovement,
+            storageLocations = storageLocations,
+            onOpenInventory = onOpenInventory,
         )
     }
 }
@@ -354,13 +373,15 @@ private fun MovementMasterPane(
     onSearchInventoryBySku: (String) -> Unit,
     onImportComponent: () -> Unit,
     onRecordMovement: () -> Unit,
+    storageLocations: List<StorageLocationRecord>,
+    onOpenInventory: (() -> Unit)?,
 ) {
     val strings = vaultStrings()
 
     LazyColumn(
         modifier = modifier.testTag("movements_master_list"),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
             MovementQuickEntryPane(
@@ -411,14 +432,15 @@ private fun MovementMasterPane(
         }
 
         if (uiState.items.isEmpty()) {
-            item {
-                EmptyPane(strings.common.emptyNoMovements)
-            }
+            item { RecordsEmpty(onOpenInventory) }
+
         } else {
             items(uiState.items, key = { it.id }) { movement ->
-                MovementHistoryRow(
+                VaultMovementLogRow(
                     movement = movement,
                     selected = movement.id == uiState.selectedMovementId,
+                    storageLocations = storageLocations,
+                    showDivider = movement.id != uiState.items.lastOrNull()?.id,
                     componentDeleted = uiState.activeComponentIds?.let { movement.componentId !in it } == true,
                     onClick = { onSelectMovement(movement.id) },
                 )
@@ -446,21 +468,18 @@ private fun MovementQuickEntryPane(
         strings.movements.quickScanAction
     }
 
-    SectionPane(
-        title = strings.movements.recordTitle,
-        supporting = strings.movements.recordSubtitle,
-    ) {
-        FilledTonalButton(
-            onClick = onScanMovementLabel,
-            modifier = Modifier.fillMaxWidth(),
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(scanActionLabel)
-        }
-        OutlinedButton(
-            onClick = onRecordMovement,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(strings.movements.quickManualAction)
+            FilledTonalButton(onClick = onScanMovementLabel,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(15.dp)) {
+                Text(scanActionLabel, textAlign = TextAlign.Center)
+            }
+            TextButton(onClick = onRecordMovement, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                Text(strings.movements.quickManualAction, textAlign = TextAlign.Center)
+            }
         }
 
         when {
@@ -805,6 +824,71 @@ private fun MovementDetailPane(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RecordsEmpty(onOpenInventory: (() -> Unit)?) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 37.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(Icons.Outlined.History, contentDescription = null, modifier = Modifier.size(35.dp),
+            tint = colors.onSurfaceVariant)
+        Text(stringResource(R.string.v2_records_empty), Modifier.padding(top = 13.dp, bottom = 7.dp),
+            fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.v2_records_empty_note), fontSize = 13.sp, lineHeight = 19.sp,
+            color = colors.onSurfaceVariant, textAlign = TextAlign.Center)
+        if (onOpenInventory != null) {
+            Button(onClick = onOpenInventory, modifier = Modifier.padding(top = 18.dp).heightIn(min = 48.dp),
+                shape = RoundedCornerShape(15.dp)) {
+                Text(stringResource(R.string.v2_records_find_component))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun VaultMovementLogRow(
+    movement: StockMovementRecord,
+    storageLocations: List<StorageLocationRecord>,
+    onClick: (() -> Unit)? = null,
+    selected: Boolean = false,
+    componentDeleted: Boolean = false,
+    showDivider: Boolean = true,
+) {
+    val strings = vaultStrings()
+    val colors = MaterialTheme.colorScheme
+    val transfer = movement.movementType.equals("transfer", ignoreCase = true)
+    val source = movement.locationId?.let { displayLocationName(it, storageLocations, "") }.orEmpty()
+    val destination = movement.destinationLocationId?.let { displayLocationName(it, storageLocations, "") }.orEmpty()
+    val location = listOf(source, destination).filter { it.isNotBlank() }.joinToString(" → ")
+    val reason = movement.reason.ifBlank { strings.common.labelNoReasonRecorded }
+    val quantity = if (transfer) stringResource(R.string.v2_log_transfer, movement.quantity)
+        else formatMovementQuantity(movement.quantityChange)
+    Surface(color = if (selected) colors.primaryContainer else colors.background) {
+        Column(Modifier.fillMaxWidth().then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))) {
+            Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(movement.componentName.ifBlank { movement.componentSku }, Modifier.weight(1f),
+                        fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
+                    Text(quantity, fontSize = 14.sp, lineHeight = 21.sp,
+                        color = if (movement.quantityChange > 0) colors.primary else colors.onSurface)
+                }
+                val metadata = listOf(location, reason).filter { it.isNotBlank() }.joinToString(" · ")
+                Text(metadata, fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariant)
+                val timestamp = formatShortLocalTimestamp(movement.happenedAt)
+                val kind = movementTypeLabel(movement.movementType)
+                Text("$timestamp · $kind", fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariant)
+                if (movement.note.isNotBlank()) Text(movement.note, fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariant)
+                if (componentDeleted) {
+                    Text(stringResource(R.string.movements_deleted_component), fontSize = 12.sp,
+                        lineHeight = 18.sp, color = colors.onSurfaceVariant)
+                }
+            }
+            if (showDivider) HorizontalDivider(color = colors.outlineVariant)
         }
     }
 }

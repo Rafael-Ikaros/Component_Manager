@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prototype_movement_review">Review movement</string>
+    <string name="prototype_movement_confirm">Confirm movement</string>
+    <string name="prototype_movement_kind">Movement type</string>
+    <string name="prototype_movement_paid">Purchase total (CNY)</string>
+    <string name="prototype_movement_review_hint">Check the locations and quantity. Inventory changes only after you confirm.</string>
+</resources>

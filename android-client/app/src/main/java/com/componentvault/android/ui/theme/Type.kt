@@ -9,6 +9,7 @@ internal val VaultPageTitle = TextStyle(
     fontWeight = FontWeight.Medium,
     fontSize = 27.sp,
     lineHeight = 34.sp,
+    letterSpacing = (-0.5).sp,
 )
 
 // TextStyle uses the Android default font family and sp follows system font scaling.

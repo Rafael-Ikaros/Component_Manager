@@ -91,7 +91,7 @@ class SettingsAdaptiveDraftUiTest {
                 }
             }
         }
-        compose.onNodeWithText(context.getString(R.string.field_server_url))
+        compose.onNodeWithTag("primary-server-url")
             .performTextReplacement("https://draft.example")
         val groups = compose.onNodeWithTag("settings_group_list")
         val details = compose.onNodeWithTag("settings_detail_list")
@@ -100,13 +100,13 @@ class SettingsAdaptiveDraftUiTest {
             groups.performScrollToNode(hasTestTag(tag))
             compose.onNodeWithTag(tag).performClick()
         }
-        val minStockLabel = context.getString(R.string.field_minimum_stock)
         select(SettingsSection.ImportAndOcr)
-        details.performScrollToNode(hasText(minStockLabel))
-        compose.onNodeWithText(minStockLabel).performTextReplacement("17")
+        details.performScrollToNode(hasTestTag("import-min-stock"))
+        compose.onNodeWithTag("import-min-stock").performTextReplacement("17")
         select(SettingsSection.Appearance)
         compose.onNodeWithTag("appearance_open_theme").performClick()
-        compose.onNodeWithTag("appearance_mode_Dark").performClick()
+        details.performScrollToNode(hasTestTag("appearance_mode_Dark"))
+        compose.onNodeWithTag("appearance_mode_Dark").assertIsDisplayed().performClick()
         select(SettingsSection.Appearance)
         compose.onNodeWithTag("appearance_open_accent").performClick()
         details.performScrollToNode(hasTestTag("appearance_accent_Blue"))

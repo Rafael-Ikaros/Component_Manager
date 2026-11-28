@@ -44,9 +44,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -80,9 +77,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.componentvault.android.ui.theme.LocalVaultWarning
@@ -188,6 +187,7 @@ internal fun InventoryContent(
     onBatchTransfer: BatchTransferAction? = null,
     onQuickMovement: QuickMovementAction? = null,
     onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
+    lowStockCount: Int? = null,
 ) {
     val density = LocalDensity.current
     val imeOccludesBottom = WindowInsets.isImeVisible &&
@@ -252,10 +252,13 @@ internal fun InventoryContent(
                                 }
                             },
                             onOpenBluetoothPrint = onOpenBluetoothPrint,
+                            onEditFromList = onEditComponent,
+                            onLabelFromList = onGenerateLabel,
                             onPrintSelectedComponents = onPrintSelectedComponents,
                             onRequestDeleteComponent = onRequestDeleteComponent,
                             onBatchTransfer = onBatchTransfer,
                             onQuickMovement = onQuickMovement,
+                            lowStockCount = lowStockCount,
                         )
                     }
                 },
@@ -288,7 +291,8 @@ internal fun InventoryContent(
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding)
                 .imePadding(),
-            contentPadding = rememberContentPadding(contentPadding, horizontal = 16.dp, vertical = 8.dp,
+            contentPadding = rememberContentPadding(contentPadding,
+                horizontal = if (LocalConfiguration.current.screenWidthDp <= 340) 7.dp else 10.dp, vertical = 0.dp,
                 bottom = if (imeOccludesBottom) 0.dp else 12.dp),
             uiState = uiState,
             statusMessage = statusMessage,
@@ -308,10 +312,14 @@ internal fun InventoryContent(
                 onOpenComponentDetail(componentId)
             },
             onOpenBluetoothPrint = onOpenBluetoothPrint,
+            onEditFromList = onEditComponent,
+            onLabelFromList = onGenerateLabel,
             onPrintSelectedComponents = onPrintSelectedComponents,
             onRequestDeleteComponent = onRequestDeleteComponent,
             onBatchTransfer = onBatchTransfer,
             onQuickMovement = onQuickMovement,
+            lowStockCount = lowStockCount,
+            controlsInset = if (LocalConfiguration.current.screenWidthDp <= 340) 8.dp else 9.dp,
         )
     }
 }
@@ -331,33 +339,11 @@ internal fun InventoryDetailRoute(
     onRecordMovement: (String) -> Unit,
     onAddComponent: () -> Unit,
     onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
+    onEditPhoto: ((String) -> Unit)? = null,
 ) {
     val strings = vaultStrings()
-    var actionsExpanded by rememberSaveable(component?.id) { mutableStateOf(false) }
-
     Scaffold(
-        topBar = {
-            VaultScreenHeader(
-                title = strings.inventory.selectedComponentTitle,
-                onBack = onDismiss,
-                actions = {
-                    Box {
-                        IconButton(onClick = { actionsExpanded = true }) {
-                            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions),
-                                modifier = Modifier.size(18.dp))
-                        }
-                        DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
-                            DropdownMenuItem(text = { Text(strings.common.actionImport) },
-                                onClick = { actionsExpanded = false; onAddComponent() })
-                            if (component != null && onDetailAction != null) {
-                                DropdownMenuItem(text = { Text(strings.common.actionRecordMovement) },
-                                    onClick = { actionsExpanded = false; onRecordMovement(component.id) })
-                            }
-                        }
-                    }
-                },
-            )
-        },
+        topBar = { VaultScreenHeader(title = strings.inventory.selectedComponentTitle, onBack = onDismiss) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         InventoryDetailPane(
@@ -371,13 +357,15 @@ internal fun InventoryDetailRoute(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(padding),
-            contentPadding = rememberContentPadding(padding, horizontal = 18.dp, vertical = 8.dp),
+            contentPadding = rememberContentPadding(padding, horizontal = 18.dp, vertical = 0.dp),
             onEditComponent = onEditComponent,
             onGenerateLabel = onGenerateLabel,
             onRequestDeleteComponent = onRequestDeleteComponent,
             onRecordMovement = onRecordMovement,
             onDetailAction = onDetailAction,
             showMovementShortcut = false,
+            onEditPhoto = onEditPhoto,
+            onAddComponent = onAddComponent,
         )
     }
 }
@@ -405,6 +393,10 @@ private fun InventoryListPane(
     onRequestDeleteComponent: (String) -> Unit,
     onBatchTransfer: BatchTransferAction?,
     onQuickMovement: QuickMovementAction?,
+    onEditFromList: (String) -> Unit,
+    onLabelFromList: (String) -> Unit,
+    lowStockCount: Int? = null,
+    controlsInset: Dp = 0.dp,
 ) {
     val strings = vaultStrings()
     val diagnostic = inventoryDiagnosticFields(uiState)
@@ -433,7 +425,7 @@ private fun InventoryListPane(
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
-            Column(modifier = Modifier.padding(bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(modifier = Modifier.padding(horizontal = controlsInset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 InventoryFilterHeader(
                     uiState = uiState,
                     statusMessage = statusMessage,
@@ -442,32 +434,33 @@ private fun InventoryListPane(
                     onCategoryChange = onCategoryChange,
                     onLocationChange = onLocationChange,
                     onSortChange = onSortChange,
+                    lowStockCount = lowStockCount,
                 )
                 FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 49.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.inventory_ui_result_count, uiState.list.items.size),
                         modifier = Modifier.align(Alignment.CenterVertically),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if ((onBatchTransfer != null || onPrintSelectedComponents != null) && !selecting) {
                         TextButton(onClick = { selecting = true }) {
-                            Text(stringResource(R.string.inventory_ui_select))
+                            Text(stringResource(R.string.inventory_ui_select), fontSize = 13.sp)
                         }
                     }
                     if (!selecting) {
                         TextButton(onClick = onScanInventory) {
-                            Text(stringResource(R.string.location_qr_scan))
+                            Text(stringResource(R.string.location_qr_scan), fontSize = 13.sp)
                         }
                     }
                     if (!selecting) {
                         Box {
                             IconButton(onClick = { actionsExpanded = true }) {
-                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions),
+                                Icon(painterResource(R.drawable.v2_ellipsis_vertical), contentDescription = stringResource(R.string.inventory_ui_more_actions),
                                 modifier = Modifier.size(18.dp))
                             }
                             DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
@@ -531,6 +524,8 @@ private fun InventoryListPane(
                     onOutbound = if (onQuickMovement == null || selecting) null else ({ quickMovement = item to false }),
                     onTransfer = if (onBatchTransfer == null || selecting) null else ({ quickTransferItem = item }),
                     onDelete = if (selecting) null else ({ onRequestDeleteComponent(item.id) }),
+                    onEdit = if (selecting) null else ({ onEditFromList(item.id) }),
+                    onLabel = if (selecting) null else ({ onLabelFromList(item.id) }),
                 )
             }
         }
@@ -566,6 +561,7 @@ internal fun InventoryFilterHeader(
     onCategoryChange: (String?) -> Unit,
     onLocationChange: (String?) -> Unit,
     onSortChange: (InventorySortOption) -> Unit,
+    lowStockCount: Int? = null,
 ) {
     val strings = vaultStrings()
     val focusManager = LocalFocusManager.current
@@ -574,7 +570,7 @@ internal fun InventoryFilterHeader(
     val searchFocused by searchInteraction.collectIsFocusedAsState()
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         BasicTextField(
             modifier = Modifier.fillMaxWidth().testTag("inventory_search")
@@ -588,11 +584,11 @@ internal fun InventoryFilterHeader(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
             decorationBox = { field ->
-                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                Surface(shape = RoundedCornerShape(17.dp), color = MaterialTheme.colorScheme.surfaceVariant,
                     border = if (searchFocused) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 12.dp, end = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(painterResource(R.drawable.v2_search), contentDescription = null, modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Box(Modifier.weight(1f).padding(vertical = 12.dp)) {
                             if (uiState.filters.query.isEmpty()) Text(searchLabel,
@@ -602,7 +598,7 @@ internal fun InventoryFilterHeader(
                         }
                         if (uiState.filters.query.isNotBlank()) {
                             IconButton(onClick = { onQueryChange("") }) {
-                                Icon(Icons.Outlined.Clear, contentDescription = stringResource(R.string.inventory_ui_clear_search))
+                                Icon(painterResource(R.drawable.v2_x), contentDescription = stringResource(R.string.inventory_ui_clear_search))
                             }
                         }
                     }
@@ -612,7 +608,7 @@ internal fun InventoryFilterHeader(
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("inventory_filter_bar"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             InventoryFilterButton(
                 value = strings.inventory.filterAll,
@@ -623,6 +619,7 @@ internal fun InventoryFilterHeader(
                 value = strings.inventory.filterLowStock,
                 selected = uiState.filters.stockFilter == InventoryStockFilter.LowStock,
                 warning = true,
+                count = lowStockCount,
                 onClick = { onStockFilterChange(InventoryStockFilter.LowStock) },
             )
             InventoryDropdownFilters(
@@ -757,6 +754,7 @@ private fun InventoryFilterButton(
     modifier: Modifier = Modifier,
     dropdown: Boolean = false,
     warning: Boolean = false,
+    count: Int? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val warningColors = LocalVaultWarning.current
@@ -779,7 +777,8 @@ private fun InventoryFilterButton(
         ) {
             Text(value, modifier = if (dropdown) Modifier.weight(1f, fill = false) else Modifier,
                 style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (dropdown) Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null,
+            if (count != null) Text(count.toString(), style = MaterialTheme.typography.bodySmall)
+            if (dropdown) Icon(painterResource(R.drawable.v2_chevron_down), contentDescription = null,
                 modifier = Modifier.size(14.dp))
         }
     }
@@ -792,6 +791,7 @@ private fun FilterMenuItemText(value: String) {
 
 private val detailPhotoReferenceLine = Regex("本地图片：[0-9a-f]{64}\\.(?:png|jpg)")
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun InventoryDetailPane(
     detail: InventoryDetailUiState,
@@ -804,6 +804,8 @@ internal fun InventoryDetailPane(
     onRecordMovement: (String) -> Unit,
     onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
     showMovementShortcut: Boolean = true,
+    onEditPhoto: ((String) -> Unit)? = null,
+    onAddComponent: (() -> Unit)? = null,
 ) {
     val strings = vaultStrings()
     val priceLanguage = if (LocalConfiguration.current.locales[0].language.equals("zh", ignoreCase = true))
@@ -827,7 +829,9 @@ internal fun InventoryDetailPane(
             return@LazyColumn
         }
 
-        item(key = "identity_${component.id}") { InventoryDetailIdentity(component) }
+        item(key = "identity_${component.id}") {
+            InventoryDetailIdentity(component, onEditPhoto = { (onEditPhoto ?: onEditComponent)(component.id) })
+        }
         item(key = "stock_${component.id}") {
             InventoryTabletDetailSummary(
                 component = component,
@@ -936,26 +940,19 @@ internal fun InventoryDetailPane(
                     EmptyPane(strings.inventory.detailRecentMovementsEmpty)
                 } else {
                     Column {
-                        detail.recentMovements.forEach { movement ->
-                            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Text(movementTypeLabel(movement.movementType), Modifier.weight(1f),
-                                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                    Text(formatMovementQuantity(movement.quantityChange),
-                                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                                }
-                                Text(movement.reason.ifBlank { strings.common.labelNoReasonRecorded },
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (movement.note.isNotBlank()) {
-                                    Text(movement.note, style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Text(formatShortLocalTimestamp(movement.happenedAt),
-                                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        detail.recentMovements.forEachIndexed { index, movement ->
+                            VaultMovementLogRow(movement, storageLocations, showDivider = index < detail.recentMovements.lastIndex)
                         }
+                    }
+                }
+            }
+        }
+        if (onAddComponent != null) {
+            item(key = "detail_other_actions") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onAddComponent) { Text(strings.common.actionImport) }
+                    if (onDetailAction != null) {
+                        TextButton(onClick = { onRecordMovement(component.id) }) { Text(strings.common.actionRecordMovement) }
                     }
                 }
             }

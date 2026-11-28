@@ -60,7 +60,7 @@
     <string name="empty_no_movements">No stock movements recorded yet.</string>
 
     <string name="search_components_label">Search components</string>
-    <string name="search_components_placeholder">SKU, name, category, package, location</string>
+    <string name="search_components_placeholder">Search model, SKU, specifications</string>
     <string name="filter_all">All</string>
     <string name="filter_low_stock">Low stock</string>
     <string name="filter_category_label">Category</string>

@@ -75,11 +75,7 @@ class SettingsDraftUiTest {
         groups.performScrollToNode(hasTestTag("settings_group_Appearance"))
         compose.onNodeWithTag("settings_group_Appearance")
             .assertHeightIsAtLeast(77.dp)
-            .assert(hasText(context.getString(
-                R.string.appearance_summary,
-                context.getString(R.string.appearance_system),
-                context.getString(R.string.appearance_teal),
-            )))
+            .assert(hasText(context.getString(R.string.appearance_system)))
         groups.performScrollToNode(hasTestTag("settings_group_App"))
         compose.onNodeWithTag("settings_group_App").assert(hasText("English"))
         groups.performScrollToNode(hasTestTag("settings_group_Sync"))
@@ -96,11 +92,7 @@ class SettingsDraftUiTest {
         compose.onNodeWithTag("settings_group_App")
             .assert(hasText(context.getString(R.string.appearance_language_chinese)))
         groups.performScrollToNode(hasTestTag("settings_group_Appearance"))
-        compose.onNodeWithTag("settings_group_Appearance").assert(hasText(context.getString(
-            R.string.appearance_summary,
-            context.getString(R.string.appearance_dark),
-            context.getString(R.string.appearance_blue),
-        )))
+        compose.onNodeWithTag("settings_group_Appearance").assert(hasText(context.getString(R.string.appearance_dark)))
     }
 
     @Test
@@ -179,7 +171,7 @@ class SettingsDraftUiTest {
                 }
             }
         }
-        compose.onNodeWithText(context.getString(R.string.field_server_url))
+        compose.onNodeWithTag("primary-server-url")
             .performTextReplacement("https://draft.example")
         val saveLabel = context.getString(R.string.action_save_settings)
         compose.onNodeWithTag("settings_detail_list").performScrollToNode(hasText(saveLabel))
@@ -212,7 +204,7 @@ class SettingsDraftUiTest {
                 }
             }
         }
-        compose.onNodeWithText(context.getString(R.string.field_server_url)).performTextReplacement("https://draft.example")
+        compose.onNodeWithTag("primary-server-url").performTextReplacement("https://draft.example")
         compose.onNodeWithTag("external-server-url").performTextReplacement("https://external.example")
         val testLabel = context.getString(R.string.action_test_connection)
         compose.onNodeWithTag("settings_detail_list").performScrollToNode(hasText(testLabel))

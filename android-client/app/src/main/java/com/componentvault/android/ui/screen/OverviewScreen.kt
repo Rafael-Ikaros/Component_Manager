@@ -1,6 +1,23 @@
 package com.componentvault.android.ui.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import com.componentvault.android.R
+import com.componentvault.android.ui.theme.LocalVaultWarning
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -30,6 +47,7 @@ internal fun OverviewScreen(
     onOpenSettings: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    onOpenInventory: () -> Unit = onOpenLowStock,
 ) {
     OverviewContent(
         contentPadding = contentPadding,
@@ -43,6 +61,7 @@ internal fun OverviewScreen(
         onOpenSettings = onOpenSettings,
         onOpenSyncSettings = onOpenSyncSettings,
         storageLocations = storageLocations,
+        onOpenInventory = onOpenInventory,
     )
 }
 
@@ -59,92 +78,88 @@ internal fun OverviewContent(
     onOpenSettings: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     storageLocations: List<StorageLocationRecord> = emptyList(),
+    onOpenInventory: () -> Unit = onOpenLowStock,
 ) {
     val strings = vaultStrings()
+    val colors = MaterialTheme.colorScheme
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .consumeWindowInsets(contentPadding),
-        contentPadding = rememberContentPadding(contentPadding, horizontal = 20.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize().consumeWindowInsets(contentPadding),
+        contentPadding = rememberContentPadding(contentPadding, horizontal = 18.dp, vertical = 0.dp, bottom = 20.dp),
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                MetricTile(
-                    label = strings.overview.metricComponents,
-                    value = uiState.componentCount.toString(),
-                    modifier = Modifier.weight(1f),
-                )
-                MetricTile(
-                    label = strings.overview.metricUnits,
-                    value = uiState.totalUnits.toString(),
-                    modifier = Modifier.weight(1f),
-                )
+            Row(Modifier.fillMaxWidth().padding(top = 19.dp, bottom = 23.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                OverviewMetric(uiState.componentCount.toString(), stringResource(R.string.v2_overview_parts), Modifier.weight(1f))
+                OverviewMetric(uiState.totalUnits.toString(), stringResource(R.string.v2_overview_quantity), Modifier.weight(1f))
+                OverviewMetric(uiState.lowStockCount.toString(), strings.overview.metricLowStock,
+                    Modifier.weight(1f).clickable(onClick = onOpenLowStock))
             }
+            HorizontalDivider(color = colors.outlineVariant)
         }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                MetricTile(
-                    label = strings.overview.metricLowStock,
-                    value = uiState.lowStockCount.toString(),
-                    modifier = Modifier.weight(1f),
-                )
-                MetricTile(
-                    label = strings.overview.metricMovements,
-                    value = uiState.movementCount.toString(),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        item {
-            SectionPane(
-                title = strings.overview.lowStockSectionTitle,
-                supporting = strings.overview.lowStockSupporting,
-            ) {
-                if (uiState.lowStockItems.isEmpty()) {
-                    EmptyPane(strings.common.emptyAllComponentsHealthy)
-                } else {
-                    uiState.lowStockItems.take(3).forEach { item ->
-                        InventoryListRow(
-                            item = item,
-                            storageLocations = storageLocations,
-                            selected = false,
-                            onClick = { onSelectLowStockComponent(item.id) },
-                        )
+        item { OverviewSectionHeading(stringResource(R.string.v2_overview_attention)) }
+        if (uiState.lowStockItems.isEmpty()) {
+            item { Text(strings.common.emptyAllComponentsHealthy, color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium) }
+        } else {
+            items(uiState.lowStockItems.size) { index ->
+                val part = uiState.lowStockItems[index]
+                val warning = LocalVaultWarning.current
+                Row(Modifier.fillMaxWidth().heightIn(min = 65.dp)
+                    .clickable { onSelectLowStockComponent(part.id) }.padding(vertical = 15.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(part.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.v2_overview_low_stock_caption, part.sku, part.quantity, part.minStock),
+                            fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariant)
                     }
+                    Surface(color = warning.container, contentColor = warning.foreground, shape = RoundedCornerShape(6.dp)) {
+                        Text(if (part.quantity == 0) stringResource(R.string.inventory_zero_stock) else strings.common.statusLowStock,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                            fontSize = 12.sp, lineHeight = 17.sp)
+                    }
+                    Icon(painterResource(R.drawable.v2_chevron_right), contentDescription = null,
+                        modifier = Modifier.size(18.dp), tint = colors.onSurfaceVariant)
                 }
-                TextButton(onClick = onOpenLowStock) {
-                    Text(strings.common.actionViewInventory)
-                }
+                HorizontalDivider(color = colors.outlineVariant)
+            }
+        }
+        item { OverviewSectionHeading(stringResource(R.string.v2_overview_recent)) }
+        if (uiState.recentMovements.isEmpty()) {
+            item { Text(strings.common.emptyNoMovements, color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium) }
+        } else {
+            val recent = uiState.recentMovements.take(3)
+            items(recent.size) { index ->
+                val movement = recent[index]
+                VaultMovementLogRow(movement, storageLocations = storageLocations,
+                    showDivider = index < recent.lastIndex, onClick = { onSelectMovement(movement.id) })
             }
         }
         item {
-            SectionPane(
-                title = strings.overview.recentActivitySectionTitle,
-                supporting = strings.overview.recentActivitySupporting,
-            ) {
-                if (uiState.recentMovements.isEmpty()) {
-                    EmptyPane(strings.common.emptyNoMovements)
-                } else {
-                    uiState.recentMovements.take(4).forEach { movement ->
-                        MovementHistoryRow(
-                            movement = movement,
-                            selected = false,
-                            onClick = { onSelectMovement(movement.id) },
-                        )
-                    }
-                }
-                TextButton(onClick = onOpenMovements) {
-                    Text(strings.common.actionViewMovements)
-                }
+            TextButton(onClick = onOpenMovements) {
+                Text(stringResource(R.string.v2_overview_view_records, uiState.movementCount))
+            }
+            Button(onClick = onOpenInventory, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                shape = RoundedCornerShape(15.dp)) {
+                Text(stringResource(R.string.v2_overview_open_inventory))
             }
         }
     }
+}
+
+@Composable
+private fun OverviewMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(value, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"))
+        Text(label, fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun OverviewSectionHeading(text: String) {
+    Text(text, Modifier.padding(top = 22.dp, bottom = 12.dp),
+        fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
 }

@@ -1,0 +1,24 @@
+<resources>
+    <string name="v2_overview_offline">Local warehouse · Available offline</string>
+    <string name="v2_records_caption">Stock receipts, issues and transfers</string>
+    <string name="v2_restore_stock">Restore inventory backup</string>
+    <string name="v2_restore_stock_summary">Preview an Excel workbook and merge records</string>
+    <string name="v2_manual_entry">Manual entry</string>
+    <string name="v2_manual_entry_summary">Enter component details without a supplier code</string>
+    <string name="v2_add_caption">Add stock, prepare a project or restore a backup</string>
+    <string name="v2_component_actions">Component actions</string>
+    <string name="v2_inbound_hint">Choose a location, quantity and reason</string>
+    <string name="v2_outbound_hint">Review available stock by location</string>
+    <string name="v2_transfer_hint">Move stock between locations</string>
+    <string name="v2_delete_hint">Review before removing this component</string>
+    <string name="v2_label_action">Generate component label</string>
+    <string name="v2_edit_action">Edit details</string>
+    <string name="v2_photo_loading">Loading photo</string>
+    <string name="v2_photo_available">Component photo</string>
+    <string name="v2_photo_missing">No photo · Showing placeholder</string>
+    <string name="v2_photo_edit">Edit component photo</string>
+    <string name="v2_confirm_inbound">Confirm receipt</string>
+    <string name="v2_confirm_outbound">Confirm issue</string>
+    <string name="v2_confirm_transfer">Confirm transfer</string>
+    <string name="v2_movement_choose_location">Choose a location and quantity</string>
+</resources>
