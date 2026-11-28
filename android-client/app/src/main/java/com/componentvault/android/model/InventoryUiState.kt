@@ -37,6 +37,7 @@ data class InventoryScreenUiState(
     val detail: InventoryDetailUiState = InventoryDetailUiState(),
     val storageLocations: List<StorageLocationRecord> = emptyList(),
     val allocations: List<ComponentAllocationRecord> = emptyList(),
+    val isLoaded: Boolean = true,
 )
 
 data class InventoryFiltersUiState(

@@ -10,8 +10,11 @@ import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.SavedStateHandle
 import com.componentvault.android.R
@@ -24,6 +27,8 @@ import com.componentvault.android.model.ComponentImportFieldOrigins
 import com.componentvault.android.model.ComponentImportSourceType
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.StorageLocationSaveIntent
+import com.componentvault.android.ui.screen.preview.CompactPreviewLayout
+import com.componentvault.android.ui.screen.preview.ExpandedPreviewLayout
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -164,6 +169,37 @@ class InventoryDraftRecoveryTest {
     }
 
     @Test
+    fun outboundDraftKeepsItsNoteAcrossFormPresentationAndStateRestoration() {
+        val tester = StateRestorationTester(compose)
+        val mode = mutableStateOf(CompactPreviewLayout)
+        val part = ComponentRecord(
+            id = "movement-part", sku = "C123", name = "Test part", category = "IC", packageName = "SOT",
+            location = "A", description = "", quantity = 10, minStock = 0, updatedAt = "", deleted = false,
+        )
+        tester.setContent {
+            MaterialTheme {
+                ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
+                    MovementEditorSurface(
+                        components = listOf(part), selectedComponentId = part.id, layoutMode = mode.value,
+                        initialMovementType = "outbound", allowManualComponentSelection = false,
+                        onDismiss = {}, onSave = { _, _ -> error("Restore must not submit") },
+                    )
+                }
+            }
+        }
+        val noteLabel = context.getString(R.string.field_note)
+        val fields = compose.onNodeWithTag("component_editor_fields")
+        fields.performScrollToNode(hasText(noteLabel))
+        compose.onNodeWithText(noteLabel).performTextReplacement("Draft outbound note")
+        compose.runOnIdle { mode.value = ExpandedPreviewLayout }
+        fields.performScrollToNode(hasText("Draft outbound note"))
+        compose.onNodeWithText("Draft outbound note").assertTextContains("Draft outbound note")
+        tester.emulateSavedInstanceStateRestore()
+        fields.performScrollToNode(hasText("Draft outbound note"))
+        compose.onNodeWithText("Draft outbound note").assertTextContains("Draft outbound note")
+    }
+
+    @Test
     fun createdImportLocationRefreshesParentInventory() {
         val helper = InventoryDatabaseHelper(context)
         try { context.deleteDatabase(helper.databaseName) } finally { helper.close() }
@@ -175,6 +211,41 @@ class InventoryDraftRecoveryTest {
         }
         awaitModel(model) { model.uiState.inventory.storageLocations.any { it.id == "RECOVER-A" } }
         assertEquals("New shelf", model.uiState.inventory.storageLocations.single { it.id == "RECOVER-A" }.name)
+    }
+
+    @Test
+    fun savedInventoryFiltersAndSelectionSurviveFirstProjectionAndDeleteUsesItsOwnId() {
+        val repository = InventoryRepository(context)
+        val ids = runBlocking {
+            assertTrue(repository.saveStorageLocation("STATE", "State shelf", StorageLocationSaveIntent.Create).isSuccess)
+            (1..2).map { index ->
+                repository.saveComponent(ComponentDraft(
+                    sku = "C$index", name = "Restore part $index", category = "IC", packageName = "SOT-23",
+                    location = "STATE", description = "", quantity = 1, minStock = 3,
+                )).entityId!!
+            }
+        }
+        val handle = SavedStateHandle()
+        val original = InventoryViewModel(context, handle)
+        compose.setContent { MaterialTheme { androidx.compose.material3.Text("host") } }
+        awaitModel(original) { original.uiState.inventory.isLoaded }
+        compose.runOnIdle {
+            original.updateComponentQuery("Restore part")
+            original.setLowStockOnly(true)
+            original.updateCategoryFilter("IC")
+            original.updateLocationFilter("STATE")
+            original.updateSort(com.componentvault.android.model.InventorySortOption.Name)
+            original.selectComponent(ids[1])
+        }
+        val restoredHandle = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
+        val restored = InventoryViewModel(context, restoredHandle)
+        awaitModel(restored) { restored.uiState.inventory.isLoaded }
+        assertEquals(original.uiState.inventory.filters, restored.uiState.inventory.filters)
+        assertEquals(ids, restored.uiState.inventory.list.items.map { it.id })
+        assertEquals(ids[1], restored.uiState.inventory.detail.component?.id)
+        compose.runOnIdle { restored.deleteComponent(ids[0]) }
+        awaitModel(restored) { restored.uiState.inventory.list.items.map { it.id } == listOf(ids[1]) }
+        assertEquals(ids[1], restored.uiState.inventory.detail.component?.id)
     }
 
     @Test

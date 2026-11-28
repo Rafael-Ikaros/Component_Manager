@@ -22,6 +22,7 @@ import com.componentvault.android.model.ComponentDraft
 import com.componentvault.android.model.ComponentImportCandidate
 import com.componentvault.android.model.ComponentRecord
 import com.componentvault.android.model.InventoryFiltersUiState
+import com.componentvault.android.model.InventoryListUiState
 import com.componentvault.android.model.InventoryScreenUiState
 import com.componentvault.android.model.InventorySortOption
 import com.componentvault.android.model.InventoryStockFilter
@@ -98,6 +99,23 @@ class InventoryViewModel(
 
     var uiState by mutableStateOf(
         InventoryUiState(
+            inventory = InventoryScreenUiState(
+                filters = InventoryFiltersUiState(
+                    query = savedStateHandle.get<String>("inventory_query").orEmpty(),
+                    stockFilter = InventoryStockFilter.entries.firstOrNull {
+                        it.name == savedStateHandle.get<String>("inventory_stock_filter")
+                    } ?: InventoryStockFilter.All,
+                    category = savedStateHandle["inventory_category"],
+                    location = savedStateHandle["inventory_location"],
+                    sort = InventorySortOption.entries.firstOrNull {
+                        it.name == savedStateHandle.get<String>("inventory_sort")
+                    } ?: InventorySortOption.UpdatedNewest,
+                ),
+                list = InventoryListUiState(
+                    selectedComponentId = savedStateHandle["inventory_selection"],
+                ),
+                isLoaded = false,
+            ),
             syncConfiguration = SyncConfiguration(
                 deviceId = "",
                 serverBaseUrl = "",
@@ -198,15 +216,20 @@ class InventoryViewModel(
     }
 
     fun selectComponent(componentId: String?) {
-        val selectedComponent = allComponentsCache.firstOrNull { it.id == componentId }
-        val selectedId = selectedComponent?.id
+        val detail = componentDetail(componentId)
+        val selectedId = detail.component?.id
         uiState = uiState.copy(
             inventory = uiState.inventory.copy(
                 list = uiState.inventory.list.copy(selectedComponentId = selectedId),
-                detail = inventoryProjector().detail(selectedComponent),
+                detail = detail,
             ),
         )
+        savedStateHandle["inventory_selection"] = selectedId
     }
+
+    internal fun componentDetail(componentId: String?) = inventoryProjector().detail(
+        allComponentsCache.firstOrNull { it.id == componentId && !it.deleted },
+    )
 
     fun saveComponent(
         draft: ComponentDraft,
@@ -360,12 +383,8 @@ class InventoryViewModel(
         }
     }
 
-    fun deleteSelectedComponent() {
-        val componentId = uiState.inventory.list.selectedComponentId
-        if (componentId == null) {
-            uiState = uiState.copy(statusMessage = getApplication<Application>().getString(R.string.sync_select_component_first))
-            return
-        }
+    fun deleteComponent(componentId: String) {
+        if (allComponentsCache.none { it.id == componentId && !it.deleted }) return
 
         viewModelScope.launch {
             uiState = uiState.copy(isBusy = true)
@@ -863,15 +882,20 @@ class InventoryViewModel(
         statusMessage: String? = null,
         preferredSelectedComponentId: String? = null,
     ) {
-        allComponentsCache = repository.loadComponents()
-        allMovementsCache = repository.loadMovements()
-        issuedQuantitiesCache = repository.loadIssuedQuantities()
-        storageLocationsCache = repository.loadStorageLocations()
-        allocationsCache = repository.loadAllocations()
+        val components = repository.loadComponents()
+        val movements = repository.loadMovements()
+        val issuedQuantities = repository.loadIssuedQuantities()
+        val locations = repository.loadStorageLocations()
+        val allocations = repository.loadAllocations()
         val appPreferences = repository.loadAppPreferences()
         val syncConfiguration = repository.loadSyncConfiguration()
         val importLearningSummary = repository.loadImportLearningSummary()
         val dashboardSnapshot = repository.loadDashboardSnapshot()
+        allComponentsCache = components
+        allMovementsCache = movements
+        issuedQuantitiesCache = issuedQuantities
+        storageLocationsCache = locations
+        allocationsCache = allocations
         uiState = uiState.copy(
             overview = inventoryProjector().overview(dashboardSnapshot),
             availableComponents = allComponentsCache,
@@ -888,6 +912,7 @@ class InventoryViewModel(
             statusMessage = statusMessage ?: syncConfiguration.lastSyncMessage,
             isBusy = false,
         )
+        savedStateHandle["inventory_selection"] = uiState.inventory.list.selectedComponentId
         val diagnostic = inventoryDiagnosticFields(uiState.inventory) + listOf(
             "available" to uiState.availableComponents.size,
             "cache" to allComponentsCache.size,
@@ -913,9 +938,21 @@ class InventoryViewModel(
     }
 
     private fun updateInventoryFilters(filters: InventoryFiltersUiState) {
-        uiState = uiState.copy(
-            inventory = buildInventoryScreenUiState(filters = filters),
+        val inventory = uiState.inventory
+        publishInventory(
+            if (inventory.isLoaded) buildInventoryScreenUiState(filters = filters)
+            else inventory.copy(filters = filters),
         )
+    }
+
+    private fun publishInventory(inventory: InventoryScreenUiState) {
+        uiState = uiState.copy(inventory = inventory)
+        savedStateHandle["inventory_query"] = inventory.filters.query
+        savedStateHandle["inventory_stock_filter"] = inventory.filters.stockFilter.name
+        savedStateHandle["inventory_category"] = inventory.filters.category
+        savedStateHandle["inventory_location"] = inventory.filters.location
+        savedStateHandle["inventory_sort"] = inventory.filters.sort.name
+        savedStateHandle["inventory_selection"] = inventory.list.selectedComponentId
     }
 
     private fun buildMovementsUiState(
@@ -946,12 +983,10 @@ class InventoryViewModel(
 
     private fun revealSavedComponent(componentId: String) {
         val filters = inventoryProjector().filtersRevealing(componentId, uiState.inventory.filters)
-        uiState = uiState.copy(
-            inventory = buildInventoryScreenUiState(
-                filters = filters,
-                preferredSelectedComponentId = componentId,
-            ),
-        )
+        publishInventory(buildInventoryScreenUiState(
+            filters = filters,
+            preferredSelectedComponentId = componentId,
+        ))
     }
 
     private fun updateMovementBatchItem(

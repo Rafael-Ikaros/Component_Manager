@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -352,6 +353,25 @@ internal data class MovementEditorState(
     val errorMessage: String? = null,
 )
 
+private val MovementEditorStateSaver = listSaver<MovementEditorState, Any>(
+    save = {
+        listOf(it.purchaseText, it.purchaseIsUnit, it.movementType, it.quantityText,
+            it.reason, it.note, it.locationId, it.destinationLocationId)
+    },
+    restore = {
+        MovementEditorState(
+            purchaseText = it[0] as String,
+            purchaseIsUnit = it[1] as Boolean,
+            movementType = it[2] as String,
+            quantityText = it[3] as String,
+            reason = it[4] as String,
+            note = it[5] as String,
+            locationId = it[6] as String,
+            destinationLocationId = it[7] as String,
+        )
+    },
+)
+
 internal fun validateMovementEditorState(
     strings: ComponentVaultStrings,
     selectedComponentId: String?,
@@ -532,15 +552,16 @@ internal fun MovementEditorSurface(
     storageLocations: List<StorageLocationRecord> = emptyList(),
     allocations: List<ComponentAllocationRecord> = emptyList(),
 ) {
+    BackHandler(enabled = !layoutMode.prefersDialogForms, onBack = onDismiss)
     val strings = vaultStrings()
     val defaultReasons = listOf("inbound", "outbound", "adjustment", "transfer")
         .associateWith { movementTypeLabel(it) }
     var componentMenuExpanded by remember { mutableStateOf(false) }
-    var chosenComponentId by remember(selectedComponentId) { mutableStateOf(selectedComponentId) }
+    var chosenComponentId by rememberSaveable(selectedComponentId) { mutableStateOf(selectedComponentId) }
     val selectedComponent = if (chosenComponentId == null) components.firstOrNull()
         else components.firstOrNull { it.id == chosenComponentId }
     var saving by remember { mutableStateOf(false) }
-    var editorState by remember(initialMovementType) {
+    var editorState by rememberSaveable(initialMovementType, stateSaver = MovementEditorStateSaver) {
         mutableStateOf(
             MovementEditorState(
                 movementType = initialMovementType ?: "inbound",

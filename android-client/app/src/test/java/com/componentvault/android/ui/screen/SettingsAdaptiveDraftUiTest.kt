@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -23,6 +23,13 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import com.componentvault.android.R
+import com.componentvault.android.data.AppearanceAccent
+import com.componentvault.android.data.AppearanceMode
+import com.componentvault.android.data.AppearancePreferences
+import com.componentvault.android.data.AppearancePreferenceStore
+import com.componentvault.android.ui.theme.ComponentVaultTheme
+import com.componentvault.android.ui.theme.LocalAppearance
+import com.componentvault.android.ui.theme.LocalOnAppearanceChange
 import com.componentvault.android.model.AppPreferences
 import com.componentvault.android.model.ImportLearningSummary
 import com.componentvault.android.model.SyncConfiguration
@@ -45,48 +52,80 @@ class SettingsAdaptiveDraftUiTest {
         val context: Application = RuntimeEnvironment.getApplication()
         var saveCount = 0
         var savedUrl: String? = null
+        var savedPreferences: AppPreferences? = null
+        var labelToolOpens = 0
+        val store = AppearancePreferenceStore(context)
+        var appearance by mutableStateOf(store.read())
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             var selected by rememberSaveable { mutableStateOf<SettingsSection?>(SettingsSection.Sync) }
-            MaterialTheme {
-                ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
-                    Box(Modifier.requiredSize(840.dp, 280.dp)) {
-                        SettingsContent(
-                            contentPadding = PaddingValues(),
-                            syncConfiguration = SyncConfiguration("device", "https://saved.example", "saved-token", false, "", ""),
-                            appPreferences = AppPreferences(),
-                            importLearningSummary = ImportLearningSummary(),
-                            isBusy = false,
-                            statusMessage = "",
-                            layoutMode = ExpandedPreviewLayout,
-                            selectedSection = selected,
-                            onSelectSection = { selected = it },
-                            onSaveSyncSettings = { url, _, _, _ -> saveCount++; savedUrl = url },
-                            onSaveAppPreferences = {},
-                            onTestConnection = { _, _, _ -> },
-                            onSyncNow = {},
-                            onClearImportLearningMappings = {},
-                        )
+            CompositionLocalProvider(
+                LocalAppearance provides appearance,
+                LocalOnAppearanceChange provides { value ->
+                    store.save(value)
+                    appearance = value
+                },
+            ) {
+                ComponentVaultTheme(darkTheme = appearance.mode == AppearanceMode.Dark, accent = appearance.accent) {
+                    ProvideComponentVaultStrings(runtimeComponentVaultStrings()) {
+                        Box(Modifier.requiredSize(840.dp, 280.dp)) {
+                            SettingsContent(
+                                contentPadding = PaddingValues(),
+                                syncConfiguration = SyncConfiguration("device", "https://saved.example", "saved-token", false, "", ""),
+                                appPreferences = AppPreferences(),
+                                importLearningSummary = ImportLearningSummary(),
+                                isBusy = false,
+                                statusMessage = "",
+                                layoutMode = ExpandedPreviewLayout,
+                                selectedSection = selected,
+                                onSelectSection = { selected = it },
+                                onSaveSyncSettings = { url, _, _, _ -> saveCount++; savedUrl = url },
+                                onSaveAppPreferences = { savedPreferences = it },
+                                onTestConnection = { _, _, _ -> },
+                                onSyncNow = {},
+                                onClearImportLearningMappings = {},
+                                onOpenLabelTools = { labelToolOpens++ },
+                            )
+                        }
                     }
                 }
             }
         }
         compose.onNodeWithText(context.getString(R.string.field_server_url))
             .performTextReplacement("https://draft.example")
-        compose.onNodeWithTag("settings_group_list")
-            .performScrollToNode(hasTestTag("settings_group_App"))
-        compose.onNodeWithTag("settings_group_App").performClick()
+        val groups = compose.onNodeWithTag("settings_group_list")
+        val details = compose.onNodeWithTag("settings_detail_list")
+        fun select(section: SettingsSection) {
+            val tag = "settings_group_${section.name}"
+            groups.performScrollToNode(hasTestTag(tag))
+            compose.onNodeWithTag(tag).performClick()
+        }
+        val minStockLabel = context.getString(R.string.field_minimum_stock)
+        select(SettingsSection.ImportAndOcr)
+        details.performScrollToNode(hasText(minStockLabel))
+        compose.onNodeWithText(minStockLabel).performTextReplacement("17")
+        select(SettingsSection.Appearance)
+        compose.onNodeWithTag("appearance_mode_Dark").performClick()
+        details.performScrollToNode(hasTestTag("appearance_accent_Blue"))
+        compose.onNodeWithTag("appearance_accent_Blue").performClick()
+        val printingLabel = context.getString(R.string.appearance_printing)
+        groups.performScrollToNode(hasText(printingLabel))
+        compose.onNodeWithText(printingLabel).performClick()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithTag("settings_group_list")
-            .performScrollToNode(hasTestTag("settings_group_Sync"))
-        compose.onNodeWithTag("settings_group_Sync").performClick()
-        compose.runOnIdle { assertEquals(0, saveCount) }
+        select(SettingsSection.Sync)
+        compose.runOnIdle {
+            assertEquals(AppearancePreferences(AppearanceMode.Dark, AppearanceAccent.Blue), store.read())
+            assertEquals(1, labelToolOpens)
+            assertEquals(0, saveCount)
+            assertEquals(null, savedPreferences)
+        }
         val saveLabel = context.getString(R.string.action_save_settings)
-        compose.onNodeWithTag("settings_detail_list").performScrollToNode(hasText(saveLabel))
+        details.performScrollToNode(hasText(saveLabel))
         compose.onNodeWithText(saveLabel).assertIsDisplayed().performClick()
         compose.runOnIdle {
             assertEquals(1, saveCount)
             assertEquals("https://draft.example", savedUrl)
+            assertEquals(17, savedPreferences?.defaultImportMinStock)
         }
     }
 }

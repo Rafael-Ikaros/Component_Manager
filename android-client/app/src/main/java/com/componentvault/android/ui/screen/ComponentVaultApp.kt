@@ -49,11 +49,16 @@ private val LabelSeedSaver = Saver<ComponentLabelSeed?, String>(
 )
 
 @Composable
-fun ComponentVaultApp(
+fun ComponentVaultApp(viewModel: InventoryViewModel) {
+    ComponentVaultApp(viewModel, rememberInventoryLayoutMode())
+}
+
+@Composable
+internal fun ComponentVaultApp(
     viewModel: InventoryViewModel,
+    layoutMode: InventoryLayoutMode,
 ) {
     val uiState = viewModel.uiState
-    val layoutMode = rememberInventoryLayoutMode()
     val strings = runtimeComponentVaultStrings()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -84,6 +89,7 @@ fun ComponentVaultApp(
     var compactDetailComponentId by rememberSaveable { mutableStateOf<String?>(null) }
     var compactMovementDetailId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSettingsSectionName by rememberSaveable { mutableStateOf<String?>(null) }
+    var settingsTwoPane by remember(layoutMode) { mutableStateOf(false) }
     var componentEditorVisible by rememberSaveable { mutableStateOf(false) }
     var componentEditorTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var componentEditorExpectedUpdatedAt by rememberSaveable { mutableStateOf<String?>(null) }
@@ -105,7 +111,7 @@ fun ComponentVaultApp(
     var inventoryBackupVisible by rememberSaveable { mutableStateOf(false) }
     var syncConflictReviewVisible by rememberSaveable { mutableStateOf(false) }
     var batchJlcVisible by rememberSaveable { mutableStateOf(false) }
-    var showDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
+    var deleteTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var showAddEntrySheet by rememberSaveable { mutableStateOf(false) }
     var componentEditorInitialDraft by rememberSaveable(stateSaver = ComponentDraftSaver) { mutableStateOf<ComponentDraft?>(null) }
     var componentEditorImportCandidate by rememberSaveable(stateSaver = ComponentImportCandidateSaver) { mutableStateOf<ComponentImportCandidate?>(null) }
@@ -136,20 +142,15 @@ fun ComponentVaultApp(
     }
 
     val editingComponent = uiState.availableComponents.firstOrNull { it.id == componentEditorTargetId }
-    val compactDetailComponent = uiState.inventory.detail.component
-        ?.takeIf { it.id == compactDetailComponentId }
-        ?: uiState.availableComponents.firstOrNull { it.id == compactDetailComponentId }
+    val compactDetail = viewModel.componentDetail(compactDetailComponentId)
     val compactMovementDetail = uiState.movements.items.firstOrNull { it.id == compactMovementDetailId }
-    val compactDetailMovements = if (compactDetailComponent == null) {
-        emptyList()
-    } else {
-        uiState.movements.items.filter { it.componentId == compactDetailComponent.id }.take(5)
-    }
     val selectedSettingsSection = SettingsSection.entries.firstOrNull { it.name == selectedSettingsSectionName }
 
-    LaunchedEffect(uiState.inventory.list.selectedComponentId) {
-        if (compactDetailComponentId != null) {
-            compactDetailComponentId = uiState.inventory.list.selectedComponentId
+    LaunchedEffect(uiState.inventory.isLoaded, uiState.availableComponents, compactDetailComponentId, deleteTargetId) {
+        if (!uiState.inventory.isLoaded) return@LaunchedEffect
+        if (compactDetailComponentId != null && compactDetail.component == null) compactDetailComponentId = null
+        if (deleteTargetId != null && uiState.availableComponents.none { it.id == deleteTargetId && !it.deleted }) {
+            deleteTargetId = null
         }
     }
 
@@ -227,6 +228,23 @@ fun ComponentVaultApp(
         movementEditorVisible = true
     }
 
+    fun openDetailAction(componentId: String, action: InventoryDetailAction) {
+        val type = when (action) {
+            InventoryDetailAction.Inbound -> "inbound"
+            InventoryDetailAction.Outbound -> "outbound"
+            InventoryDetailAction.Transfer -> "transfer"
+        }
+        openMovementEditor(componentId, type, allowManualSelection = false)
+    }
+
+    fun openLabelTools() {
+        locationLabelTargetId = null
+        labelPrintSeed = null
+        labelPrintComponentIds = emptyList()
+        labelPrintFromToolPicker = false
+        labelToolPickerVisible = true
+    }
+
     fun openCompactMovementDetail(movementId: String) {
         viewModel.selectMovement(movementId)
         if (!layoutMode.showsListDetail) {
@@ -277,16 +295,13 @@ fun ComponentVaultApp(
         }
     }
 
-    BackHandler(enabled = movementEditorVisible && !layoutMode.prefersDialogForms) {
-        closeMovementEditor()
-    }
     BackHandler(enabled = importSurfaceVisible && !layoutMode.prefersDialogForms) {
         closeImportSurface()
     }
     BackHandler(enabled = destination == InventoryDestination.Settings) {
         focusManager.clearFocus()
         keyboardController?.hide()
-        if (selectedSettingsSection != null && !layoutMode.showsListDetail) {
+        if (selectedSettingsSection != null && !settingsTwoPane) {
             selectedSettingsSectionName = null
         } else {
             destination = InventoryDestination.Inventory
@@ -405,26 +420,7 @@ fun ComponentVaultApp(
 
             componentEditorVisible && !layoutMode.prefersDialogForms -> Unit
 
-            movementEditorVisible && !layoutMode.prefersDialogForms -> {
-                MovementEditorSurface(
-                    components = uiState.availableComponents,
-                    selectedComponentId = movementEditorTargetId ?: uiState.inventory.list.selectedComponentId,
-                    layoutMode = layoutMode,
-                    initialMovementType = movementEditorInitialType,
-                    allowManualComponentSelection = movementEditorAllowManualSelection,
-                    onDismiss = ::closeMovementEditor,
-                    onSave = { draft, onComplete ->
-                        viewModel.recordMovement(draft) { result ->
-                            onComplete(result)
-                            if (result.isSuccess) {
-                                closeMovementEditor()
-                            }
-                        }
-                    },
-                    storageLocations = uiState.inventory.storageLocations,
-                    allocations = uiState.inventory.allocations,
-                )
-            }
+            movementEditorVisible && !layoutMode.prefersDialogForms -> Unit
 
             importSurfaceVisible && !layoutMode.prefersDialogForms -> {
                 JlcImportSurface(
@@ -537,10 +533,10 @@ fun ComponentVaultApp(
 
             destination == InventoryDestination.Inventory && compactDetailComponentId != null && !layoutMode.showsListDetail -> {
                 InventoryDetailRoute(
-                    component = compactDetailComponent,
-                    recentMovements = compactDetailMovements,
-                    issuedQuantity = uiState.inventory.detail.issuedQuantity,
-                    allocations = uiState.inventory.detail.allocations,
+                    component = compactDetail.component,
+                    recentMovements = compactDetail.recentMovements,
+                    issuedQuantity = compactDetail.issuedQuantity,
+                    allocations = compactDetail.allocations,
                     storageLocations = uiState.inventory.storageLocations,
                     onDismiss = { compactDetailComponentId = null },
                     onEditComponent = { componentId -> openComponentEditor(componentId) },
@@ -548,11 +544,9 @@ fun ComponentVaultApp(
                         labelPrintSeed = component.toLabelSeed()
                         labelPrintVisible = true
                     },
-                    onRequestDeleteComponent = { componentId ->
-                        viewModel.selectComponent(componentId)
-                        showDeleteConfirmation = true
-                    },
+                    onRequestDeleteComponent = { deleteTargetId = it },
                     onRecordMovement = { componentId -> openMovementEditor(componentId) },
+                    onDetailAction = ::openDetailAction,
                     onAddComponent = { showAddEntrySheet = true },
                 )
             }
@@ -584,13 +578,13 @@ fun ComponentVaultApp(
                         onLocationChange = viewModel::updateLocationFilter,
                         onScanInventory = { inventoryScannerVisible = true },
                         onSortChange = viewModel::updateSort,
-                        onSelectComponent = viewModel::selectComponent,
-                        onOpenComponentDetail = { componentId ->
+                        onSelectComponent = { componentId ->
                             viewModel.selectComponent(componentId)
-                            if (!layoutMode.showsListDetail) {
+                            if (layoutMode.showsListDetail && compactDetailComponentId != null) {
                                 compactDetailComponentId = componentId
                             }
                         },
+                        onOpenComponentDetail = { componentId -> compactDetailComponentId = componentId },
                         onAddComponent = { showAddEntrySheet = true },
                         onImportComponent = { importSurfaceVisible = true },
                         onGenerateLabel = { componentId ->
@@ -599,12 +593,8 @@ fun ComponentVaultApp(
                                 labelPrintVisible = true
                             }
                         },
-                        onOpenBluetoothPrint = {
-                            locationLabelTargetId = null
-                            labelPrintSeed = null
-                            labelPrintFromToolPicker = false
-                            labelToolPickerVisible = true
-                        },
+                        onOpenBluetoothPrint = ::openLabelTools,
+                        onDetailAction = ::openDetailAction,
                         onPrintSelectedComponents = { ids ->
                             locationLabelTargetId = null
                             labelPrintSeed = null
@@ -617,10 +607,7 @@ fun ComponentVaultApp(
                             viewModel.selectComponent(componentId)
                             openComponentEditor(componentId)
                         },
-                        onRequestDeleteComponent = { componentId ->
-                            viewModel.selectComponent(componentId)
-                            showDeleteConfirmation = true
-                        },
+                        onRequestDeleteComponent = { deleteTargetId = it },
                         onBatchTransfer = viewModel::transferComponentsBatch,
                         onQuickMovement = viewModel::recordMovement,
                         onScanMovementLabel = {
@@ -684,6 +671,7 @@ fun ComponentVaultApp(
                         onOpenSyncSettings = { openSettingsRoute(SettingsSection.Sync) },
                         selectedSettingsSection = selectedSettingsSection,
                         onBackFromSettingsSection = { selectedSettingsSectionName = null },
+                        settingsTwoPane = settingsTwoPane,
                         settingsContent = { padding ->
                             SettingsContent(
                                 contentPadding = padding,
@@ -704,6 +692,8 @@ fun ComponentVaultApp(
                                 onClearImportLearningMappings = viewModel::clearImportLearningMappings,
                                 onManageLocations = { storageLocationsVisible = true },
                                 onBackupRestore = { inventoryBackupVisible = true },
+                                onOpenLabelTools = ::openLabelTools,
+                                onSplitLayoutChanged = { settingsTwoPane = it },
                             )
                         },
                         snackbarHostState = snackbarHostState,
@@ -731,29 +721,30 @@ fun ComponentVaultApp(
             },
         )
 
+        // Keep the draft in the same composition when the form moves between page and dialog.
+        if (movementEditorVisible && !uiState.movements.scan.isScannerVisible &&
+            (layoutMode.prefersDialogForms || (!inventoryScannerVisible && !componentEditorVisible &&
+                !(movementBatchReviewVisible && uiState.movements.batchSession.queuedItems.isNotEmpty())))
+        ) {
+            MovementEditorSurface(
+                components = uiState.availableComponents,
+                selectedComponentId = movementEditorTargetId ?: uiState.inventory.list.selectedComponentId,
+                layoutMode = layoutMode,
+                initialMovementType = movementEditorInitialType,
+                allowManualComponentSelection = movementEditorAllowManualSelection,
+                onDismiss = ::closeMovementEditor,
+                onSave = { draft, onComplete ->
+                    viewModel.recordMovement(draft) { result ->
+                        onComplete(result)
+                        if (result.isSuccess) closeMovementEditor()
+                    }
+                },
+                storageLocations = uiState.inventory.storageLocations,
+                allocations = uiState.inventory.allocations,
+            )
+        }
+
         if (!uiState.movements.scan.isScannerVisible && layoutMode.prefersDialogForms) {
-
-            if (movementEditorVisible) {
-                MovementEditorSurface(
-                    components = uiState.availableComponents,
-                    selectedComponentId = movementEditorTargetId ?: uiState.inventory.list.selectedComponentId,
-                    layoutMode = layoutMode,
-                    initialMovementType = movementEditorInitialType,
-                    allowManualComponentSelection = movementEditorAllowManualSelection,
-                    onDismiss = ::closeMovementEditor,
-                    onSave = { draft, onComplete ->
-                        viewModel.recordMovement(draft) { result ->
-                            onComplete(result)
-                            if (result.isSuccess) {
-                                closeMovementEditor()
-                            }
-                        }
-                    },
-                    storageLocations = uiState.inventory.storageLocations,
-                    allocations = uiState.inventory.allocations,
-                )
-            }
-
             if (importSurfaceVisible) {
                 JlcImportSurface(
                     layoutMode = layoutMode,
@@ -808,13 +799,16 @@ fun ComponentVaultApp(
             )
         }
 
-        if (showDeleteConfirmation) {
+        val pendingDeleteId = deleteTargetId
+        if (pendingDeleteId != null && uiState.inventory.isLoaded &&
+            uiState.availableComponents.any { it.id == pendingDeleteId && !it.deleted }
+        ) {
             DeleteComponentConfirmationDialog(
-                onDismiss = { showDeleteConfirmation = false },
+                onDismiss = { deleteTargetId = null },
                 onConfirm = {
-                    viewModel.deleteSelectedComponent()
-                    showDeleteConfirmation = false
-                    compactDetailComponentId = null
+                    viewModel.deleteComponent(pendingDeleteId)
+                    deleteTargetId = null
+                    if (compactDetailComponentId == pendingDeleteId) compactDetailComponentId = null
                 },
             )
         }

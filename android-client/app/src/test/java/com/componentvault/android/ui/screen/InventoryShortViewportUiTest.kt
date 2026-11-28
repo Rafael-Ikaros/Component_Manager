@@ -84,7 +84,7 @@ class InventoryShortViewportUiTest {
         val viewport = list.getUnclippedBoundsInRoot()
         val bounds = firstRow.getUnclippedBoundsInRoot()
         assertTrue(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom,
-            "The complete first row must fit inside the short scrolling pane")
+            "The complete first row ($bounds) must fit inside the short scrolling pane ($viewport)")
         firstRow.performClick()
         compose.runOnIdle { assertEquals(first.id, openedId); assertEquals(0, writes) }
 

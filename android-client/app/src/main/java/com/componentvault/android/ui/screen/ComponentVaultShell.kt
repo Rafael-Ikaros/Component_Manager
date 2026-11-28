@@ -83,6 +83,8 @@ internal fun ComponentVaultAppShell(
     onBackFromSettingsSection: () -> Unit,
     settingsContent: @Composable (PaddingValues) -> Unit,
     snackbarHostState: SnackbarHostState,
+    settingsTwoPane: Boolean = layoutMode.showsListDetail,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
 ) {
     ComponentVaultAppShellContent(
         uiState = uiState,
@@ -130,6 +132,8 @@ internal fun ComponentVaultAppShell(
         onBackFromSettingsSection = onBackFromSettingsSection,
         settingsContent = settingsContent,
         snackbarHostState = snackbarHostState,
+        settingsTwoPane = settingsTwoPane,
+        onDetailAction = onDetailAction,
     )
 }
 
@@ -181,12 +185,14 @@ internal fun ComponentVaultAppShellContent(
     onBackFromSettingsSection: () -> Unit = {},
     settingsContent: @Composable (PaddingValues) -> Unit = {},
     snackbarHostState: SnackbarHostState? = null,
+    settingsTwoPane: Boolean = layoutMode.showsListDetail,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
 ) {
     val strings = vaultStrings()
     val title = if (
         destination == InventoryDestination.Settings &&
         selectedSettingsSection != null &&
-        !layoutMode.showsListDetail
+        !settingsTwoPane
     ) {
         selectedSettingsSection.title(strings)
     } else {
@@ -199,7 +205,7 @@ internal fun ComponentVaultAppShellContent(
         TopAppBar(
             title = { Text(title) },
             navigationIcon = {
-                if (destination == InventoryDestination.Settings && selectedSettingsSection != null && !layoutMode.showsListDetail) {
+                if (destination == InventoryDestination.Settings && selectedSettingsSection != null && !settingsTwoPane) {
                     androidx.compose.material3.TextButton(onClick = onBackFromSettingsSection) {
                         Text(strings.common.actionBack)
                     }
@@ -291,6 +297,7 @@ internal fun ComponentVaultAppShellContent(
                         onRequestDeleteComponent = onRequestDeleteComponent,
                         onBatchTransfer = onBatchTransfer,
                         onQuickMovement = onQuickMovement,
+                        onDetailAction = onDetailAction,
                         onScanMovementLabel = onScanMovementLabel,
                         onRetryMovementScan = onRetryMovementScan,
                         onDismissMovementScanResult = onDismissMovementScanResult,
@@ -362,6 +369,7 @@ private fun ShellContent(
     onOpenSettings: () -> Unit,
     onOpenSyncSettings: () -> Unit,
     settingsContent: @Composable (PaddingValues) -> Unit,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)?,
 ) {
     when (destination) {
         InventoryDestination.Inventory -> InventoryContent(
@@ -385,6 +393,7 @@ private fun ShellContent(
             onRequestDeleteComponent = onRequestDeleteComponent,
             onBatchTransfer = onBatchTransfer,
             onQuickMovement = onQuickMovement,
+            onDetailAction = onDetailAction,
             onRecordMovement = { componentId -> onRecordMovement(componentId) },
         )
 

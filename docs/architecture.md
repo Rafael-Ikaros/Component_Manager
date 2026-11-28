@@ -285,7 +285,10 @@ and final submission. Long bodies use an explicit copy/paste path rather than
 silent truncation. No GitHub token, OAuth secret or feedback server is required.
 See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
 
-- Built with Jetpack Compose and Material 3.
+- Built with Jetpack Compose and Material 3. Appearance follows the system by
+  default; light/dark overrides and Teal/Mist blue/Sand accents persist in
+  appearance-only SharedPreferences. Changes update the theme and system bars
+  without submitting sync or import drafts. Printed labels retain their own palette.
 - Current implementation is a stable-mode local-first client backed by
   on-device SQLite and shared preferences.
 - User-facing copy is routed through Android string resources, with a
@@ -295,8 +298,10 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   sample bundles plus content-level preview composables so Preview rendering
   does not depend on Android Studio resolving the runtime `R.string` graph.
 - Navigation centers on four adaptive top-level destinations: `Home`,
-  `Inventory`, `Records`, and `Settings`. Home presents the summary; settings
-  has one main entry with section drill-down and direct sync-section routing.
+  `Inventory`, `Records`, and `Settings`. Home presents the summary. Settings
+  groups its Appearance, import, language, sync, warehouse/data, feedback and
+  updates entries; the printing shortcut opens the existing label tools.
+  The sync section remains directly addressable.
   Inventory's Import and scan bottom sheet has Add component, Batch inbound
   and Project materials. Batch inbound uses one local draft for package scans,
   C-code text or XLSX lists, and LCSC order XLS files. Add component includes lookup, scanning and manual entry;
@@ -323,8 +328,15 @@ See [feedback and scan diagnostics](feedback-and-scan-diagnostics.md).
   window size classes for width handling, and
   `NavigableListDetailPaneScaffold` for Inventory list-detail behavior. The
   Inventory header treats search as the primary action through
-  an inline `OutlinedTextField`, with results visible while typing, fixed horizontal filters and denser inventory rows instead
-  of the older stacked filter-card layout. It also includes quantity-first
+  an inline `OutlinedTextField`, with results visible while typing and all five
+  filters on a single horizontally scrollable row. Flat rows emphasize quantity
+  and include an overflow menu alongside swipe actions. Detail actions use the
+  existing movement editor; current inventory cost and catalog reference price
+  are displayed separately. `SavedStateHandle` stores only filter values and
+  selection ID, and the first loaded projection validates restored selection.
+  Loading uses a separate list state so it cannot reset the saved scroll position.
+  Compact detail and delete confirmation each use their own target ID.
+  Inventory also includes quantity-first
   import flows for JLC copied mobile product text, package QR payloads,
   supplier packaging and reel label OCR, and generated warehouse labels.
   The same import screen accepts a camera photo or an image from the device.

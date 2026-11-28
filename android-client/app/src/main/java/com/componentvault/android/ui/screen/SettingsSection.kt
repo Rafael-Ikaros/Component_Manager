@@ -10,6 +10,7 @@ internal enum class SettingsSection {
     App,
     Feedback,
     About,
+    Appearance,
 }
 
 @Composable
@@ -18,7 +19,8 @@ internal fun SettingsSection.title(strings: ComponentVaultStrings): String = whe
     SettingsSection.ImportAndOcr -> strings.settings.importPreferencesTitle
     SettingsSection.App -> strings.settings.languageTitle
     SettingsSection.Feedback -> stringResource(R.string.feedback_title)
-    SettingsSection.About -> strings.settings.aboutTitle
+    SettingsSection.About -> stringResource(R.string.appearance_about_updates)
+    SettingsSection.Appearance -> stringResource(R.string.appearance_title)
 }
 
 @Composable
@@ -28,4 +30,5 @@ internal fun SettingsSection.supporting(strings: ComponentVaultStrings): String 
     SettingsSection.App -> strings.settings.languageSubtitle
     SettingsSection.Feedback -> stringResource(R.string.feedback_section_supporting)
     SettingsSection.About -> strings.settings.aboutSubtitle
+    SettingsSection.Appearance -> stringResource(R.string.appearance_description)
 }

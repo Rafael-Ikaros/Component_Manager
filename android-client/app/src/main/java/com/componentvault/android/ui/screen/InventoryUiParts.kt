@@ -11,11 +11,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,8 +76,7 @@ import com.componentvault.android.model.InventoryListItemUiState
 import com.componentvault.android.model.InventorySortOption
 import com.componentvault.android.model.StockMovementRecord
 import com.componentvault.android.model.StorageLocationRecord
-import com.componentvault.android.ui.theme.VaultWarning
-import com.componentvault.android.ui.theme.VaultWarningContainer
+import com.componentvault.android.ui.theme.LocalVaultWarning
 import androidx.compose.animation.core.animate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -219,7 +228,6 @@ internal fun ValueBlock(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun InventoryListRow(
     item: InventoryListItemUiState,
@@ -234,7 +242,13 @@ internal fun InventoryListRow(
     storageLocations: List<StorageLocationRecord> = emptyList(),
     compact: Boolean = false,
 ) {
-    if (!selectionMode && listOf(onInbound, onOutbound, onTransfer, onDelete).any { it != null }) {
+    val actions = if (selectionMode) emptyList() else listOfNotNull(
+        onInbound?.let { InventoryRowAction(R.string.inventory_quick_inbound, Icons.Outlined.Add, it) },
+        onOutbound?.let { InventoryRowAction(R.string.inventory_quick_outbound, Icons.Outlined.Remove, it) },
+        onTransfer?.let { InventoryRowAction(R.string.inventory_quick_transfer, Icons.Outlined.SwapHoriz, it) },
+        onDelete?.let { InventoryRowAction(R.string.action_delete, Icons.Outlined.Delete, it) },
+    )
+    if (actions.isNotEmpty()) {
         BoxWithConstraints(modifier.fillMaxWidth()) {
             val buttonWidth = ((maxWidth - 96.dp) / 4).coerceIn(48.dp, 56.dp)
             val revealWidth = buttonWidth * 4
@@ -249,7 +263,7 @@ internal fun InventoryListRow(
                 settleJob?.cancel()
                 offsetPx = 0f
             }
-            val shape = RoundedCornerShape(16.dp)
+            val shape = RectangleShape
             Box(Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)) {
                 if (offsetPx < 0f) Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
                     Row(
@@ -271,7 +285,7 @@ internal fun InventoryListRow(
                         Box(
                             modifier = Modifier.width(buttonWidth).fillMaxHeight()
                                 .background(palette.first)
-                                .clickable(enabled = callback != null) {
+                                .clickable(enabled = callback != null, role = Role.Button) {
                                     close()
                                     callback?.invoke()
                                 }
@@ -282,7 +296,7 @@ internal fun InventoryListRow(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(icon, contentDescription = null, tint = palette.second)
                                 Text(stringResource(label), color = palette.second,
-                                    style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                    style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -306,14 +320,19 @@ internal fun InventoryListRow(
                             settleJob?.cancel()
                             settleJob = scope.launch { animate(offsetPx, 0f) { value, _ -> offsetPx = value } }
                         } else onClick()
-                    }, selectionMode, storageLocations, compact)
+                    }, selectionMode, storageLocations, compact, actions, showOverflow = offsetPx >= 0f)
             }
         }
     } else {
-        InventoryListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations, compact)
+        InventoryListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations, compact, actions)
     }
 }
-@OptIn(ExperimentalLayoutApi::class)
+internal data class InventoryRowAction(
+    val labelResource: Int,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
+
 @Composable
 private fun InventoryListRowContent(
     item: InventoryListItemUiState,
@@ -323,134 +342,114 @@ private fun InventoryListRowContent(
     selectionMode: Boolean,
     storageLocations: List<StorageLocationRecord>,
     compact: Boolean,
+    actions: List<InventoryRowAction>,
+    showOverflow: Boolean = true,
 ) {
     if (compact) {
-        InventoryTabletListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations)
-        return
+        InventoryTabletListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations, actions, showOverflow)
+    } else {
+        InventoryFlatListRowContent(item, selected, modifier, onClick, selectionMode, storageLocations, actions, showOverflow = showOverflow)
     }
-    val strings = vaultStrings()
-    val localizedCategory = localizedCategoryLabel(item.category)
+}
 
+/** Shared flat row so the tablet and handset expose the same identity and actions. */
+@Composable
+internal fun InventoryFlatListRowContent(
+    item: InventoryListItemUiState,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    selectionMode: Boolean,
+    storageLocations: List<StorageLocationRecord>,
+    actions: List<InventoryRowAction> = emptyList(),
+    compact: Boolean = false,
+    showOverflow: Boolean = true,
+) {
+    val strings = vaultStrings()
+    val warning = LocalVaultWarning.current
+    val identity = remember(item.description) { com.componentvault.android.model.parseImportDescription(item.description) }
+    var menuExpanded by remember(item.id) { mutableStateOf(false) }
+    val quantityDescription = stringResource(R.string.inventory_usage_remaining) + ": " + item.quantity
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surface
-        },
-        tonalElevation = if (selected) 2.dp else 0.dp,
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .selectable(selected = selected, role = if (selectionMode) Role.Checkbox else Role.Button, onClick = onClick),
+        shape = RectangleShape,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-                if (selectionMode) Checkbox(checked = selected, onCheckedChange = null)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = item.sku,
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = if (compact) 8.dp else 12.dp)
+                    .then(if (compact) Modifier.testTag("inventory_tablet_row") else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    ProductThumbnail(sku = item.sku, imageUrl = item.productImageUrl,
+                        description = item.description, imageSize = 48.dp)
+                    if (selectionMode) Checkbox(checked = selected, onCheckedChange = null)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(item.name, style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(item.sku, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(identity.brand, localizedCategoryLabel(item.category), item.packageName)
+                        .filter { it.isNotBlank() }.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    item.specificationSummary?.let { summary ->
-                        Text(
-                            text = summary,
-                            style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    item.specificationSummary?.takeIf { it.isNotBlank() }?.let { summary ->
+                        Text(summary, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                    Text(
-                        text = "$localizedCategory / ${item.packageName}",
-                        style = MaterialTheme.typography.bodySmall,
+                    Text(displayLocationName(item.location, storageLocations, strings.common.labelNotConfigured),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InventoryTag(text = displayLocationName(item.location, storageLocations, strings.common.labelNotConfigured))
-                    InventoryTag(
-                        text = if (item.isLowStock) {
-                            strings.common.statusLowStock
-                        } else {
-                            strings.common.statusHealthy
-                        },
-                        containerColor = if (item.isLowStock) {
-                            VaultWarningContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        contentColor = if (item.isLowStock) {
-                            VaultWarning
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.inventory_usage_issued_value, item.issuedQuantity),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(formatShortLocalTimestamp(item.updatedAt), style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                Text(
-                    text = formatShortLocalTimestamp(item.updatedAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                }
-                Column(
-                    modifier = Modifier.widthIn(max = 144.dp),
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = stringResource(R.string.inventory_usage_remaining),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = item.quantity.toString(),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                text = strings.inventory.componentMinStock(item.minStock),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        ProductThumbnail(
-                            sku = item.sku,
-                            imageUrl = item.productImageUrl,
-                            description = item.description,
-                            imageSize = 52.dp,
-                        )
+                Column(Modifier.widthIn(max = 112.dp), horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(item.quantity.toString(), style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { contentDescription = quantityDescription })
+                    Text(strings.inventory.componentMinStock(item.minStock),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (item.isLowStock) Surface(color = warning.container, shape = RoundedCornerShape(8.dp)) {
+                        Text(strings.common.statusLowStock, color = warning.foreground,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                     }
-                StockUsageDonut(
-                    summary = com.componentvault.android.model.StockUsageSummary(
-                        remaining = item.quantity,
-                        issued = item.issuedQuantity,
-                    ),
-                )
+                    if (actions.isNotEmpty() && !showOverflow) {
+                        // Keep the row height stable and let a tap on the shifted row dismiss it.
+                        Box(Modifier.size(48.dp))
+                    } else if (actions.isNotEmpty()) Box {
+                        IconButton(onClick = { menuExpanded = true },
+                            modifier = Modifier.size(48.dp).testTag("inventory_row_more_${item.id}")) {
+                            Icon(Icons.Outlined.MoreVert,
+                                contentDescription = stringResource(R.string.inventory_ui_more_actions) + " · " + item.sku)
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            actions.forEach { action ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(action.labelResource)) },
+                                    leadingIcon = { Icon(action.icon, contentDescription = null) },
+                                    onClick = { menuExpanded = false; action.onClick() },
+                                )
+                            }
+                        }
+                    }
+                }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -640,8 +639,8 @@ internal fun MovementTypePill(movementType: String) {
             labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         "outbound" -> androidx.compose.material3.AssistChipDefaults.assistChipColors(
-            containerColor = VaultWarningContainer,
-            labelColor = VaultWarning,
+            containerColor = LocalVaultWarning.current.container,
+            labelColor = LocalVaultWarning.current.foreground,
         )
         else -> androidx.compose.material3.AssistChipDefaults.assistChipColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,

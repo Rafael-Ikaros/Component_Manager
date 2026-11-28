@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="inventory_actual_cost_title">实际库存成本</string>
+    <string name="inventory_unit_cost_cny">库存均价（CNY）</string>
+    <string name="inventory_value_cny">库存价值（CNY）</string>
+    <string name="inventory_cost_unknown">成本未知</string>
+    <string name="inventory_usage_title">用量统计</string>
+</resources>

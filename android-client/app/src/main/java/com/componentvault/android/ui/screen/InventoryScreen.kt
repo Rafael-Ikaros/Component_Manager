@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.horizontalScroll
@@ -84,8 +85,6 @@ import com.componentvault.android.model.officialParameters
 import com.componentvault.android.model.officialParameterKind
 import com.componentvault.android.model.StockMovementRecord
 import com.componentvault.android.model.StorageLocationRecord
-import com.componentvault.android.ui.theme.VaultWarning
-import com.componentvault.android.ui.theme.VaultWarningContainer
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -100,6 +99,8 @@ internal fun localizedOfficialParameterValue(kind: String?, value: String, local
         else -> value
     }
 }
+internal enum class InventoryDetailAction { Inbound, Outbound, Transfer }
+
 @Composable
 internal fun InventoryScreen(
     contentPadding: PaddingValues,
@@ -123,6 +124,7 @@ internal fun InventoryScreen(
     onRecordMovement: (String) -> Unit,
     onBatchTransfer: BatchTransferAction? = null,
     onQuickMovement: QuickMovementAction? = null,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
 ) {
     InventoryContent(
         contentPadding = contentPadding,
@@ -146,6 +148,7 @@ internal fun InventoryScreen(
         onRecordMovement = onRecordMovement,
         onBatchTransfer = onBatchTransfer,
         onQuickMovement = onQuickMovement,
+        onDetailAction = onDetailAction,
     )
 }
 
@@ -173,6 +176,7 @@ internal fun InventoryContent(
     onRecordMovement: (String) -> Unit,
     onBatchTransfer: BatchTransferAction? = null,
     onQuickMovement: QuickMovementAction? = null,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val imeOccludesBottom = WindowInsets.isImeVisible &&
@@ -261,6 +265,7 @@ internal fun InventoryContent(
                                 onGenerateLabel = { component -> onGenerateLabel(component.id) },
                                 onRequestDeleteComponent = onRequestDeleteComponent,
                                 onRecordMovement = onRecordMovement,
+                                onDetailAction = onDetailAction,
                             )
                         }
                     }
@@ -315,15 +320,17 @@ internal fun InventoryDetailRoute(
     onRequestDeleteComponent: (String) -> Unit,
     onRecordMovement: (String) -> Unit,
     onAddComponent: () -> Unit,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
 ) {
     val strings = vaultStrings()
+    var actionsExpanded by rememberSaveable(component?.id) { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = component?.name ?: strings.inventory.selectedComponentTitle,
+                        text = strings.inventory.selectedComponentTitle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -334,8 +341,21 @@ internal fun InventoryDetailRoute(
                     }
                 },
                 actions = {
-                    TextButton(onClick = onAddComponent) {
-                        Text(strings.common.actionImport)
+                    component?.let { current ->
+                        TextButton(onClick = { onEditComponent(current.id) }) { Text(strings.common.actionEdit) }
+                    }
+                    Box {
+                        IconButton(onClick = { actionsExpanded = true }) {
+                            Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.inventory_ui_more_actions))
+                        }
+                        DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                            DropdownMenuItem(text = { Text(strings.common.actionImport) },
+                                onClick = { actionsExpanded = false; onAddComponent() })
+                            component?.let { current ->
+                                DropdownMenuItem(text = { Text(strings.common.actionDelete, color = MaterialTheme.colorScheme.error) },
+                                    onClick = { actionsExpanded = false; onRequestDeleteComponent(current.id) })
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -362,10 +382,12 @@ internal fun InventoryDetailRoute(
             onGenerateLabel = onGenerateLabel,
             onRequestDeleteComponent = onRequestDeleteComponent,
             onRecordMovement = onRecordMovement,
+            onDetailAction = onDetailAction,
         )
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun InventoryListPane(
     modifier: Modifier,
@@ -400,20 +422,23 @@ private fun InventoryListPane(
     var quickMovement by androidx.compose.runtime.remember { mutableStateOf<Pair<com.componentvault.android.model.InventoryListItemUiState, Boolean>?>(null) }
     var quickTransferItem by androidx.compose.runtime.remember { mutableStateOf<com.componentvault.android.model.InventoryListItemUiState?>(null) }
     var actionsExpanded by androidx.compose.runtime.remember { mutableStateOf(false) }
-    LaunchedEffect(uiState.list.items.map { it.id }) {
-        selectedIds = selectedIds.intersect(uiState.list.items.map { it.id }.toSet()).toList()
+    LaunchedEffect(uiState.isLoaded, uiState.list.items.map { it.id }) {
+        if (uiState.isLoaded) {
+            selectedIds = selectedIds.intersect(uiState.list.items.map { it.id }.toSet()).toList()
+        }
     }
     val selectedItems = uiState.list.items.filter { it.id in selectedIds }
     fun exitSelection() { selecting = false; selectedIds = emptyList(); transferVisible = false }
 
     LazyColumn(
         modifier = modifier.padding(contentPadding).testTag("inventory_list"),
-        state = listState,
+        // The loading header must not clamp a restored position against an empty data set.
+        state = if (uiState.isLoaded) listState else rememberLazyListState(),
         contentPadding = PaddingValues(bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compactRows) 4.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 InventoryFilterHeader(
                     uiState = uiState,
                     statusMessage = statusMessage,
@@ -423,14 +448,14 @@ private fun InventoryListPane(
                     onLocationChange = onLocationChange,
                     onSortChange = onSortChange,
                 )
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.inventory_ui_result_count, uiState.list.items.size),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.align(Alignment.CenterVertically),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -459,33 +484,29 @@ private fun InventoryListPane(
                     }
                 }
                 if (selecting) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.batch_transfer_selected_count, selectedItems.size),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        TextButton(onClick = ::exitSelection) { Text(stringResource(R.string.action_cancel)) }
+                    Text(stringResource(R.string.batch_transfer_selected_count, selectedItems.size),
+                        style = MaterialTheme.typography.titleSmall)
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = ::exitSelection, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.action_cancel))
+                        }
                         if (onBatchTransfer != null) FilledTonalButton(
                             enabled = selectedItems.isNotEmpty(),
                             onClick = { transferVisible = true },
+                            modifier = Modifier.heightIn(min = 48.dp),
                         ) { Text(stringResource(R.string.batch_transfer_select)) }
-                    }
-                    if (onPrintSelectedComponents != null) Row(
-                        Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        TextButton(onClick = { selectedIds = uiState.list.items.map { it.id } }) {
-                            Text(stringResource(R.string.label_batch_select_results))
+                        if (onPrintSelectedComponents != null) {
+                            TextButton(onClick = { selectedIds = uiState.list.items.map { it.id } },
+                                modifier = Modifier.heightIn(min = 48.dp)) {
+                                Text(stringResource(R.string.label_batch_select_results))
+                            }
+                            FilledTonalButton(
+                                enabled = selectedItems.isNotEmpty(),
+                                onClick = { onPrintSelectedComponents(selectedItems.map { it.id }) },
+                                modifier = Modifier.heightIn(min = 48.dp).testTag("inventory_print_selected"),
+                            ) { Text(stringResource(R.string.label_batch_print_selected)) }
                         }
-                        FilledTonalButton(
-                            enabled = selectedItems.isNotEmpty(),
-                            onClick = { onPrintSelectedComponents(selectedItems.map { it.id }) },
-                            modifier = Modifier.weight(1f).testTag("inventory_print_selected"),
-                        ) { Text(stringResource(R.string.label_batch_print_selected)) }
                     }
                 }
             }
@@ -569,6 +590,7 @@ internal fun InventoryFilterHeader(
                 }
             },
             singleLine = true,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         )
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("inventory_filter_bar"),
@@ -576,11 +598,13 @@ internal fun InventoryFilterHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FilterChip(
+                modifier = Modifier.heightIn(min = 48.dp),
                 selected = uiState.filters.stockFilter == InventoryStockFilter.All,
                 onClick = { onStockFilterChange(InventoryStockFilter.All) },
                 label = { Text(strings.inventory.filterAll) },
             )
             FilterChip(
+                modifier = Modifier.heightIn(min = 48.dp),
                 selected = uiState.filters.stockFilter == InventoryStockFilter.LowStock,
                 onClick = { onStockFilterChange(InventoryStockFilter.LowStock) },
                 label = { Text(strings.inventory.filterLowStock) },
@@ -691,7 +715,7 @@ private fun FilterMenuButton(
 
     Box {
         OutlinedButton(
-            modifier = Modifier.widthIn(max = maxMenuWidth),
+            modifier = Modifier.widthIn(max = maxMenuWidth).heightIn(min = 48.dp),
             onClick = { onExpandedChange(true) },
             colors = ButtonDefaults.outlinedButtonColors(
                 containerColor = if (expanded) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
@@ -743,6 +767,7 @@ internal fun InventoryDetailPane(
     onGenerateLabel: (ComponentRecord) -> Unit,
     onRequestDeleteComponent: (String) -> Unit,
     onRecordMovement: (String) -> Unit,
+    onDetailAction: ((String, InventoryDetailAction) -> Unit)? = null,
 ) {
     val strings = vaultStrings()
     val priceLanguage = if (LocalConfiguration.current.locales[0].language.equals("zh", ignoreCase = true))
@@ -766,86 +791,36 @@ internal fun InventoryDetailPane(
             return@LazyColumn
         }
 
-        item {
-            if (adaptiveLayout) {
-                InventoryTabletDetailSummary(
-                    component = component,
-                    onEditComponent = onEditComponent,
-                    onGenerateLabel = onGenerateLabel,
-                    onRequestDeleteComponent = onRequestDeleteComponent,
-                    onRecordMovement = onRecordMovement,
-                )
-            } else {
-                SectionPane(
-                    title = component.name,
-                    supporting = strings.inventory.componentSubtitle(
-                        component.sku,
-                        localizedCategoryLabel(component.category),
-                        component.packageName,
-                    ),
-                ) {
-                    ProductThumbnail(
-                        sku = component.sku,
-                        imageUrl = component.productImageUrl,
-                        description = component.description,
-                        imageSize = 112.dp,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    )
-                    StatusBanner(
-                        message = if (component.isLowStock) {
-                            strings.inventory.selectedComponentLowStockStatus
-                        } else {
-                            strings.inventory.selectedComponentHealthyStatus
-                        },
-                        containerColor = if (component.isLowStock) {
-                            VaultWarningContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
-                        contentColor = if (component.isLowStock) {
-                            VaultWarning
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        MetricTile(
-                            label = strings.inventory.metricQuantity,
-                            value = component.quantity.toString(),
-                            modifier = Modifier.weight(1f),
-                        )
-                        MetricTile(
-                            label = strings.inventory.metricMinStock,
-                            value = component.minStock.toString(),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        FilledTonalButton(onClick = { onEditComponent(component.id) }) {
-                            Text(strings.common.actionEdit)
-                        }
-                        OutlinedButton(
-                            onClick = { onRecordMovement(component.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(strings.common.actionRecordMovement)
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = { onGenerateLabel(component) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(strings.common.actionGenerateLabel)
-                    }
-                    TextButton(onClick = { onRequestDeleteComponent(component.id) }) {
-                        Text(strings.common.actionDelete)
-                    }
+        item(key = "identity_${component.id}") { InventoryDetailIdentity(component) }
+        item(key = "stock_${component.id}") {
+            InventoryTabletDetailSummary(
+                component = component,
+                onEditComponent = onEditComponent,
+                onGenerateLabel = onGenerateLabel,
+                onRequestDeleteComponent = onRequestDeleteComponent,
+                onRecordMovement = onRecordMovement,
+                onDetailAction = onDetailAction,
+            )
+        }
+        item(key = "cost_${component.id}") {
+            SectionPane(title = stringResource(R.string.inventory_actual_cost_title),
+                modifier = Modifier.testTag("inventory_detail_actual_cost")) {
+                InventoryDetailFieldGrid(listOf(
+                    stringResource(R.string.inventory_unit_cost_cny) to
+                        (component.inventoryUnitCost ?: stringResource(R.string.inventory_cost_unknown)),
+                    stringResource(R.string.inventory_value_cny) to
+                        (com.componentvault.android.data.InventoryCost.amount(component.inventoryUnitCost, component.quantity)
+                            ?.let { java.math.BigDecimal(it).setScale(2, java.math.RoundingMode.HALF_EVEN).toPlainString() }
+                            ?: stringResource(R.string.inventory_cost_unknown)),
+                ))
+            }
+        }
+        com.componentvault.android.model.ReferencePriceNotes.display(
+            component.description, priceLanguage, { formatShortLocalTimestamp(it) },
+        )?.let { price ->
+            item(key = "reference_${component.id}") {
+                SectionPane(title = stringResource(R.string.catalog_reference_price)) {
+                    Text(price, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -881,32 +856,6 @@ internal fun InventoryDetailPane(
             }
         }
         item {
-            SectionPane(title = strings.inventory.detailStockTitle) {
-                ValueBlock(label = "库存均价（CNY）", value = component.inventoryUnitCost ?: "成本未知")
-                ValueBlock(label = "库存价值（CNY）", value = com.componentvault.android.data.InventoryCost.amount(component.inventoryUnitCost, component.quantity)?.let { java.math.BigDecimal(it).setScale(2, java.math.RoundingMode.HALF_EVEN).toPlainString() } ?: "成本未知")
-                ValueBlock(
-                    label = androidx.compose.ui.res.stringResource(
-                        com.componentvault.android.R.string.inventory_usage_remaining,
-                    ),
-                    value = component.quantity.toString(),
-                )
-                ValueBlock(
-                    label = androidx.compose.ui.res.stringResource(
-                        com.componentvault.android.R.string.inventory_usage_issued,
-                    ),
-                    value = detail.issuedQuantity.toString(),
-                )
-                ValueBlock(
-                    label = strings.inventory.metricMinStock,
-                    value = component.minStock.toString(),
-                )
-                ValueBlock(
-                    label = strings.common.labelUpdated,
-                    value = formatShortLocalTimestamp(component.updatedAt),
-                )
-            }
-        }
-        item {
             SectionPane(title = strings.inventory.detailLocationTitle) {
                 if (detail.allocations.isEmpty()) {
                     ValueBlock(
@@ -923,15 +872,6 @@ internal fun InventoryDetailPane(
                 }
             }
         }
-        com.componentvault.android.model.ReferencePriceNotes.display(
-            component.description, priceLanguage, { formatShortLocalTimestamp(it) },
-        )?.let { price ->
-            item {
-                SectionPane(title = androidx.compose.ui.res.stringResource(com.componentvault.android.R.string.catalog_reference_price)) {
-                    Text(price, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
         item {
             SectionPane(title = strings.inventory.detailNotesTitle) {
                 Text(
@@ -939,6 +879,15 @@ internal fun InventoryDetailPane(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+        item(key = "usage_${component.id}") {
+            SectionPane(title = stringResource(R.string.inventory_usage_title)) {
+                InventoryDetailFieldGrid(listOf(
+                    stringResource(R.string.inventory_usage_remaining) to component.quantity.toString(),
+                    stringResource(R.string.inventory_usage_issued) to detail.issuedQuantity.toString(),
+                    strings.common.labelUpdated to formatShortLocalTimestamp(component.updatedAt),
+                ))
             }
         }
         item {

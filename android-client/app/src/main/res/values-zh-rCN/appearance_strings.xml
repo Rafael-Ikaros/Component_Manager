@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appearance_title">外观</string>
+    <string name="appearance_description">主题和强调色</string>
+    <string name="appearance_summary">%1$s · %2$s</string>
+    <string name="appearance_theme">主题</string>
+    <string name="appearance_accent">强调色</string>
+    <string name="appearance_system">跟随系统</string>
+    <string name="appearance_light">浅色</string>
+    <string name="appearance_dark">深色</string>
+    <string name="appearance_teal">青绿</string>
+    <string name="appearance_blue">雾蓝</string>
+    <string name="appearance_sand">沙色</string>
+    <string name="appearance_group_habits">使用习惯</string>
+    <string name="appearance_group_warehouse">仓库与数据</string>
+    <string name="appearance_group_support">支持</string>
+    <string name="appearance_printing">标签与打印</string>
+    <string name="appearance_printing_hint">打开原有标签工具</string>
+    <string name="appearance_about_updates">关于与更新</string>
+</resources>

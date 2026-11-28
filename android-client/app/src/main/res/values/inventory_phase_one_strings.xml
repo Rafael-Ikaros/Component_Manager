@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="inventory_actual_cost_title">Actual inventory cost</string>
+    <string name="inventory_unit_cost_cny">Average unit cost (CNY)</string>
+    <string name="inventory_value_cny">Inventory value (CNY)</string>
+    <string name="inventory_cost_unknown">Cost unknown</string>
+    <string name="inventory_usage_title">Usage</string>
+</resources>

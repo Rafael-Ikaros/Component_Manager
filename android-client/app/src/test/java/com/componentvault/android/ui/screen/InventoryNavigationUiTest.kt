@@ -38,6 +38,48 @@ class InventoryNavigationUiTest {
     }
 
     @Test
+    @Config(qualifiers = "w1200dp-h960dp")
+    fun detailFollowsAnExplicitWideSelectionButDoesNotReopenAfterBack() {
+        val ids = runBlocking {
+            val repository = InventoryRepository(context)
+            repository.saveStorageLocation("NAV", "Shelf", com.componentvault.android.model.StorageLocationSaveIntent.Create)
+            (1..2).map { index ->
+                repository.saveComponent(com.componentvault.android.model.ComponentDraft(
+                    sku = "C$index", name = "Route part $index", category = "IC", packageName = "SOT-23",
+                    location = "NAV", description = "", quantity = 3, minStock = 0,
+                )).entityId!!
+            }
+        }
+        val compact = InventoryLayoutMode(InventoryWidthClass.Compact, false,
+            InventoryFormPresentation.FullScreenRoute, InventorySecondaryPanePresentation.FullScreenRoute)
+        val expanded = InventoryLayoutMode(InventoryWidthClass.Expanded, true,
+            InventoryFormPresentation.Dialog, InventorySecondaryPanePresentation.SplitPane)
+        val mode = mutableStateOf(compact)
+        val model = InventoryViewModel(context)
+        compose.setContent { MaterialTheme { ComponentVaultApp(model, mode.value) } }
+        compose.onNodeWithContentDescription(context.getString(R.string.destination_inventory), useUnmergedTree = true).performClick()
+        compose.waitUntil(10_000) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            model.uiState.inventory.isLoaded || model.startupFailure != null
+        }
+        kotlin.test.assertNull(model.startupFailure)
+        compose.onNodeWithText("Route part 1").performClick()
+        val detail = hasAnyAncestor(hasTestTag("inventory_detail_list"))
+        compose.onAllNodes(hasText("Route part 1") and detail).onFirst().assertIsDisplayed()
+        compose.runOnIdle { mode.value = expanded }
+        compose.onNode(hasText("Route part 2") and hasClickAction() and hasAnyAncestor(hasTestTag("inventory_list"))).performClick()
+        compose.runOnIdle { mode.value = compact }
+        compose.onAllNodes(hasText("Route part 2") and detail).onFirst().assertIsDisplayed()
+        compose.onNode(hasText("Route part 1") and detail).assertDoesNotExist()
+        compose.runOnIdle {
+            kotlin.test.assertEquals(ids[1], model.uiState.inventory.list.selectedComponentId)
+            compose.activity.onBackPressedDispatcher.onBackPressed()
+        }
+        compose.onNodeWithTag("inventory_list").assertExists()
+        compose.onNodeWithTag("inventory_detail_list").assertDoesNotExist()
+    }
+
+    @Test
     fun importMenuOffersBatchWithoutMaintenanceEntries() {
         compose.setContent {
             MaterialTheme {
