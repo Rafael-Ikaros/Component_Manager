@@ -32,7 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -397,21 +396,6 @@ private fun MovementMasterPane(
             )
         }
 
-        if (uiState.activeComponentIds != null) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(R.string.movements_include_deleted_components, hiddenDeletedCount),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = includeDeletedComponents, onCheckedChange = onIncludeDeletedChange,
-                        modifier = Modifier.testTag("movements_include_deleted_components"))
-                }
-            }
-        }
         if (uiState.batchSession.queuedItems.isNotEmpty()) {
             item {
                 OutlinedButton(onClick = onOpenMovementBatchReview, modifier = Modifier.fillMaxWidth()) {
@@ -421,14 +405,26 @@ private fun MovementMasterPane(
         }
 
         item {
-            Text(
-                text = strings.movements.resultsSummary(
-                    uiState.items.size,
-                    uiState.componentCount,
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val showDeletedFilter = uiState.activeComponentIds != null &&
+                (hiddenDeletedCount > 0 || includeDeletedComponents)
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(strings.movements.resultsSummary(uiState.items.size, uiState.componentCount),
+                    Modifier.weight(1f), fontSize = 12.sp, lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (showDeletedFilter) {
+                    androidx.compose.material3.FilterChip(
+                        selected = includeDeletedComponents,
+                        onClick = { onIncludeDeletedChange(!includeDeletedComponents) },
+                        label = { Text(stringResource(R.string.movements_include_deleted_components, hiddenDeletedCount),
+                            fontSize = 12.sp) },
+                        modifier = Modifier.testTag("movements_include_deleted_components"),
+                    )
+                }
+            }
         }
 
         if (uiState.items.isEmpty()) {
@@ -470,15 +466,20 @@ private fun MovementQuickEntryPane(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
-            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilledTonalButton(onClick = onScanMovementLabel,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = RoundedCornerShape(15.dp)) {
-                Text(scanActionLabel, textAlign = TextAlign.Center)
+            TextButton(onClick = onScanMovementLabel, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                Icon(androidx.compose.ui.res.painterResource(R.drawable.v2_scan_text), contentDescription = null,
+                    modifier = Modifier.padding(end = 5.dp).size(20.dp))
+                Text(scanActionLabel, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
-            TextButton(onClick = onRecordMovement, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                Text(strings.movements.quickManualAction, textAlign = TextAlign.Center)
+            TextButton(onClick = onRecordMovement, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
+                Icon(androidx.compose.ui.res.painterResource(R.drawable.v2_pencil), contentDescription = null,
+                    modifier = Modifier.padding(end = 5.dp).size(20.dp))
+                Text(strings.movements.quickManualAction, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
         }
 

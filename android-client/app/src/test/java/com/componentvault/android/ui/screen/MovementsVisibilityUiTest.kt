@@ -5,8 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -77,11 +77,11 @@ class MovementsVisibilityUiTest {
         val list = compose.onNodeWithTag("movements_master_list")
         list.performScrollToNode(hasTestTag("movements_include_deleted_components"))
         val toggle = compose.onNodeWithTag("movements_include_deleted_components")
-        toggle.assertIsOff()
+        toggle.assertIsNotSelected()
         compose.onNodeWithText(context.getString(R.string.movements_include_deleted_components, 1))
             .assertIsDisplayed()
         toggle.performClick()
-        toggle.assertIsOn()
+        toggle.assertIsSelected()
         list.performScrollToNode(hasText("Deleted part"))
         compose.onNodeWithText("Deleted part").assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.movements_deleted_component)).assertIsDisplayed()
